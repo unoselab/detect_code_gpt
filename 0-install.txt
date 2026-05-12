@@ -1,15 +1,18 @@
-# Activate the fresh env
+# 1. Create and Activate the fresh env
+# conda create -n detectcodegpt python=3.11 -y
 conda activate detectcodegpt
 
-# Verify
-python --version  # Should be 3.11.x
-
-# Install PyTorch from conda first (handles CUDA cleanly)
+# 2. Install PyTorch and CUDA toolkit from conda
+# This ensures binaries are optimized for the RTX 6000 Ada
 conda install pytorch==2.1.2 pytorch-cuda=12.1 -c pytorch -c nvidia -y
 
-pip install -r requirements.txt --timeout 120 --retries 5
-
+# 3. FIX: Downgrade MKL to avoid 'undefined symbol: iJIT_NotifyEvent'
+# The 2025 version is incompatible with PyTorch 2.1.2
 conda install -c pkgs/main "mkl=2023.1.0" "intel-openmp<2025" -y
 
-python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('GPU count:', torch.cuda.device_count()); print('GPU 0:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A')"
+# 4. Install pip requirements (includes SentencePiece and Protobuf)
+pip install -r requirements.txt --timeout 120 --retries 5
 
+# 5. Final Verification
+# Checks PyTorch version, CUDA availability, and GPU visibility
+python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('GPU count:', torch.cuda.device_count()); print('GPU 0:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A')"
