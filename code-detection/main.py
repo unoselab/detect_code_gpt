@@ -83,11 +83,13 @@ def setup_args():
     return parser.parse_args()
 
 
-def generate_data(dataset, key, max_num=200, min_len=0, max_len=128, max_comment_num=10, max_def_num=5, cut_def=False, max_todo_num=3):
+def generate_data(dataset, key, max_num=200, min_len=0, max_len=128, max_comment_num=10, max_def_num=5, cut_def=False, max_todo_num=3, data_path=None):
 
     # 2026-05-12 msong, avoid the hard-coded info.
-    # path = f'../code-generation/output/{dataset}/{key}/outputs.txt'
-    path = data_path
+    if data_path is not None:
+        path = data_path
+    else:
+        path = f'../code-generation/output/{dataset}/{key}/outputs.txt'
 
     logger.info(f'Loading data from {path}')
     import json

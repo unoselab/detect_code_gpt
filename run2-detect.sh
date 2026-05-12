@@ -1,11 +1,13 @@
-# Inside tmux
-tmux attach -t codellama0
+#!/bin/bash
+# Run this script from inside a tmux session (e.g., `tmux attach -t codellama0` first)
+# Detection Phase — DetectCodeGPT scoring on CodeLlama-7B + CodeSearchNet + T=0.2
 
-# In the env
+set -euo pipefail  # exit on error, undefined var, or failed pipe
+
 cd ~/project-workspace/detect_code_gpt
+
 mkdir -p logs
 
-# CRITICAL: still need to cd into code-detection/ because of relative imports
 cd code-detection
 
 # Launch with explicit args — no more hardcoded config!
