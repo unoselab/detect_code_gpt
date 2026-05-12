@@ -1,3 +1,15 @@
+# 2026-05-12 msong: env vars MUST be set BEFORE any import that touches torch.
+#   The original code had `import torch` (transitively via baselines.utils.run_baseline)
+#   on line 4, BEFORE `os.environ["CUDA_VISIBLE_DEVICES"]` ran on line 25. So PyTorch's
+#   CUDA context initialized with BOTH GPUs visible. Later, Accelerate's device_map="auto"
+#   enumerated both GPUs, tried to probe GPU 1, and crashed with:
+#     DeferredCudaCallError: device >= 0 && device < num_gpus ... device=1, num_gpus=
+#   This block fixes that by setting env vars FIRST.
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+# Now everything else can import safely
 from sklearn.neighbors import KernelDensity
 from scipy.stats import norm
 import math
@@ -21,10 +33,6 @@ from baselines.utils.loadmodel import load_base_model_and_tokenizer, load_mask_f
 from baselines.utils.preprocessing import preprocess_and_save
 import json
 import argparse
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-# from baselines.sample_generate.generate import generate_data
 
 
 def setup_args():
