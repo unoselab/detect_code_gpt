@@ -26,7 +26,7 @@ def load_base_model_and_tokenizer(args, model_config):
             name, 
             cache_dir=model_config['cache_dir'], 
             device_map="auto", 
-            torch_dtype=torch.float16,
+            torch_dtype=torch.bfloat16,  # Use bfloat16 for Ada GPU stability (ORG: torch.float16,)
             trust_remote_code=True, 
             # decoder_start_token_id=50256, 
             # pad_token_id=50256
@@ -79,7 +79,7 @@ def load_mask_filling_model(args, mask_filling_model_name, model_config):
             mask_filling_model_name,
             cache_dir=model_config['cache_dir'],
             device_map="auto",
-            torch_dtype=torch.float16,
+            torch_dtype=torch.bfloat16,  # Use bfloat16 for Ada GPU stability (ORG: torch.float16,)
             trust_remote_code=True,
         )
         # NOTE: do NOT call mask_model.to(args.DEVICE) when device_map="auto" was used.
