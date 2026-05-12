@@ -80,7 +80,14 @@ def setup_args():
                              'If provided, overrides dataset/dataset_key/relative-path lookup.')
 
     # 2026-05-12 msong, drop the args_dict override in setup_args.
-    return parser.parse_args()
+    args = parser.parse_args()
+    # 2026-05-12 msong, expand ~ in path-style args. HuggingFace's symlink-based
+    # cache layout fails with FileNotFoundError on relative blob paths if cache_dir
+    # contains an unexpanded "~", so we resolve it here once and for all.
+    args.cache_dir = os.path.expanduser(args.cache_dir)
+    if args.data_path is not None:
+        args.data_path = os.path.expanduser(args.data_path)
+    return args
 
 
 def generate_data(dataset, key, max_num=200, min_len=0, max_len=128, max_comment_num=10, max_def_num=5, cut_def=False, max_todo_num=3, data_path=None):
