@@ -1,5 +1,4 @@
 # Core deep learning and AI libraries
-torch==2.1.2
 transformers==4.36.2
 accelerate==0.25.0
 datasets==2.16.1
@@ -26,7 +25,7 @@ tree-sitter-languages==1.10.2
 # Web requests
 requests==2.31.0
 
-# HuggingFace ecosystem (pin to avoid 1.x breaking changes)
+# HuggingFace ecosystem
 huggingface-hub==0.20.2
 tokenizers==0.15.0
 safetensors==0.4.1
