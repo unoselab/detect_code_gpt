@@ -17,8 +17,20 @@ def load_base_model_and_tokenizer(args, model_config):
     if '13b' in name:
         base_model = transformers.AutoModelForCausalLM.from_pretrained(name, **base_model_kwargs, cache_dir=model_config['cache_dir'], device_map="auto")
     elif 'codet5p' in name:
-        base_model = transformers.AutoModelForSeq2SeqLM.from_pretrained(name, cache_dir=model_config['cache_dir'], device_map="auto", torch_dtype=torch.float16,
-                                                                        trust_remote_code=True, decoder_start_token_id=50256, pad_token_id=50256)
+        # 2026-05-12 msong (later): DO NOT hardcode decoder_start_token_id=50256 or
+        #   pad_token_id=50256. Those values are valid for codet5p-220m-py (50K vocab)
+        #   but INVALID for codet5p-770m (32100 vocab — actual values: 0/0). Hardcoded
+        #   50256 triggered: indexSelectSmallIndex: Assertion `srcIndex < srcSelectDimSize`
+        #   The model's own config has the correct token IDs; let it use them.
+        base_model = transformers.AutoModelForSeq2SeqLM.from_pretrained(
+            name, 
+            cache_dir=model_config['cache_dir'], 
+            device_map="auto", 
+            torch_dtype=torch.float16,
+            trust_remote_code=True, 
+            # decoder_start_token_id=50256, 
+            # pad_token_id=50256
+            )
     elif '20b' in name:
         config = transformers.AutoConfig.from_pretrained("EleutherAI/gpt-neox-20b")
         with init_empty_weights():
@@ -52,11 +64,11 @@ def load_base_model_and_tokenizer(args, model_config):
 def load_mask_filling_model(args, mask_filling_model_name, model_config):
 
     print(f'Loading mask filling model {mask_filling_model_name}...')
-    if 'incoder' in mask_filling_model_name:
+    if 'incoder' in mask_filling_model_name.lower():
         mask_model = transformers.AutoModelForCausalLM.from_pretrained(mask_filling_model_name, cache_dir=model_config['cache_dir'])
         # to device
         mask_model.to(args.DEVICE)
-    elif 'codet5p' in mask_filling_model_name:
+    elif 'codet5p' in mask_filling_model_name.lower():
         # 2026-05-12 msong: codet5p-770m is a Salesforce custom architecture and REQUIRES
         #   trust_remote_code=True to load the proper layer definitions. Without it the
         #   model loads silently with meta-tensor placeholders, then mask_model.to(DEVICE)
@@ -69,8 +81,6 @@ def load_mask_filling_model(args, mask_filling_model_name, model_config):
             device_map="auto",
             torch_dtype=torch.float16,
             trust_remote_code=True,
-            decoder_start_token_id=50256,
-            pad_token_id=50256,
         )
         # NOTE: do NOT call mask_model.to(args.DEVICE) when device_map="auto" was used.
     else:
@@ -88,7 +98,7 @@ def load_mask_filling_model(args, mask_filling_model_name, model_config):
     mask_tokenizer = transformers.AutoTokenizer.from_pretrained(mask_filling_model_name, model_max_length=n_positions, cache_dir=model_config['cache_dir'])
     if 'incoder' in mask_filling_model_name:
         mask_tokenizer.pad_token = "<pad>"
-        mask_tokenizer.paddding_side = "left"
+        mask_tokenizer.padding_side = "left"
 
     # if args.dataset in ['english', 'german']:
         # preproc_tokenizer = mask_tokenizer
