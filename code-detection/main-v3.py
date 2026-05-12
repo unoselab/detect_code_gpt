@@ -32,16 +32,16 @@ def setup_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default="writing")
     parser.add_argument('--dataset_key', type=str, default="document")
-    parser.add_argument('--pct_words_masked', type=float, default=0.5)
+    parser.add_argument('--pct_words_masked', type=float, default=0.5) # default=0.3
     parser.add_argument('--span_length', type=int, default=2)
-    parser.add_argument('--n_samples', type=int, default=500)
-    parser.add_argument('--n_perturbation_list', type=str, default="50")
+    parser.add_argument('--n_samples', type=int, default=500) # default=5
+    parser.add_argument('--n_perturbation_list', type=str, default="50") # default="10"
     parser.add_argument('--n_perturbation_rounds', type=int, default=1)
     parser.add_argument('--base_model_name', type=str, default="codellama/CodeLlama-7b-hf")
-    parser.add_argument('--scoring_model_name', type=str, default="")
-    parser.add_argument('--mask_filling_model_name', type=str, default="Salesforce/codet5p-770m")
-    parser.add_argument('--batch_size', type=int, default=50)
-    parser.add_argument('--chunk_size', type=int, default=10)
+    parser.add_argument('--scoring_model_name', type=str, default="codellama/CodeLlama-7b-hf")
+    parser.add_argument('--mask_filling_model_name', type=str, default="Salesforce/codet5p-770m") # default="Salesforce/CodeT5-large"
+    parser.add_argument('--batch_size', type=int, default=50) # default=5
+    parser.add_argument('--chunk_size', type=int, default=10) # default=20
     parser.add_argument('--n_similarity_samples', type=int, default=20)
     parser.add_argument('--int8', action='store_true')
     parser.add_argument('--half', action='store_true')
@@ -67,75 +67,27 @@ def setup_args():
     parser.add_argument('--min_words', type=int, default=55)
     parser.add_argument('--temperature', type=float, default=1)
     parser.add_argument('--baselines', type=str, default="LRR,DetectGPT,NPR")
-    parser.add_argument('--perturb_type', type=str, default="random-insert-space+newline")
-    parser.add_argument('--pct_identifiers_masked', type=float, default=0.75)
+    parser.add_argument('--perturb_type', type=str, default="random-insert-space+newline") # default="random"
+    parser.add_argument('--pct_identifiers_masked', type=float, default=0.75) # default=0.5
     parser.add_argument('--min_len', type=int, default=0)
     parser.add_argument('--max_len', type=int, default=128)
     parser.add_argument('--max_comment_num', type=int, default=10)
     parser.add_argument('--max_def_num', type=int, default=5)
     parser.add_argument('--cut_def', action='store_true')
     parser.add_argument('--max_todo_num', type=int, default=3)
+    parser.add_argument('--data_path', type=str, default=None,
+                        help='Full path to outputs.txt produced by generate.py. '
+                             'If provided, overrides dataset/dataset_key/relative-path lookup.')
 
-    args_dict = {
-        'dataset': "TheVault",
-        # 'dataset': "CodeSearchNet",
-        'dataset_key': "CodeLlama-7b-hf-10000-tp0.2",
-        # 'dataset_key': "CodeLlama-7b-hf-10000-tp1.0",
-        'pct_words_masked': 0.5,
-        'pct_identifiers_masked': 0.75,
-        'span_length': 2,
-        'n_samples': 500,
-        'n_perturbation_list': "50",
-        'n_perturbation_rounds': 1,
-        'base_model_name': "codellama/CodeLlama-7b-hf", # Make sure to use the same model as the one used for generating the samples
-        'mask_filling_model_name': "Salesforce/codet5p-770m",
-        'batch_size': 50,
-        'chunk_size': 10,
-        'n_similarity_samples': 20,
-        'int8': False,
-        'half': False,
-        'base_half': False,
-        'do_top_k': False,
-        'top_k': 40,
-        'do_top_p': False,
-        'top_p': 0.96,
-        'output_name': "test_ipynb",
-        'openai_model': None,
-        'openai_key': None,
-        'DEVICE': 'cuda',
-        'buffer_size': 1,
-        'mask_top_p': 1.0,
-        'mask_temperature': 1,
-        'pre_perturb_pct': 0.0,
-        'pre_perturb_span_length': 5,
-        'random_fills': False,
-        'random_fills_tokens': False,
-        'cache_dir': "~/.cache/huggingface/hub",
-        'prompt_len': 30,
-        'generation_len': 200,
-        'min_words': 55,
-        'temperature': 1,
-        'baselines': "LRR,DetectGPT,NPR",
-        'perturb_type': "random-insert-space+newline", # if you want the performance of original DetectLLM-NPR and DetectGPT, use "random"
-        'min_len': 0,
-        'max_len': 128,
-        'max_comment_num': 10,
-        'max_def_num': 5,
-        'cut_def': False,
-        'max_todo_num': 3
-    }
-
-    input_args = []
-    for key, value in args_dict.items():
-        if value:
-            input_args.append(f"--{key}={value}")
-
-    return parser.parse_args(input_args)
+    # 2026-05-12 msong, drop the args_dict override in setup_args.
+    return parser.parse_args()
 
 
 def generate_data(dataset, key, max_num=200, min_len=0, max_len=128, max_comment_num=10, max_def_num=5, cut_def=False, max_todo_num=3):
 
-    path = f'../code-generation/output/{dataset}/{key}/outputs.txt'
+    # 2026-05-12 msong, avoid the hard-coded info.
+    # path = f'../code-generation/output/{dataset}/{key}/outputs.txt'
+    path = data_path
 
     logger.info(f'Loading data from {path}')
     import json
@@ -538,8 +490,12 @@ def main():
 
     logger.info(f'args: {args}')
 
+    # 2026-05-12 msong, data_path replaces the hard-coded info.
+    # data = generate_data(args.dataset, args.dataset_key, max_num=args.n_samples, min_len=args.min_len, max_len=args.max_len,
+    #                      max_comment_num=args.max_comment_num, max_def_num=args.max_def_num, cut_def=args.cut_def, max_todo_num=args.max_todo_num)
     data = generate_data(args.dataset, args.dataset_key, max_num=args.n_samples, min_len=args.min_len, max_len=args.max_len,
-                         max_comment_num=args.max_comment_num, max_def_num=args.max_def_num, cut_def=args.cut_def, max_todo_num=args.max_todo_num)
+                         max_comment_num=args.max_comment_num, max_def_num=args.max_def_num, cut_def=args.cut_def, max_todo_num=args.max_todo_num,
+                         data_path=args.data_path)
 
     logger.info(f'Original: {data["original"][0]}')
     logger.info(f'Sampled: {data["sampled"][0]}')

@@ -37,8 +37,8 @@ def setup_args():
     parser.add_argument('--n_samples', type=int, default=500) # default=5
     parser.add_argument('--n_perturbation_list', type=str, default="50") # default="10"
     parser.add_argument('--n_perturbation_rounds', type=int, default=1)
-    parser.add_argument('--base_model_name', type=str, default="")
-    parser.add_argument('--scoring_model_name', type=str, default="codellama/CodeLlama-7b-hf")
+    parser.add_argument('--base_model_name', type=str, default="codellama/CodeLlama-7b-hf")
+    parser.add_argument('--scoring_model_name', type=str, default="")
     parser.add_argument('--mask_filling_model_name', type=str, default="Salesforce/codet5p-770m") # default="Salesforce/CodeT5-large"
     parser.add_argument('--batch_size', type=int, default=50) # default=5
     parser.add_argument('--chunk_size', type=int, default=10) # default=20
