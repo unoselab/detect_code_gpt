@@ -10,7 +10,8 @@ mkdir -p logs
 
 cd code-detection
 
-# Launch with explicit args — no more hardcoded config!
+export CUDA_VISIBLE_DEVICES=0
+
 python main.py \
     --dataset CodeSearchNet \
     --dataset_key CodeLlama-7b-hf-500-tp0.2 \
