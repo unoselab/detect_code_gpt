@@ -9,4 +9,7 @@ conda install pytorch==2.1.2 pytorch-cuda=12.1 -c pytorch -c nvidia -y
 
 pip install -r requirements.txt --timeout 120 --retries 5
 
-python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('CUDA version:', torch.version.cuda); print('GPU count:', torch.cuda.device_count()); print('GPU 0:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A')"
+conda install -c pkgs/main "mkl=2023.1.0" "intel-openmp<2025" -y
+
+python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('GPU count:', torch.cuda.device_count()); print('GPU 0:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A')"
+
