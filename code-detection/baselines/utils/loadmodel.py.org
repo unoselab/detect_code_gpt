@@ -54,30 +54,11 @@ def load_mask_filling_model(args, mask_filling_model_name, model_config):
     print(f'Loading mask filling model {mask_filling_model_name}...')
     if 'incoder' in mask_filling_model_name:
         mask_model = transformers.AutoModelForCausalLM.from_pretrained(mask_filling_model_name, cache_dir=model_config['cache_dir'])
-        # to device
-        mask_model.to(args.DEVICE)
-    elif 'codet5p' in mask_filling_model_name:
-        # 2026-05-12 msong: codet5p-770m is a Salesforce custom architecture and REQUIRES
-        #   trust_remote_code=True to load the proper layer definitions. Without it the
-        #   model loads silently with meta-tensor placeholders, then mask_model.to(DEVICE)
-        #   crashes with a misleading "device=1, num_gpus=" assertion.
-        #   Loader matches the codet5p branch in load_base_model_and_tokenizer().
-        #   device_map="auto" places the model on GPU automatically — no manual .to() needed.
-        mask_model = transformers.AutoModelForSeq2SeqLM.from_pretrained(
-            mask_filling_model_name,
-            cache_dir=model_config['cache_dir'],
-            device_map="auto",
-            torch_dtype=torch.float16,
-            trust_remote_code=True,
-            decoder_start_token_id=50256,
-            pad_token_id=50256,
-        )
-        # NOTE: do NOT call mask_model.to(args.DEVICE) when device_map="auto" was used.
     else:
         mask_model = transformers.AutoModelForSeq2SeqLM.from_pretrained(mask_filling_model_name, cache_dir=model_config['cache_dir'])
-        # to device
-        mask_model.to(args.DEVICE)
     # mask_model.parallelize()
+    # to device
+    mask_model.to(args.DEVICE)
 
     try:
         n_positions = mask_model.config.n_positions
