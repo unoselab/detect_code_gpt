@@ -1,0 +1,26 @@
+# Core deep learning and AI libraries
+torch
+transformers
+accelerate
+datasets
+openai
+
+# Scientific computing
+numpy
+scipy
+scikit-learn
+
+# Data processing and analysis
+pandas
+matplotlib
+seaborn
+
+# Progress bars and logging
+tqdm
+loguru
+
+# Code parsing
+tree-sitter
+
+# Web requests (for API calls)
+requests
