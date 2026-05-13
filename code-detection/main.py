@@ -627,11 +627,6 @@ def main():
     # start to load the base scoring model
     model_config = load_base_model_and_tokenizer(args, model_config)
 
-
-
-
-
-
     # 2026-05-13 msong: short-circuit ALL scoring if loading from a cached results pickle.
     if args.load_cached_results is not None:
         logger.info(f"Loading cached results from {args.load_cached_results} — skipping all scoring")
@@ -689,15 +684,18 @@ def main():
         logger.info(f"To re-run AUROC/threshold analysis without re-scoring: --load_cached_results {results_cache_path}")
 
 
-
-
-
-
-
     torch.cuda.empty_cache()
 
     print(len(results))  # corresponds to the number of samples, and the result of each sample is stored in a dictionary
     print(results[0].keys())  # corresponds to the computed metrics of for each sample
+
+
+
+
+
+
+
+
 
     fig, axs = plt.subplots(2, 2, figsize=(10, 10))
 
@@ -742,6 +740,15 @@ def main():
     _, _, roc_auc = get_roc_metrics(predictions['real'], predictions['samples'])
     print(f'ROC AUC of DetectCodeGPT: {roc_auc}')
     vislualize_distribution(predictions, f'DetectCodeGPT AUC = {roc_auc}', axs[1, 1])
+
+
+
+
+
+
+
+
+
 
     plt.tight_layout()
     plt.savefig('results.pdf')
