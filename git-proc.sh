@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-
+git status
 ADDITIONAL_COMMENT="$1"
 
 git add .
