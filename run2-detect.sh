@@ -43,6 +43,9 @@ BATCH_SIZE=50
 CHUNK_SIZE=10
 BASELINES="LRR,DetectGPT,NPR"         # comma-separated, no spaces
 PERTURB_TYPE="random-insert-space+newline"   # DetectCodeGPT's strategy
+# --- Mode flags ---
+DETECTCODEGPT_ONLY=true               # true = skip baselines (~32 min saved). false = full run.
+LOAD_CACHED_RESULTS=""                # path to results pickle; "" means run from scratch
 
 # --- Run identity ---
 RUN_TAG="n${GEN_MAX_NUM}_run"         # previous: "n500_first_run" / "n500_scaled_run"
@@ -121,4 +124,6 @@ python main.py \
     --baselines "${BASELINES}" \
     --perturb_type "${PERTURB_TYPE}" \
     --output_name "${OUTPUT_NAME}" \
+    $([ "${DETECTCODEGPT_ONLY}" = "true" ] && echo "--detectcodegpt_only") \
+    $([ -n "${LOAD_CACHED_RESULTS}" ] && echo "--load_cached_results ${LOAD_CACHED_RESULTS}") \
     2>&1 | tee "${LOG_FILE}"

@@ -689,14 +689,6 @@ def main():
     print(len(results))  # corresponds to the number of samples, and the result of each sample is stored in a dictionary
     print(results[0].keys())  # corresponds to the computed metrics of for each sample
 
-
-
-
-
-
-
-
-
     # ==================================================================
     # 2026-05-13 msong: consolidated AUROC + per-sample NPR analysis
     # ==================================================================
@@ -860,19 +852,14 @@ def main():
         vislualize_distribution(predictions_dcg, f'DetectCodeGPT AUC = {roc_auc_dcg}', axs[1, 1])
 
 
-
-
-
-
-
-
-
     plt.tight_layout()
     plt.savefig('results.pdf')
 
 
 if __name__ == "__main__":
     main()
+
+
 
 # =====================================================================================================
 # How ROC AUC of DetectCodeGPT: 0.9007 is computed
