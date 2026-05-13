@@ -20,7 +20,7 @@ CUDA_DEVICE=0
 # --- Dataset / generation identity ---
 DATASET=CodeSearchNet
 GEN_MODEL=CodeLlama-7b-hf            # short name used in dataset_key
-GEN_MAX_NUM=2000                      # how many samples generate.py produced
+GEN_MAX_NUM=500                      # how many samples generate.py produced
                                       # previous (n=131 valid): 500
                                       # current (n~520 valid):   2000
 GEN_TEMPERATURE=0.2                   # generation temperature
@@ -32,7 +32,7 @@ BASE_MODEL_NAME=codellama/CodeLlama-7b-hf
 MASK_FILLING_MODEL_NAME=Salesforce/codet5p-770m
 
 # --- Detection hyperparameters (paper-aligned defaults) ---
-N_SAMPLES=2000                        # upper bound; actual count = min(N_SAMPLES, post-filter count)
+N_SAMPLES=500                        # upper bound; actual count = min(N_SAMPLES, post-filter count)
                                       # previous (first pass):  500  → 131 valid after filter
                                       # current (scaled pass):  2000 → ~520 valid after filter
 N_PERTURBATION_LIST=50                # k in the paper (number of perturbations per sample)
