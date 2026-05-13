@@ -697,50 +697,167 @@ def main():
 
 
 
-    fig, axs = plt.subplots(2, 2, figsize=(10, 10))
+    # ==================================================================
+    # 2026-05-13 msong: consolidated AUROC + per-sample NPR analysis
+    # ==================================================================
 
-    predictions = {'real': [], 'samples': []}
+    # Compute DetectCodeGPT NPR (the headline number) — always done
+    predictions_dcg = {'real': [], 'samples': []}
     for res in results:
-        predictions['real'].append(-res['original_logrank'])
-        predictions['samples'].append(-res['sampled_logrank'])
-    _, _, roc_auc = get_roc_metrics(predictions['real'], predictions['samples'])
+        predictions_dcg['real'].append(
+            res[f'perturbed_original_logrank_{n_perturbation}'] / res["original_logrank"]
+        )
+        predictions_dcg['samples'].append(
+            res[f'perturbed_sampled_logrank_{n_perturbation}'] / res["sampled_logrank"]
+        )
+    _, _, roc_auc_dcg = get_roc_metrics(predictions_dcg['real'], predictions_dcg['samples'])
 
-    print(f"ROC AUC of logrank: {roc_auc}")
-    vislualize_distribution(predictions, f'Logrank AUC = {roc_auc}', axs[0, 0])
+    real_arr   = np.array(predictions_dcg['real'])     # HWC NPR scores (label=0)
+    sample_arr = np.array(predictions_dcg['samples'])  # MGC NPR scores (label=1)
 
-    predictions = {'real': [], 'samples': []}
-    for res in results:
-        predictions['real'].append(-res['original_ll']/res['original_logrank'])
-        predictions['samples'].append(-res['sampled_ll']/res['sampled_logrank'])
-    _, _, roc_auc = get_roc_metrics(predictions['real'], predictions['samples'])
-    print(f'ROC AUC of LRR: {roc_auc}')
-    vislualize_distribution(predictions, f'LRR AUC = {roc_auc}', axs[0, 1])
+    # ----- summary statistics -----
+    print()
+    print("=" * 72)
+    print(f"DetectCodeGPT NPR scores (n={len(real_arr)} per class)")
+    print("=" * 72)
+    print(f"HWC (real):    mean={real_arr.mean():.4f}  std={real_arr.std():.4f}  "
+          f"min={real_arr.min():.4f}  max={real_arr.max():.4f}  median={np.median(real_arr):.4f}")
+    print(f"MGC (samples): mean={sample_arr.mean():.4f}  std={sample_arr.std():.4f}  "
+          f"min={sample_arr.min():.4f}  max={sample_arr.max():.4f}  median={np.median(sample_arr):.4f}")
+    print(f"Mean separation (MGC - HWC): {sample_arr.mean() - real_arr.mean():.4f}")
 
-    predictions = {'real': [], 'samples': []}
-    for res in results:
-        real_comp = (res['original_ll'] - res[f'perturbed_original_ll_{n_perturbation}']) / res[f'perturbed_original_ll_std_{n_perturbation}']
-        sample_comp = (res['sampled_ll'] - res[f'perturbed_sampled_ll_{n_perturbation}']) / res[f'perturbed_sampled_ll_std_{n_perturbation}']
+    # ----- per-sample preview (first 10) -----
+    print()
+    print("First 10 pairs (index, HWC NPR, MGC NPR, MGC>HWC?):")
+    print("-" * 50)
+    for i in range(min(10, len(real_arr))):
+        winner = "MGC" if sample_arr[i] > real_arr[i] else "HWC"
+        print(f"  {i:3d}    {real_arr[i]:.4f}    {sample_arr[i]:.4f}    {winner}")
 
-        # avoid nan
-        if math.isnan(real_comp) or math.isnan(sample_comp):
-            logger.warning(f"NaN detected, skipping")
-            continue
+    # ----- text histogram -----
+    all_scores = np.concatenate([real_arr, sample_arr])
+    lo, hi = all_scores.min(), all_scores.max()
+    n_bins = 20
+    edges = np.linspace(lo, hi, n_bins + 1)
+    hist_real,   _ = np.histogram(real_arr,   bins=edges)
+    hist_sample, _ = np.histogram(sample_arr, bins=edges)
+    max_count = max(hist_real.max(), hist_sample.max())
+    bar_width = 30
+    print()
+    print(f"Histogram (range {lo:.3f} to {hi:.3f}, {n_bins} bins):")
+    print(f"{'  bin_center':>12}  {'HWC':>4} {'MGC':>4}  HWC=. MGC=#")
+    for i in range(n_bins):
+        center = 0.5 * (edges[i] + edges[i + 1])
+        bar_real   = "." * int(bar_width * hist_real[i]   / max_count) if max_count else ""
+        bar_sample = "#" * int(bar_width * hist_sample[i] / max_count) if max_count else ""
+        print(f"  {center:8.4f}    {hist_real[i]:4d} {hist_sample[i]:4d}  {bar_real}{bar_sample}")
 
-        predictions['real'].append(real_comp)
-        predictions['samples'].append(sample_comp)
-    _, _, roc_auc = get_roc_metrics(predictions['real'], predictions['samples'])
+    # ----- candidate thresholds -----
+    print()
+    print("Percentile-based threshold candidates:")
+    print("-" * 72)
+    for label, arr in [("HWC", real_arr), ("MGC", sample_arr)]:
+        p = np.percentile(arr, [5, 25, 50, 75, 95])
+        print(f"  {label} percentiles: 5%={p[0]:.4f}  25%={p[1]:.4f}  "
+              f"50%={p[2]:.4f}  75%={p[3]:.4f}  95%={p[4]:.4f}")
 
-    print(f"ROC AUC of DetectGPT with DetectCodeGPT's perturbation")
-    vislualize_distribution(predictions, f"DetectGPT with DetectCodeGPT's perturbation AUC = {roc_auc}", axs[1, 0])
+    # Optimal threshold via Youden's J statistic
+    from sklearn.metrics import roc_curve as _roc_curve
+    y_true_combined = np.concatenate([np.zeros_like(real_arr), np.ones_like(sample_arr)])
+    y_score_combined = np.concatenate([real_arr, sample_arr])
+    fpr, tpr, thresholds = _roc_curve(y_true_combined, y_score_combined)
+    j_stat = tpr - fpr
+    best_idx = np.argmax(j_stat)
+    best_threshold = thresholds[best_idx]
+    print()
+    print(f"Optimal threshold (Youden's J = TPR - FPR maximized):")
+    print(f"  threshold = {best_threshold:.4f}")
+    print(f"  at TPR = {tpr[best_idx]:.4f}, FPR = {fpr[best_idx]:.4f}, J = {j_stat[best_idx]:.4f}")
+    print(f"  decision rule: NPR > {best_threshold:.4f}  =>  predict MGC, else HWC")
 
-    predictions = {'real': [], 'samples': []}
-    for res in results:
-        predictions['real'].append(res[f'perturbed_original_logrank_{n_perturbation}']/res["original_logrank"])
-        predictions['samples'].append(res[f'perturbed_sampled_logrank_{n_perturbation}']/res["sampled_logrank"])
-    _, _, roc_auc = get_roc_metrics(predictions['real'], predictions['samples'])
-    print(f'ROC AUC of DetectCodeGPT: {roc_auc}')
-    vislualize_distribution(predictions, f'DetectCodeGPT AUC = {roc_auc}', axs[1, 1])
+    # ----- save CSV -----
+    npr_csv_dir = args.npr_csv_dir if args.npr_csv_dir else "../logs"
+    os.makedirs(npr_csv_dir, exist_ok=True)
+    csv_path = f"{npr_csv_dir}/npr_scores_{args.output_name}.csv"
+    with open(csv_path, "w") as f:
+        f.write("index,hwc_npr,mgc_npr,winner,"
+                "hwc_logrank,mgc_logrank,hwc_perturbed_logrank,mgc_perturbed_logrank\n")
+        for i, res in enumerate(results):
+            hwc = real_arr[i]
+            mgc = sample_arr[i]
+            winner = "MGC" if mgc > hwc else "HWC"
+            f.write(f"{i},{hwc:.6f},{mgc:.6f},{winner},"
+                    f"{res['original_logrank']:.6f},"
+                    f"{res['sampled_logrank']:.6f},"
+                    f"{res[f'perturbed_original_logrank_{n_perturbation}']:.6f},"
+                    f"{res[f'perturbed_sampled_logrank_{n_perturbation}']:.6f}\n")
+    print()
+    print(f"Saved per-sample scores to: {csv_path}")
+    print(f"  Columns: index, hwc_npr, mgc_npr, winner, "
+          f"hwc_logrank, mgc_logrank, hwc_perturbed_logrank, mgc_perturbed_logrank")
 
+    print()
+    print("=" * 72)
+    print(f"ROC AUC of DetectCodeGPT: {roc_auc_dcg}")
+    print("=" * 72)
+
+    # ----- plot + baseline AUROCs -----
+    if args.detectcodegpt_only:
+        # Smaller 1x2 figure: free logrank baseline + DetectCodeGPT
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+        # logrank baseline — free, uses already-computed unperturbed log rank
+        predictions_lr = {'real': [], 'samples': []}
+        for res in results:
+            predictions_lr['real'].append(-res['original_logrank'])
+            predictions_lr['samples'].append(-res['sampled_logrank'])
+        _, _, roc_auc_lr = get_roc_metrics(predictions_lr['real'], predictions_lr['samples'])
+        print(f"ROC AUC of logrank: {roc_auc_lr}  (free baseline, sanity check)")
+        vislualize_distribution(predictions_lr, f'Logrank AUC = {roc_auc_lr}', axs[0])
+
+        vislualize_distribution(predictions_dcg, f'DetectCodeGPT AUC = {roc_auc_dcg}', axs[1])
+    else:
+        # Full 2x2 figure with all four methods
+        fig, axs = plt.subplots(2, 2, figsize=(10, 10))
+
+        # logrank baseline
+        predictions_lr = {'real': [], 'samples': []}
+        for res in results:
+            predictions_lr['real'].append(-res['original_logrank'])
+            predictions_lr['samples'].append(-res['sampled_logrank'])
+        _, _, roc_auc_lr = get_roc_metrics(predictions_lr['real'], predictions_lr['samples'])
+        print(f"ROC AUC of logrank: {roc_auc_lr}")
+        vislualize_distribution(predictions_lr, f'Logrank AUC = {roc_auc_lr}', axs[0, 0])
+
+        # LRR baseline
+        predictions_lrr = {'real': [], 'samples': []}
+        for res in results:
+            predictions_lrr['real'].append(-res['original_ll'] / res['original_logrank'])
+            predictions_lrr['samples'].append(-res['sampled_ll'] / res['sampled_logrank'])
+        _, _, roc_auc_lrr = get_roc_metrics(predictions_lrr['real'], predictions_lrr['samples'])
+        print(f'ROC AUC of LRR: {roc_auc_lrr}')
+        vislualize_distribution(predictions_lrr, f'LRR AUC = {roc_auc_lrr}', axs[0, 1])
+
+        # DetectGPT-with-DetectCodeGPT-perturbation baseline
+        predictions_dgp = {'real': [], 'samples': []}
+        for res in results:
+            real_comp = (res['original_ll'] - res[f'perturbed_original_ll_{n_perturbation}']) \
+                        / res[f'perturbed_original_ll_std_{n_perturbation}']
+            sample_comp = (res['sampled_ll'] - res[f'perturbed_sampled_ll_{n_perturbation}']) \
+                          / res[f'perturbed_sampled_ll_std_{n_perturbation}']
+            if math.isnan(real_comp) or math.isnan(sample_comp):
+                logger.warning("NaN detected, skipping")
+                continue
+            predictions_dgp['real'].append(real_comp)
+            predictions_dgp['samples'].append(sample_comp)
+        _, _, roc_auc_dgp = get_roc_metrics(predictions_dgp['real'], predictions_dgp['samples'])
+        # 2026-05-13 msong: original code had `print(f"ROC AUC of DetectGPT...")` without the value
+        print(f"ROC AUC of DetectGPT with DetectCodeGPT's perturbation: {roc_auc_dgp}")
+        vislualize_distribution(predictions_dgp,
+                                 f"DetectGPT with DetectCodeGPT's perturbation AUC = {roc_auc_dgp}",
+                                 axs[1, 0])
+
+        vislualize_distribution(predictions_dcg, f'DetectCodeGPT AUC = {roc_auc_dcg}', axs[1, 1])
 
 
 
