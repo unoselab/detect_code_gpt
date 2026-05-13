@@ -627,32 +627,72 @@ def main():
     # start to load the base scoring model
     model_config = load_base_model_and_tokenizer(args, model_config)
 
-    for res in tqdm(results, desc="Computing unperturbed log likelihoods"):
-        res["original_ll"] = get_ll(res["original"], args, model_config)
-        res["sampled_ll"] = get_ll(res["sampled"], args, model_config)
 
-    for res in tqdm(results, desc="Computing unperturbed log rank"):
-        res["original_logrank"] = get_rank(res["original"], args, model_config, log=True)
-        res["sampled_logrank"] = get_rank(res["sampled"], args, model_config, log=True)
 
-    for res in tqdm(results, desc="Computing perturbed log likelihoods"):
-        p_sampled_ll = get_lls(res["perturbed_sampled"], args, model_config)
-        p_original_ll = get_lls(res["perturbed_original"], args, model_config)
 
-        for n_perturbation in n_perturbation_list:
-            res[f"perturbed_sampled_ll_{n_perturbation}"] = np.mean([i for i in p_sampled_ll[:n_perturbation] if not math.isnan(i)])
-            res[f"perturbed_original_ll_{n_perturbation}"] = np.mean([i for i in p_original_ll[:n_perturbation] if not math.isnan(i)])
-            res[f"perturbed_sampled_ll_std_{n_perturbation}"] = np.std([i for i in p_sampled_ll[:n_perturbation] if not math.isnan(i)]) if len([
-                i for i in p_sampled_ll[:n_perturbation] if not math.isnan(i)]) > 1 else 1
-            res[f"perturbed_original_ll_std_{n_perturbation}"] = np.std([i for i in p_original_ll[:n_perturbation] if not math.isnan(i)]) if len([
-                i for i in p_original_ll[:n_perturbation] if not math.isnan(i)]) > 1 else 1
 
-    for res in tqdm(results, desc="Computing perturbed log rank"):
-        p_sampled_rank = get_ranks(res["perturbed_sampled"], args, model_config, log=True)
-        p_original_rank = get_ranks(res["perturbed_original"], args, model_config, log=True)
-        for n_perturbation in n_perturbation_list:
-            res[f"perturbed_sampled_logrank_{n_perturbation}"] = np.mean([i for i in p_sampled_rank[:n_perturbation] if not math.isnan(i)])
-            res[f"perturbed_original_logrank_{n_perturbation}"] = np.mean([i for i in p_original_rank[:n_perturbation] if not math.isnan(i)])
+
+    # 2026-05-13 msong: short-circuit ALL scoring if loading from a cached results pickle.
+    if args.load_cached_results is not None:
+        logger.info(f"Loading cached results from {args.load_cached_results} — skipping all scoring")
+        with open(args.load_cached_results, "rb") as f:
+            results = pickle.load(f)
+        logger.info(f"Loaded {len(results)} cached results")
+    else:
+        # 2026-05-13 msong: Block 1 (unperturbed LL) is only needed for the LRR baseline.
+        # Skip in --detectcodegpt_only mode to save ~36 sec.
+        if not args.detectcodegpt_only:
+            for res in tqdm(results, desc="Computing unperturbed log likelihoods"):
+                res["original_ll"] = get_ll(res["original"], args, model_config)
+                res["sampled_ll"] = get_ll(res["sampled"], args, model_config)
+        else:
+            logger.info("Skipping Block 1 (unperturbed log likelihoods) due to --detectcodegpt_only")
+
+        # Block 2 — REQUIRED for both logrank baseline AND DetectCodeGPT NPR (denominator)
+        for res in tqdm(results, desc="Computing unperturbed log rank"):
+            res["original_logrank"] = get_rank(res["original"], args, model_config, log=True)
+            res["sampled_logrank"] = get_rank(res["sampled"], args, model_config, log=True)
+
+        # 2026-05-13 msong: Block 3 (perturbed LL) is only needed for the
+        # DetectGPT-with-DetectCodeGPT-perturbation baseline. Skip in --detectcodegpt_only
+        # mode to save ~32 minutes — the single biggest time win available.
+        if not args.detectcodegpt_only:
+            for res in tqdm(results, desc="Computing perturbed log likelihoods"):
+                p_sampled_ll = get_lls(res["perturbed_sampled"], args, model_config)
+                p_original_ll = get_lls(res["perturbed_original"], args, model_config)
+                for n_perturbation in n_perturbation_list:
+                    res[f"perturbed_sampled_ll_{n_perturbation}"] = np.mean([i for i in p_sampled_ll[:n_perturbation] if not math.isnan(i)])
+                    res[f"perturbed_original_ll_{n_perturbation}"] = np.mean([i for i in p_original_ll[:n_perturbation] if not math.isnan(i)])
+                    res[f"perturbed_sampled_ll_std_{n_perturbation}"] = np.std([i for i in p_sampled_ll[:n_perturbation] if not math.isnan(i)]) if len([
+                        i for i in p_sampled_ll[:n_perturbation] if not math.isnan(i)]) > 1 else 1
+                    res[f"perturbed_original_ll_std_{n_perturbation}"] = np.std([i for i in p_original_ll[:n_perturbation] if not math.isnan(i)]) if len([
+                        i for i in p_original_ll[:n_perturbation] if not math.isnan(i)]) > 1 else 1
+        else:
+            logger.info("Skipping Block 3 (perturbed log likelihoods) due to --detectcodegpt_only — saves ~32 min")
+
+        # Block 4 — REQUIRED for DetectCodeGPT NPR (numerator)
+        for res in tqdm(results, desc="Computing perturbed log rank"):
+            p_sampled_rank = get_ranks(res["perturbed_sampled"], args, model_config, log=True)
+            p_original_rank = get_ranks(res["perturbed_original"], args, model_config, log=True)
+            for n_perturbation in n_perturbation_list:
+                res[f"perturbed_sampled_logrank_{n_perturbation}"] = np.mean([i for i in p_sampled_rank[:n_perturbation] if not math.isnan(i)])
+                res[f"perturbed_original_logrank_{n_perturbation}"] = np.mean([i for i in p_original_rank[:n_perturbation] if not math.isnan(i)])
+
+        # 2026-05-13 msong: cache the results dict to disk after scoring completes.
+        # Subsequent runs with --load_cached_results can skip the 32-64 min scoring
+        # phases and iterate on threshold logic in ~1 second.
+        results_cache_path = args.results_cache if args.results_cache else f"../logs/results_cache_{args.output_name}.pkl"
+        os.makedirs(os.path.dirname(results_cache_path) or ".", exist_ok=True)
+        with open(results_cache_path, "wb") as f:
+            pickle.dump(results, f)
+        logger.info(f"Cached results to {results_cache_path} ({os.path.getsize(results_cache_path) / 1e6:.1f} MB)")
+        logger.info(f"To re-run AUROC/threshold analysis without re-scoring: --load_cached_results {results_cache_path}")
+
+
+
+
+
+
 
     torch.cuda.empty_cache()
 
