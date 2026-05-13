@@ -48,7 +48,8 @@ PERTURB_TYPE="random-insert-space+newline"   # DetectCodeGPT's strategy
 RUN_TAG="n${GEN_MAX_NUM}_run"         # previous: "n500_first_run" / "n500_scaled_run"
                                       # current:  "n2000_run"
 OUTPUT_NAME="${GEN_MODEL,,}_csn_t${GEN_TEMPERATURE/./}_${RUN_TAG}"   # lowercased + temp-without-dot
-LOG_FILE="${LOG_DIR}/detection_${OUTPUT_NAME}.log"
+TIMESTAMP=$(date +%m-%d_%H:%M)        # captured at script start; format: MM-DD_HH:MM
+LOG_FILE="${LOG_DIR}/detection_${OUTPUT_NAME}_${TIMESTAMP}.log"
 
 # =====================================================================
 # Historical results — for reference
