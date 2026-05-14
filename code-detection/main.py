@@ -211,9 +211,9 @@ def generate_data(dataset, key, max_num=200, min_len=0, max_len=128, max_comment
     # random.shuffle(all_samples)
 
     return {
-        "original": all_originals,
-        "sampled": all_samples,
-        "source_line_no": all_source_line_nos,  # 2026-05-13 msong: outputs.txt line index for each kept sample
+        "original": all_originals[:max_num],
+        "sampled":  all_samples[:max_num],
+        "source_line_no": all_source_line_nos[:max_num],
     }
 
 

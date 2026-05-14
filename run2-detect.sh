@@ -45,7 +45,8 @@ BASELINES="LRR,DetectGPT,NPR"         # comma-separated, no spaces
 PERTURB_TYPE="random-insert-space+newline"   # DetectCodeGPT's strategy
 # --- Mode flags ---
 DETECTCODEGPT_ONLY=true               # true = skip baselines (~32 min saved). false = full run.
-LOAD_CACHED_RESULTS=""                # path to results pickle; "" means run from scratch
+# path to results pickle; "" means run from scratch
+LOAD_CACHED_RESULTS="../logs/results_cache_codellama-7b-hf_csn_t02_n2000_run.pkl"
 
 # --- Run identity ---
 RUN_TAG="n${GEN_MAX_NUM}_run"         # previous: "n500_first_run" / "n500_scaled_run"
