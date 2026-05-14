@@ -210,13 +210,13 @@ We also prepared `scp` and `rsync` commands for safely downloading the remote wo
 
 ### 9. Current status
 
-The project has successfully achieved the main reproduction goal:
+The project has achieved the main reproduction goal:
 
 ```text
 Paper target:       0.9095
 Reproduction:       0.9007
 Valid pairs:        530
-Conclusion:         successful tight reproduction
+Conclusion:         successful reproduction
 ```
 
 The final workspace now includes:
