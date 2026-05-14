@@ -606,8 +606,8 @@ def main():
     results = []
     for idx in range(len(original_text)):
         results.append({
-            "original": data["original"][idx],
-            "sampled":  data["sampled"][idx],
+            "original": original_text[idx],
+            "sampled": sampled_text[idx],
             "perturbed_sampled":  p_sampled_text[idx * max(n_perturbation_list): (idx + 1) * max(n_perturbation_list)],
             "perturbed_original": p_original_text[idx * max(n_perturbation_list): (idx + 1) * max(n_perturbation_list)],
             "source_line_no": data["source_line_no"][idx],  # 2026-05-13 msong: pass through for CSV
@@ -778,17 +778,19 @@ def main():
     os.makedirs(npr_csv_dir, exist_ok=True)
     csv_path = f"{npr_csv_dir}/npr_scores_{args.output_name}.csv"
     with open(csv_path, "w") as f:
-        f.write("index,hwc_npr,mgc_npr,winner,"
+        f.write("index,source_line_no,hwc_npr,mgc_npr,winner,"
                 "hwc_logrank,mgc_logrank,hwc_perturbed_logrank,mgc_perturbed_logrank\n")
+
         for i, res in enumerate(results):
             hwc = real_arr[i]
             mgc = sample_arr[i]
             winner = "MGC" if mgc > hwc else "HWC"
-            f.write(f"{i},{hwc:.6f},{mgc:.6f},{winner},"
+            f.write(f"{i},{res['source_line_no']},{hwc:.6f},{mgc:.6f},{winner},"
                     f"{res['original_logrank']:.6f},"
                     f"{res['sampled_logrank']:.6f},"
                     f"{res[f'perturbed_original_logrank_{n_perturbation}']:.6f},"
                     f"{res[f'perturbed_sampled_logrank_{n_perturbation}']:.6f}\n")
+
     print()
     print(f"Saved per-sample scores to: {csv_path}")
     print(f"  Columns: index, hwc_npr, mgc_npr, winner, "
