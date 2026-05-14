@@ -9,7 +9,7 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-import sys
+# Now everything else can import safely
 from sklearn.neighbors import KernelDensity
 from scipy.stats import norm
 import math
@@ -104,13 +104,6 @@ def setup_args():
                              '(~1 sec total). Useful for iterating on threshold logic.')
     parser.add_argument('--npr_csv_dir', type=str, default=None,
                         help='Directory to write per-sample NPR scores CSV. Defaults to ../logs/.')
-
-    # 2026-05-14 msong, interactive mode
-    parser.add_argument('--interactive', action='store_true',
-                        help='Run in interactive mode to test a single code snippet.')
-    parser.add_argument('--threshold', type=float, default=1.60, 
-                        help='Threshold for NPR score in interactive mode (Default: 1.60 for High Confidence)')
-
 
     # 2026-05-12 msong, drop the args_dict override in setup_args.
     args = parser.parse_args()
@@ -524,78 +517,9 @@ def vislualize_distribution(predictions, title, ax):
     ax.legend()
 
 
-def run_interactive_mode(args, model_config):
-    print("\n" + "="*60)
-    print("    DetectCodeGPT Interactive Mode (Single Snippet)    ")
-    print("="*60)
-    print("Paste your code snippet below.")
-    print("When finished, type 'EOF' on a new line and press Enter:")
-    print("-" * 60)
-    
-    lines = []
-    while True:
-        line = input()
-        if line.strip() == "EOF":
-            break
-        lines.append(line)
-        
-    code_to_test = "\n".join(lines).strip()
-    
-    if not code_to_test:
-        logger.error("No code provided. Exiting.")
-        return
-
-    n_perturb = max([int(x) for x in args.n_perturbation_list.split(",")])
-    
-    print("\n[Step 1] Computing original log rank...")
-    # Calculate log rank of original code (reusing existing get_rank)
-    orig_logrank = get_rank(code_to_test, args, model_config, log=True)
-    
-    print(f"[Step 2] Applying {n_perturb} stylistic perturbations...")
-    # Create list of texts for perturbation and apply perturbations (reusing existing perturb_texts)
-    inputs_to_perturb = [code_to_test for _ in range(n_perturb)]
-    p_texts = perturb_texts(inputs_to_perturb, args, model_config)
-    
-    print("[Step 3] Computing perturbed log ranks...")
-    # Calculate log ranks of perturbed versions (reusing existing get_ranks)
-    p_ranks = get_ranks(p_texts, args, model_config, log=True)
-    mean_p_rank = np.mean([r for r in p_ranks if not math.isnan(r)])
-    
-    npr_score = mean_p_rank / orig_logrank
-    
-    print("\n" + "*"*60)
-    print("                    DETECTION RESULT                    ")
-    print("*"*60)
-    print(f">> NPR Score: {npr_score:.4f}")
-    
-    if npr_score > args.threshold:
-        prediction = f"MACHINE-GENERATED (Score > {args.threshold})"
-    elif npr_score > 1.3875:  # Youden's J optimal point from your logs
-        prediction = "LIKELY MACHINE-GENERATED (Warning Zone)"
-    else:
-        prediction = "HUMAN-WRITTEN"
-        
-    print(f">> Prediction: {prediction}")
-    print("*"*60 + "\n")
-
-
 def main():
     """Main function to run the code detection pipeline."""
     args = setup_args()
-
-    # =====================================================================
-    # 2026-05-14 msong: INTERACTIVE MODE
-    # =====================================================================
-    if getattr(args, 'interactive', False):
-        cache_dir, _, _ = preprocess_and_save(args)
-        model_config = {'cache_dir': cache_dir}
-
-        logger.info("Interactive mode: Loading base scoring model only...")
-        model_config = load_base_model_and_tokenizer(args, model_config)
-
-        run_interactive_mode(args, model_config)
-        return
-    # =====================================================================
     
     mask_filling_model_name = args.mask_filling_model_name
     n_samples = args.n_samples

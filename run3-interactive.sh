@@ -109,7 +109,7 @@ cd code-detection
 
 export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
 
-python main_interactive.py \
+python main.py \
     --interactive \
     --threshold 1.6 \
     --dataset "${DATASET}" \
