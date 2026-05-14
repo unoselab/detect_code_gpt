@@ -582,6 +582,20 @@ def run_interactive_mode(args, model_config):
 def main():
     """Main function to run the code detection pipeline."""
     args = setup_args()
+
+    # =====================================================================
+    # 2026-05-14 msong: INTERACTIVE MODE
+    # =====================================================================
+    if getattr(args, 'interactive', False):
+        cache_dir, _, _ = preprocess_and_save(args)
+        model_config = {'cache_dir': cache_dir}
+
+        logger.info("Interactive mode: Loading base scoring model only...")
+        model_config = load_base_model_and_tokenizer(args, model_config)
+
+        run_interactive_mode(args, model_config)
+        return
+    # =====================================================================
     
     mask_filling_model_name = args.mask_filling_model_name
     n_samples = args.n_samples
@@ -694,11 +708,6 @@ def main():
 
     # start to load the base scoring model
     model_config = load_base_model_and_tokenizer(args, model_config)
-
-    # 2026-05-14 msong: interactive mode gets started.
-    if getattr(args, 'interactive', False):
-        run_interactive_mode(args, model_config)
-        return
 
     # 2026-05-13 msong: short-circuit ALL scoring if loading from a cached results pickle.
     if args.load_cached_results is not None:
