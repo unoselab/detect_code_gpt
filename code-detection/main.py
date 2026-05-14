@@ -717,6 +717,7 @@ def main():
     # ==================================================================
 
     # Compute DetectCodeGPT NPR (the headline number) — always done
+    n_perturbation = max(n_perturbation_list)  # 2026-05-13 msong: fixed.
     predictions_dcg = {'real': [], 'samples': []}
     for res in results:
         predictions_dcg['real'].append(
