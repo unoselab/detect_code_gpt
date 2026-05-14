@@ -132,9 +132,10 @@ def generate_data(dataset, key, max_num=200, min_len=0, max_len=128, max_comment
         path = f'../code-generation/output/{dataset}/{key}/outputs.txt'
 
     logger.info(f'Loading data from {path}')
-    import json
+
     all_originals = []
-    all_samples = []  # machine generated
+    all_samples = []
+    all_source_line_nos = []   # 2026-05-13 msong: track which outputs.txt line each kept sample came from
 
     max_def_num_count = 0
     min_len_count = 0
@@ -143,8 +144,9 @@ def generate_data(dataset, key, max_num=200, min_len=0, max_len=128, max_comment
     max_todo_num_count = 0
 
     with open(path, 'r') as f:
-        for line in tqdm(f, ncols=70):
+        for line_no, line in enumerate(tqdm(f, ncols=70)):
             line = line.strip()
+
             if line == '':
                 continue
             line = json.loads(line)
@@ -190,6 +192,7 @@ def generate_data(dataset, key, max_num=200, min_len=0, max_len=128, max_comment
             # cut to 128 tokens
             all_originals.append(' '.join(line['solution'].split(' ')[:max_len]))
             all_samples.append(' '.join(line['output'].split(' ')[:max_len]))
+            all_source_line_nos.append(line_no)
 
     logger.info(f'{max_def_num_count} examples have more than {max_def_num} "def"')
     logger.info(f'{min_len_count} examples have less than {min_len} words')
@@ -204,12 +207,11 @@ def generate_data(dataset, key, max_num=200, min_len=0, max_len=128, max_comment
     # random.shuffle(all_originals)
     # random.shuffle(all_samples)
 
-    data = {
-        "original": all_originals[:max_num],
-        "sampled": all_samples[:max_num]
+    return {
+        "original": all_originals,
+        "sampled": all_samples,
+        "source_line_no": all_source_line_nos,  # 2026-05-13 msong: outputs.txt line index for each kept sample
     }
-
-    return data
 
 
 pattern = re.compile(r"<extra_id_\d+>")
