@@ -201,6 +201,9 @@ def generate_data(dataset, key, max_num=200, min_len=0, max_len=128, max_comment
     logger.info(f'{function_comment_num_count} examples have more than 1 function comment')
     logger.info(f'Loaded {len(all_originals)} examples after filtering, and will return {min(max_num, len(all_originals))} examples')
 
+    assert len(all_originals) == len(all_samples) == len(all_source_line_nos), \
+        f"Filter bookkeeping mismatch: {len(all_originals)} originals, {len(all_samples)} samples, {len(all_source_line_nos)} line_nos"
+
     # statistical analysis
     # import random
     # random.seed(42)
@@ -603,10 +606,11 @@ def main():
     results = []
     for idx in range(len(original_text)):
         results.append({
-            "original": original_text[idx],
-            "sampled": sampled_text[idx],
-            "perturbed_sampled": p_sampled_text[idx * max(n_perturbation_list): (idx + 1) * max(n_perturbation_list)],
-            "perturbed_original": p_original_text[idx * max(n_perturbation_list): (idx + 1) * max(n_perturbation_list)]
+            "original": data["original"][idx],
+            "sampled":  data["sampled"][idx],
+            "perturbed_sampled":  p_sampled_text[idx * max(n_perturbation_list): (idx + 1) * max(n_perturbation_list)],
+            "perturbed_original": p_original_text[idx * max(n_perturbation_list): (idx + 1) * max(n_perturbation_list)],
+            "source_line_no": data["source_line_no"][idx],  # 2026-05-13 msong: pass through for CSV
         })
 
     selected_index = 1
