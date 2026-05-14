@@ -638,6 +638,23 @@ def main():
         logger.info(f"Loading cached results from {args.load_cached_results} — skipping all scoring")
         with open(args.load_cached_results, "rb") as f:
             results = pickle.load(f)
+
+        # 2026-05-13 msong: backfill source_line_no from a fresh generate_data() call.
+        # generate_data is deterministic for given filter args, so the order of returned
+        # samples matches the order in the cached results.
+        if results and "source_line_no" not in results[0]:
+            logger.info("Cached results lack source_line_no — backfilling from generate_data()")
+            fresh_data = generate_data(args.dataset, args.dataset_key,
+                                       max_num=args.n_samples, min_len=args.min_len, max_len=args.max_len,
+                                       max_comment_num=args.max_comment_num, max_def_num=args.max_def_num,
+                                       cut_def=args.cut_def, max_todo_num=args.max_todo_num,
+                                       data_path=args.data_path)
+            assert len(fresh_data["source_line_no"]) == len(results), \
+                f"Backfill mismatch: {len(fresh_data['source_line_no'])} line_nos vs {len(results)} cached results"
+            for r, line_no in zip(results, fresh_data["source_line_no"]):
+                r["source_line_no"] = line_no
+
+
         logger.info(f"Loaded {len(results)} cached results")
     else:
         # 2026-05-13 msong: Block 1 (unperturbed LL) is only needed for the LRR baseline.
