@@ -110,7 +110,7 @@ def setup_args():
                         help='Run in interactive mode to test a single code snippet.')
     parser.add_argument('--threshold', type=float, default=1.60, 
                         help='Threshold for NPR score in interactive mode (Default: 1.60 for High Confidence)')
-    parser.add_argument('--threshold_YOUDEN', type=float, default=1.3875,
+    parser.add_argument('--threshold_youden', type=float, default=1.3875,
                     help="Youden's J threshold for NPR score in interactive mode "
                          "(Default: 1.3875 from the n=530 batch run)")
 
@@ -528,7 +528,7 @@ def vislualize_distribution(predictions, title, ax):
 
 def run_interactive_mode(args, model_config):
     print("\n" + "=" * 60)
-    print("    DetectCodeGPT Interactive Mode (Single Snippet)    ")
+    print("    DetectCodeGPT Interactive Mode — MGC Localization    ")
     print("=" * 60)
     print("Paste your code snippet below.")
     print("When finished, type 'EOF' on a new line and press Enter:")
@@ -548,50 +548,53 @@ def run_interactive_mode(args, model_config):
         return
 
     # ------------------------------------------------------------------
-    # 2026-05-14 msong: function-level assessment via chunking.
-    # The threshold (1.3875 / 1.60) was calibrated on 128-whitespace-token
-    # blocks, so we MUST keep each scored unit <= max_len tokens. Instead of
-    # scoring only the first 128 tokens (block-level), we split the whole
-    # function into consecutive <=max_len chunks, score each, and aggregate.
-    #
-    # Tokenization here is whitespace-delimited, matching generate_data():
-    #   ' '.join(text.split(' ')[:max_len])
+    # 2026-05-14 msong: MGC-localization mode.
+    # Goal: given a (possibly long) function, identify which SECTIONS are
+    # likely MGC, not produce a single function-level verdict. The 128-token
+    # block-level chunking matches the calibration regime of generate_data(),
+    # so each chunk's NPR is directly comparable to the calibrated threshold.
     # ------------------------------------------------------------------
     all_tokens = code_raw.split(' ')
     n_tokens_total = len(all_tokens)
     max_len = args.max_len
-    min_chunk_tokens = 20  # chunks shorter than this are flagged low-confidence
+    min_chunk_tokens = 20  # below this, NPR is too noisy to trust
 
-    # Build consecutive chunks of up to max_len whitespace-tokens.
+    # Track token offset per chunk so we can map back to source location.
     chunks = []
     for start in range(0, n_tokens_total, max_len):
         chunk_tokens = all_tokens[start:start + max_len]
-        chunks.append(' '.join(chunk_tokens))
+        chunks.append({
+            "text":        ' '.join(chunk_tokens),
+            "token_start": start,
+            "token_end":   start + len(chunk_tokens),  # exclusive
+            "n_tokens":    len(chunk_tokens),
+        })
 
     print(f"\n[Input] {n_tokens_total} whitespace-tokens total "
           f"-> split into {len(chunks)} chunk(s) of up to {max_len} tokens each.")
+    print(f"[Thresholds] Youden's J = {args.threshold_youden:.4f} (warning),  "
+          f"high-confidence = {args.threshold:.4f}")
 
     n_perturb = max([int(x) for x in str(args.n_perturbation_list).split(",")])
 
     # ------------------------------------------------------------------
-    # Score each chunk independently
+    # Score each chunk
     # ------------------------------------------------------------------
-    chunk_results = []  # list of dicts: index, n_tokens, npr, orig_lr, mean_p_lr, low_conf
-    for ci, chunk in enumerate(chunks):
-        chunk_n_tokens = len(chunk.split(' '))
-        low_conf = chunk_n_tokens < min_chunk_tokens
+    for ci, ch in enumerate(chunks):
+        low_conf = ch["n_tokens"] < min_chunk_tokens
 
         print("\n" + "-" * 60)
         print(f"  CHUNK {ci + 1}/{len(chunks)}  "
-              f"({chunk_n_tokens} tokens"
+              f"(tokens {ch['token_start']}..{ch['token_end'] - 1}, "
+              f"len {ch['n_tokens']}"
               f"{'  [LOW CONFIDENCE: short chunk]' if low_conf else ''})")
         print("-" * 60)
 
         print(f"  [Step 1] original log rank...")
-        orig_logrank = get_rank(chunk, args, model_config, log=True)
+        orig_logrank = get_rank(ch["text"], args, model_config, log=True)
 
         print(f"  [Step 2] applying {n_perturb} perturbations...")
-        inputs_to_perturb = [chunk for _ in range(n_perturb)]
+        inputs_to_perturb = [ch["text"] for _ in range(n_perturb)]
         p_texts = perturb_texts(inputs_to_perturb, args, model_config)
 
         print(f"  [Step 3] perturbed log ranks...")
@@ -601,91 +604,105 @@ def run_interactive_mode(args, model_config):
             print(f"           WARNING: {n_perturb - len(valid_p_ranks)} NaN ranks excluded.")
         mean_p_rank = np.mean(valid_p_ranks) if valid_p_ranks else float('nan')
 
-        npr_score = mean_p_rank / orig_logrank if orig_logrank else float('nan')
+        npr = mean_p_rank / orig_logrank if orig_logrank else float('nan')
 
-        chunk_results.append({
-            "index": ci,
-            "n_tokens": chunk_n_tokens,
-            "npr": npr_score,
-            "orig_lr": orig_logrank,
-            "mean_p_lr": mean_p_rank,
-            "low_conf": low_conf,
-        })
+        ch["orig_lr"]   = orig_logrank
+        ch["mean_p_lr"] = mean_p_rank
+        ch["npr"]       = npr
+        ch["low_conf"]  = low_conf
 
-        # Show original vs first perturbed copy for this chunk
+        # Show the chunk and one perturbed example for visibility.
         print(f"\n  --- ORIGINAL (chunk {ci + 1}) ---")
-        print(chunk)
-        print(f"\n  --- PERTURBED COPY #1 of {n_perturb} (chunk {ci + 1}) ---")
+        print(ch["text"])
+        print(f"\n  --- PERTURBED COPY #1 of {n_perturb} ---")
         print(p_texts[0])
-        print(f"\n  >> Chunk {ci + 1} NPR = {npr_score:.6f}")
+        print(f"\n  >> Chunk {ci + 1} NPR = {npr:.4f}")
 
     # ------------------------------------------------------------------
-    # Per-chunk summary table
+    # Per-chunk profile (the main output)
     # ------------------------------------------------------------------
-    print("\n" + "=" * 60)
-    print("           PER-CHUNK NPR SUMMARY")
-    print("=" * 60)
-    print(f"  {'chunk':>5}  {'tokens':>6}  {'NPR':>9}  {'verdict':<28}")
-    print("  " + "-" * 54)
-    for r in chunk_results:
-        if math.isnan(r["npr"]):
-            v = "UNSCORABLE (NaN)"
-        elif r["npr"] > args.threshold:
-            v = "MACHINE-GENERATED"
-        elif r["npr"] > args.threshold_YOUDEN:
-            v = "LIKELY MACHINE [warning]"
+    print("\n" + "=" * 70)
+    print("           PER-CHUNK NPR PROFILE  —  MGC LOCALIZATION")
+    print("=" * 70)
+    print(f"  {'chunk':>5}  {'tokens':>10}  {'len':>5}  {'NPR':>9}  {'flag':<10}  {'verdict':<20}")
+    print("  " + "-" * 66)
+
+    suspects = []  # chunks above Youden's J
+    for ch in chunks:
+        token_range = f"{ch['token_start']:>4}..{ch['token_end'] - 1:<4}"
+        if math.isnan(ch["npr"]):
+            verdict = "UNSCORABLE"
+            flag = ""
+        elif ch["npr"] > args.threshold:
+            verdict = "MGC SUSPECT"
+            flag = "[HIGH]"
+            suspects.append(ch)
+        elif ch["npr"] > args.threshold_youden:
+            verdict = "MGC SUSPECT"
+            flag = "[WARN]"
+            suspects.append(ch)
         else:
-            v = "HUMAN-WRITTEN"
-        flag = "  *low-conf" if r["low_conf"] else ""
-        print(f"  {r['index'] + 1:>5}  {r['n_tokens']:>6}  "
-              f"{r['npr']:>9.4f}  {v:<28}{flag}")
+            verdict = "HWC-leaning"
+            flag = ""
+        low_conf_marker = " *" if ch["low_conf"] else ""
+        print(f"  {ch['index'] + 1 if 'index' in ch else chunks.index(ch) + 1:>5}  "
+              f"{token_range:>10}  {ch['n_tokens']:>5}  "
+              f"{ch['npr']:>9.4f}  {flag:<10}  {verdict:<20}{low_conf_marker}")
+
+    print("=" * 70)
 
     # ------------------------------------------------------------------
-    # Function-level aggregation
+    # Localized suspect report
     # ------------------------------------------------------------------
-    valid = [r for r in chunk_results if not math.isnan(r["npr"])]
-    if not valid:
-        print("\n  All chunks unscorable. Cannot produce a function-level verdict.\n")
+    if not suspects:
+        print(f"\nNo MGC suspects detected. All scorable chunks fell below "
+              f"Youden's J = {args.threshold_youden:.4f}.\n")
         return
 
-    nprs          = np.array([r["npr"] for r in valid])
-    weights       = np.array([r["n_tokens"] for r in valid], dtype=float)
-    mean_npr      = float(np.mean(nprs))
-    max_npr       = float(np.max(nprs))
-    weighted_npr  = float(np.sum(nprs * weights) / np.sum(weights))
-    most_susp_idx = int(valid[int(np.argmax(nprs))]["index"])
+    print(f"\nDetected {len(suspects)} suspect chunk(s) — possible MGC region(s):\n")
+    for ch in suspects:
+        ci = chunks.index(ch)
+        confidence = "HIGH" if ch["npr"] > args.threshold else "WARNING"
+        print(f"  [Chunk {ci + 1}]  tokens {ch['token_start']}..{ch['token_end'] - 1}  "
+              f"({ch['n_tokens']} tokens)")
+        print(f"             NPR = {ch['npr']:.4f}   ({confidence})")
+        # Show first ~6 lines of the chunk as a locator
+        preview_lines = ch["text"].split('\n')[:6]
+        for ln in preview_lines:
+            print(f"             | {ln}")
+        if len(ch["text"].split('\n')) > 6:
+            print(f"             | ... ({len(ch['text'].split(chr(10))) - 6} more lines)")
+        print()
 
-    print("\n" + "*" * 60)
-    print("              FUNCTION-LEVEL DETECTION RESULT")
-    print("*" * 60)
-    print(f"  Chunks scored:            {len(valid)} / {len(chunks)}")
-    print(f"  Mean NPR (unweighted):    {mean_npr:.6f}")
-    print(f"  Token-weighted NPR:       {weighted_npr:.6f}   <- headline")
-    print(f"  Max NPR (most suspicious):{max_npr:.6f}   (chunk {most_susp_idx + 1})")
-    print("-" * 60)
-
-    # Headline verdict uses the token-weighted mean.
-    if weighted_npr > args.threshold:
-        verdict = "MACHINE-GENERATED"
-        reason  = f"weighted NPR {weighted_npr:.4f} > high-confidence threshold {args.threshold:.4f}"
-    elif weighted_npr > args.threshold_YOUDEN:
-        verdict = "LIKELY MACHINE-GENERATED  [Warning Zone]"
-        reason  = f"weighted NPR {weighted_npr:.4f} > Youden's J threshold {args.threshold_YOUDEN:.4f} but <= {args.threshold:.4f}"
-    else:
-        verdict = "HUMAN-WRITTEN"
-        reason  = f"weighted NPR {weighted_npr:.4f} <= Youden's J threshold {args.threshold_YOUDEN:.4f}"
-
-    print(f"  Verdict: {verdict}")
-    print(f"  Reason:  {reason}")
-
-    # Callout: a single very-machine-like chunk inside otherwise-human code.
-    if verdict == "HUMAN-WRITTEN" and max_npr > args.threshold:
-        print("-" * 60)
-        print(f"  NOTE: chunk {most_susp_idx + 1} scored {max_npr:.4f} "
-              f"(> {args.threshold:.4f}) despite a human-leaning overall verdict.")
-        print(f"        This can indicate an AI-generated section inside "
-              f"otherwise-human code. Inspect chunk {most_susp_idx + 1} above.")
-    print("*" * 60 + "\n")
+    # ------------------------------------------------------------------
+    # Local-deviation pass — chunks that spike vs neighbors
+    # ------------------------------------------------------------------
+    # Even a chunk below absolute threshold can be suspicious if it stands out
+    # sharply relative to surrounding HWC. Compute neighbor-relative deltas.
+    if len(chunks) >= 3:
+        valid_chunks = [c for c in chunks if not math.isnan(c["npr"])]
+        if len(valid_chunks) >= 3:
+            nprs = np.array([c["npr"] for c in valid_chunks])
+            median_npr = float(np.median(nprs))
+            mad = float(np.median(np.abs(nprs - median_npr)))  # MAD: robust spread
+            if mad > 0.01:  # avoid divide-by-zero on near-uniform sequences
+                print("Local-deviation analysis (vs. function-wide median):")
+                print(f"  median NPR across chunks: {median_npr:.4f}")
+                print(f"  MAD (robust spread):      {mad:.4f}")
+                print(f"  Chunks with z_MAD > 2.0 (sharp deviation from neighbors):")
+                found_any = False
+                for c in valid_chunks:
+                    z_mad = (c["npr"] - median_npr) / (1.4826 * mad)
+                    if z_mad > 2.0:
+                        ci = chunks.index(c)
+                        print(f"    chunk {ci + 1}: NPR={c['npr']:.4f}, "
+                              f"z_MAD={z_mad:+.2f}  -> stands out as MGC-like")
+                        found_any = True
+                if not found_any:
+                    print("    (none — no chunk deviates >2 MAD from the median)")
+                print()
+    print("Next step: data-flow analysis to refine suspect boundaries within "
+          "flagged chunks.\n")
 
 
 def main():
