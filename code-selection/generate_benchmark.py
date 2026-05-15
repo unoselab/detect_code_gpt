@@ -151,19 +151,21 @@ def compute_token_regions(mixed_code: str, char_regions: List[Dict[str, Any]]) -
         token_start_chars.append(cursor)
         cursor += len(token) + 1  # +1 for the separator space
 
-    # Count tokens per region by checking each token's start_char against region bounds.
-    # A token belongs to the region [start_char, end_char) that contains its start_char.
     counts_by_region = [0] * len(char_regions)
+    last_idx = len(char_regions) - 1
     for tok_start in token_start_chars:
+        assigned = False
         for region_idx, char_r in enumerate(char_regions):
             if char_r["start_char"] <= tok_start < char_r["end_char"]:
                 counts_by_region[region_idx] += 1
+                assigned = True
                 break
-
-    # Tokens whose start_char exactly equals n_chars_total (rare, only if the last
-    # region's end_char equals n_chars_total AND a token starts there — impossible by
-    # construction since split(" ") never produces a token at the end-of-string boundary
-    # unless there's a trailing space). The for/else above handles it by leaving it unassigned.
+        if not assigned:
+            # Trailing tokens beyond the end of all regions (e.g., empty tokens from
+            # mixed_code ending in whitespace) belong to the last region. Keeps the
+            # partition complete and matches what a downstream detector sees when it
+            # tokenizes mixed_code with the same scheme.
+            counts_by_region[last_idx] += 1
 
     regions = []
     cursor = 0
@@ -216,6 +218,37 @@ def merge_regions(
 
     return merged
 
+# -----------------------------------------------------------------------------
+# Annotated view (for human inspection only, not for detection input)
+# -----------------------------------------------------------------------------
+
+def make_annotated_mixed_code(parts: List[str], merged_regions: List[Dict[str, Any]]) -> str:
+    """Build a human-readable annotated view of mixed_code.
+
+    Inserts a commented section header before each region. The output is for
+    DEBUGGING and VISUALIZATION ONLY — it must never be used as detector input,
+    because the headers would pollute the token space and invalidate the
+    NPR threshold (1.3875 / 1.6) calibrated on plain code.
+
+    The format keeps headers syntactically-valid Python comments so the
+    annotated view can be saved as .py and roughly inspected.
+    """
+    out = []
+    for region, part in zip(merged_regions, parts):
+        target_marker = " * TARGET *" if region["label"] == "MGC" else ""
+        header = (
+            f"# ===== {region['label']}{target_marker}  "
+            f"(chars {region['start_char']}-{region['end_char'] - 1}, "
+            f"tokens {region['start_token']}-{region['end_token'] - 1}, "
+            f"n_tokens={region['n_tokens']}) =====\n"
+        )
+        out.append(header)
+        out.append(part)
+        # Ensure annotated regions are separated by at least a newline for readability
+        if not part.endswith("\n"):
+            out.append("\n")
+    return "".join(out)
+
 
 # -----------------------------------------------------------------------------
 # Benchmark builders
@@ -252,6 +285,8 @@ def build_level1_record(record: Dict[str, Any], index: int) -> Dict[str, Any]:
             f"max(end_token)={last_end_token} but n_tokens_total={n_tokens_total}. "
             f"Per-region n_tokens: {[r['n_tokens'] for r in regions]}"
         )
+    
+    mixed_code_annotated = make_annotated_mixed_code(parts, regions)
 
     mixed_record: Dict[str, Any] = {
         "id":               index,
@@ -264,7 +299,8 @@ def build_level1_record(record: Dict[str, Any], index: int) -> Dict[str, Any]:
         "prompt":           prompt,
         "hwc":              hwc,
         "mgc":              mgc,
-        "mixed_code":       mixed_code,
+        "mixed_code":       mixed_code,        
+        "mixed_code_annotated": mixed_code_annotated,
         "regions":          regions,
         "target_label":     "MGC",
         "target_regions":   [r for r in regions if r["label"] == "MGC"],
