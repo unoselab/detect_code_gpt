@@ -152,3 +152,4 @@ Mix:
             return self
 
         # Check if we are using the same
+eof
