@@ -110,7 +110,9 @@ def setup_args():
                         help='Run in interactive mode to test a single code snippet.')
     parser.add_argument('--threshold', type=float, default=1.60, 
                         help='Threshold for NPR score in interactive mode (Default: 1.60 for High Confidence)')
-
+    parser.add_argument('--threshold_YOUDEN', type=float, default=1.3875,
+                    help="Youden's J threshold for NPR score in interactive mode "
+                         "(Default: 1.3875 from the n=530 batch run)")
 
     # 2026-05-12 msong, drop the args_dict override in setup_args.
     args = parser.parse_args()
@@ -545,98 +547,144 @@ def run_interactive_mode(args, model_config):
         logger.error("No code provided. Exiting.")
         return
 
-    # 2026-05-14 msong: apply the same max_len truncation that generate_data() uses.
-    # generate_data does: ' '.join(text.split(' ')[:max_len])
-    # i.e., it counts whitespace-delimited tokens (not subword tokens), and keeps
-    # the first max_len of them. Interactive mode MUST match this exactly; otherwise
-    # the NPR score is computed on a longer representation than the model was validated
-    # on, which shifts the score distribution and makes the threshold comparison invalid.
-    code_to_test = ' '.join(code_raw.split(' ')[:args.max_len])
+    # ------------------------------------------------------------------
+    # 2026-05-14 msong: function-level assessment via chunking.
+    # The threshold (1.3875 / 1.60) was calibrated on 128-whitespace-token
+    # blocks, so we MUST keep each scored unit <= max_len tokens. Instead of
+    # scoring only the first 128 tokens (block-level), we split the whole
+    # function into consecutive <=max_len chunks, score each, and aggregate.
+    #
+    # Tokenization here is whitespace-delimited, matching generate_data():
+    #   ' '.join(text.split(' ')[:max_len])
+    # ------------------------------------------------------------------
+    all_tokens = code_raw.split(' ')
+    n_tokens_total = len(all_tokens)
+    max_len = args.max_len
+    min_chunk_tokens = 20  # chunks shorter than this are flagged low-confidence
 
-    n_tokens_raw       = len(code_raw.split(' '))
-    n_tokens_truncated = len(code_to_test.split(' '))
-    if n_tokens_truncated < n_tokens_raw:
-        print(f"\n[Truncated] Input had {n_tokens_raw} whitespace-tokens; "
-              f"kept first {n_tokens_truncated} (max_len={args.max_len}).")
-    else:
-        print(f"\n[Input OK] {n_tokens_raw} whitespace-tokens — within "
-              f"max_len={args.max_len}, no truncation needed.")
+    # Build consecutive chunks of up to max_len whitespace-tokens.
+    chunks = []
+    for start in range(0, n_tokens_total, max_len):
+        chunk_tokens = all_tokens[start:start + max_len]
+        chunks.append(' '.join(chunk_tokens))
+
+    print(f"\n[Input] {n_tokens_total} whitespace-tokens total "
+          f"-> split into {len(chunks)} chunk(s) of up to {max_len} tokens each.")
 
     n_perturb = max([int(x) for x in str(args.n_perturbation_list).split(",")])
 
     # ------------------------------------------------------------------
-    # Step 1: original log rank
+    # Score each chunk independently
     # ------------------------------------------------------------------
-    print("\n[Step 1] Computing original log rank...")
-    orig_logrank = get_rank(code_to_test, args, model_config, log=True)
-    print(f"         original log rank = {orig_logrank:.6f}")
+    chunk_results = []  # list of dicts: index, n_tokens, npr, orig_lr, mean_p_lr, low_conf
+    for ci, chunk in enumerate(chunks):
+        chunk_n_tokens = len(chunk.split(' '))
+        low_conf = chunk_n_tokens < min_chunk_tokens
+
+        print("\n" + "-" * 60)
+        print(f"  CHUNK {ci + 1}/{len(chunks)}  "
+              f"({chunk_n_tokens} tokens"
+              f"{'  [LOW CONFIDENCE: short chunk]' if low_conf else ''})")
+        print("-" * 60)
+
+        print(f"  [Step 1] original log rank...")
+        orig_logrank = get_rank(chunk, args, model_config, log=True)
+
+        print(f"  [Step 2] applying {n_perturb} perturbations...")
+        inputs_to_perturb = [chunk for _ in range(n_perturb)]
+        p_texts = perturb_texts(inputs_to_perturb, args, model_config)
+
+        print(f"  [Step 3] perturbed log ranks...")
+        p_ranks = get_ranks(p_texts, args, model_config, log=True)
+        valid_p_ranks = [r for r in p_ranks if not math.isnan(r)]
+        if len(valid_p_ranks) < n_perturb:
+            print(f"           WARNING: {n_perturb - len(valid_p_ranks)} NaN ranks excluded.")
+        mean_p_rank = np.mean(valid_p_ranks) if valid_p_ranks else float('nan')
+
+        npr_score = mean_p_rank / orig_logrank if orig_logrank else float('nan')
+
+        chunk_results.append({
+            "index": ci,
+            "n_tokens": chunk_n_tokens,
+            "npr": npr_score,
+            "orig_lr": orig_logrank,
+            "mean_p_lr": mean_p_rank,
+            "low_conf": low_conf,
+        })
+
+        # Show original vs first perturbed copy for this chunk
+        print(f"\n  --- ORIGINAL (chunk {ci + 1}) ---")
+        print(chunk)
+        print(f"\n  --- PERTURBED COPY #1 of {n_perturb} (chunk {ci + 1}) ---")
+        print(p_texts[0])
+        print(f"\n  >> Chunk {ci + 1} NPR = {npr_score:.6f}")
 
     # ------------------------------------------------------------------
-    # Step 2: perturbations
+    # Per-chunk summary table
     # ------------------------------------------------------------------
-    print(f"\n[Step 2] Applying {n_perturb} stylistic perturbations...")
-    inputs_to_perturb = [code_to_test for _ in range(n_perturb)]
-    p_texts = perturb_texts(inputs_to_perturb, args, model_config)
-
-    # Display original vs the first perturbed copy so the user can see
-    # what the whitespace/newline insertion actually looks like.
     print("\n" + "=" * 60)
-    print("  ORIGINAL CODE  (what you submitted, after truncation)")
+    print("           PER-CHUNK NPR SUMMARY")
     print("=" * 60)
-    print(code_to_test)
-    print()
-    print("=" * 60)
-    print(f"  PERTURBED COPY #1  (1 of {n_perturb} perturbations)")
-    print("  (random spaces/newlines inserted — semantics unchanged)")
-    print("=" * 60)
-    print(p_texts[0])
-    print("=" * 60)
+    print(f"  {'chunk':>5}  {'tokens':>6}  {'NPR':>9}  {'verdict':<28}")
+    print("  " + "-" * 54)
+    for r in chunk_results:
+        if math.isnan(r["npr"]):
+            v = "UNSCORABLE (NaN)"
+        elif r["npr"] > args.threshold:
+            v = "MACHINE-GENERATED"
+        elif r["npr"] > args.threshold_YOUDEN:
+            v = "LIKELY MACHINE [warning]"
+        else:
+            v = "HUMAN-WRITTEN"
+        flag = "  *low-conf" if r["low_conf"] else ""
+        print(f"  {r['index'] + 1:>5}  {r['n_tokens']:>6}  "
+              f"{r['npr']:>9.4f}  {v:<28}{flag}")
 
     # ------------------------------------------------------------------
-    # Step 3: perturbed log ranks
+    # Function-level aggregation
     # ------------------------------------------------------------------
-    print("\n[Step 3] Computing perturbed log ranks...")
-    p_ranks = get_ranks(p_texts, args, model_config, log=True)
-    valid_p_ranks = [r for r in p_ranks if not math.isnan(r)]
-    if len(valid_p_ranks) < n_perturb:
-        print(f"         WARNING: {n_perturb - len(valid_p_ranks)} of {n_perturb} "
-              f"perturbed ranks were NaN and were excluded.")
-    mean_p_rank = np.mean(valid_p_ranks)
-    print(f"         mean perturbed log rank = {mean_p_rank:.6f} "
-          f"(over {len(valid_p_ranks)} valid perturbations)")
+    valid = [r for r in chunk_results if not math.isnan(r["npr"])]
+    if not valid:
+        print("\n  All chunks unscorable. Cannot produce a function-level verdict.\n")
+        return
 
-    # ------------------------------------------------------------------
-    # NPR score
-    # ------------------------------------------------------------------
-    npr_score = mean_p_rank / orig_logrank
+    nprs          = np.array([r["npr"] for r in valid])
+    weights       = np.array([r["n_tokens"] for r in valid], dtype=float)
+    mean_npr      = float(np.mean(nprs))
+    max_npr       = float(np.max(nprs))
+    weighted_npr  = float(np.sum(nprs * weights) / np.sum(weights))
+    most_susp_idx = int(valid[int(np.argmax(nprs))]["index"])
 
-    # ------------------------------------------------------------------
-    # Result
-    # ------------------------------------------------------------------
     print("\n" + "*" * 60)
-    print("                    DETECTION RESULT                    ")
+    print("              FUNCTION-LEVEL DETECTION RESULT")
     print("*" * 60)
-    print(f"  Original log rank:        {orig_logrank:.6f}")
-    print(f"  Mean perturbed log rank:  {mean_p_rank:.6f}")
-    print(f"  NPR Score:                {npr_score:.6f}")
-    print(f"  Threshold (Youden's J):   1.3875   "
-          f"({'ABOVE' if npr_score > 1.3875 else 'BELOW'})")
-    print(f"  Threshold (high conf):    {args.threshold:.4f}   "
-          f"({'ABOVE' if npr_score > args.threshold else 'BELOW'})")
+    print(f"  Chunks scored:            {len(valid)} / {len(chunks)}")
+    print(f"  Mean NPR (unweighted):    {mean_npr:.6f}")
+    print(f"  Token-weighted NPR:       {weighted_npr:.6f}   <- headline")
+    print(f"  Max NPR (most suspicious):{max_npr:.6f}   (chunk {most_susp_idx + 1})")
     print("-" * 60)
 
-    if npr_score > args.threshold:
+    # Headline verdict uses the token-weighted mean.
+    if weighted_npr > args.threshold:
         verdict = "MACHINE-GENERATED"
-        reason  = f"NPR {npr_score:.4f} > high-confidence threshold {args.threshold:.4f}"
-    elif npr_score > 1.3875:
+        reason  = f"weighted NPR {weighted_npr:.4f} > high-confidence threshold {args.threshold:.4f}"
+    elif weighted_npr > args.threshold_YOUDEN:
         verdict = "LIKELY MACHINE-GENERATED  [Warning Zone]"
-        reason  = f"NPR {npr_score:.4f} > Youden's J threshold 1.3875 but ≤ {args.threshold:.4f}"
+        reason  = f"weighted NPR {weighted_npr:.4f} > Youden's J threshold {args.threshold_YOUDEN:.4f} but <= {args.threshold:.4f}"
     else:
         verdict = "HUMAN-WRITTEN"
-        reason  = f"NPR {npr_score:.4f} ≤ Youden's J threshold 1.3875"
+        reason  = f"weighted NPR {weighted_npr:.4f} <= Youden's J threshold {args.threshold_YOUDEN:.4f}"
 
     print(f"  Verdict: {verdict}")
     print(f"  Reason:  {reason}")
+
+    # Callout: a single very-machine-like chunk inside otherwise-human code.
+    if verdict == "HUMAN-WRITTEN" and max_npr > args.threshold:
+        print("-" * 60)
+        print(f"  NOTE: chunk {most_susp_idx + 1} scored {max_npr:.4f} "
+              f"(> {args.threshold:.4f}) despite a human-leaning overall verdict.")
+        print(f"        This can indicate an AI-generated section inside "
+              f"otherwise-human code. Inspect chunk {most_susp_idx + 1} above.")
     print("*" * 60 + "\n")
 
 
