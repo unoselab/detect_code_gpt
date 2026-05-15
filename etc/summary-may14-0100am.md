@@ -1,5 +1,3 @@
-Here is a summary of our progress and the key decisions made in the session following the 11 PM (May 13) batch run:
-
 ### **1. Bug Fixing & Successful Batch Run**
 
 * **The Cache Bug:** We resolved an `UnboundLocalError` that occurred when loading cached results. The variable `n_perturbation` was being skipped, which we fixed by explicitly defining it before the final NPR calculation.

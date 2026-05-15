@@ -1,5 +1,3 @@
-# Afternoon Session Summary — DetectCodeGPT Reproduction (Phase 4)
-
 ## Where the morning left off
 - Generation completed: 500 CodeLlama-7B samples on CodeSearchNet at T=0.2, saved to `output/CodeSearchNet/CodeLlama-7b-hf-500-tp0.2/outputs.txt`
 - Total generation runtime: 20m 36.91s, avg 2.46s/sample

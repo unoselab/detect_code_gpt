@@ -1,5 +1,3 @@
-# Session Summary — May 12 evening → May 13 ~00:50 (DetectCodeGPT scaled reproduction)
-
 ## Where we started this session
 
 After the afternoon's Phase 4 detection run completed at 16:41, you had a successful first reproduction with **AUROC 0.8965** on n=131 valid pairs (vs paper's target 0.9095). The gap was attributed to small sample size — the function-comment filter dropped 352 of 500 input samples (70% rejection rate).

@@ -1,5 +1,3 @@
-Here is the summary of our technical progress and experiments since 3:00 PM today:
-
 ### 1. **System Optimization & Error Resolution**
 
 * **Token ID & Vocabulary Fix**: We identified that `loadmodel.py` was hardcoding a `decoder_start_token_id` of **50256**, which caused an index out-of-bounds error because the **CodeT5+ 770m** model has a vocabulary of only **32,100**. We updated the script to use the correct IDs (0) from the model config.

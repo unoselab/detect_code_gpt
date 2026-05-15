@@ -1,5 +1,3 @@
-## Conversation summary: DetectCodeGPT reproduction
-
 We reviewed the ICSE 2025 paper **“Between Lines of Code: Unraveling the Distinct Patterns of Machine and Human Programmers”**, which proposes **DetectCodeGPT**, a zero-shot detector for machine-generated code. The method perturbs code by inserting spaces and newlines, then measures changes in normalized perturbed log-rank. The paper reports an average AUROC of **0.8308**, and for the specific reproduction target **CodeSearchNet + CodeLlama-7B + T=0.2**, it reports **AUROC ≈ 0.9095**.
 
 ## What has been reproduced so far

@@ -1,5 +1,3 @@
-# DetectCodeGPT Reproduction — Conversation Summary
-
 ## The paper
 **"Between Lines of Code: Unraveling the Distinct Patterns of Machine and Human Programmers"** (ICSE 2025, Shi et al.)
 

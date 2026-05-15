@@ -1,5 +1,3 @@
-# Conversation Summary — After Noon, May 13, 2026
-
 ## Context entering this period
 The morning's scaled detection run (n=530, started 00:03 May 13) had finished with **AUROC = 0.9007** against the paper's target of 0.9095 — a successful tight reproduction. The afternoon focused on understanding the AUROC computation, then building analysis tooling for an eventual interactive single-code detector app.
 
