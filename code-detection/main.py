@@ -525,58 +525,119 @@ def vislualize_distribution(predictions, title, ax):
 
 
 def run_interactive_mode(args, model_config):
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("    DetectCodeGPT Interactive Mode (Single Snippet)    ")
-    print("="*60)
+    print("=" * 60)
     print("Paste your code snippet below.")
     print("When finished, type 'EOF' on a new line and press Enter:")
     print("-" * 60)
-    
+
     lines = []
     while True:
         line = input()
         if line.strip().upper() == "EOF":
             break
         lines.append(line)
-        
-    code_to_test = "\n".join(lines).strip()
-    
-    if not code_to_test:
+
+    code_raw = "\n".join(lines).strip()
+
+    if not code_raw:
         logger.error("No code provided. Exiting.")
         return
 
-    n_perturb = max([int(x) for x in args.n_perturbation_list.split(",")])
-    
+    # 2026-05-14 msong: apply the same max_len truncation that generate_data() uses.
+    # generate_data does: ' '.join(text.split(' ')[:max_len])
+    # i.e., it counts whitespace-delimited tokens (not subword tokens), and keeps
+    # the first max_len of them. Interactive mode MUST match this exactly; otherwise
+    # the NPR score is computed on a longer representation than the model was validated
+    # on, which shifts the score distribution and makes the threshold comparison invalid.
+    code_to_test = ' '.join(code_raw.split(' ')[:args.max_len])
+
+    n_tokens_raw       = len(code_raw.split(' '))
+    n_tokens_truncated = len(code_to_test.split(' '))
+    if n_tokens_truncated < n_tokens_raw:
+        print(f"\n[Truncated] Input had {n_tokens_raw} whitespace-tokens; "
+              f"kept first {n_tokens_truncated} (max_len={args.max_len}).")
+    else:
+        print(f"\n[Input OK] {n_tokens_raw} whitespace-tokens — within "
+              f"max_len={args.max_len}, no truncation needed.")
+
+    n_perturb = max([int(x) for x in str(args.n_perturbation_list).split(",")])
+
+    # ------------------------------------------------------------------
+    # Step 1: original log rank
+    # ------------------------------------------------------------------
     print("\n[Step 1] Computing original log rank...")
-    # Calculate log rank of original code (reusing existing get_rank)
     orig_logrank = get_rank(code_to_test, args, model_config, log=True)
-    
-    print(f"[Step 2] Applying {n_perturb} stylistic perturbations...")
-    # Create list of texts for perturbation and apply perturbations (reusing existing perturb_texts)
+    print(f"         original log rank = {orig_logrank:.6f}")
+
+    # ------------------------------------------------------------------
+    # Step 2: perturbations
+    # ------------------------------------------------------------------
+    print(f"\n[Step 2] Applying {n_perturb} stylistic perturbations...")
     inputs_to_perturb = [code_to_test for _ in range(n_perturb)]
     p_texts = perturb_texts(inputs_to_perturb, args, model_config)
-    
-    print("[Step 3] Computing perturbed log ranks...")
-    # Calculate log ranks of perturbed versions (reusing existing get_ranks)
+
+    # Display original vs the first perturbed copy so the user can see
+    # what the whitespace/newline insertion actually looks like.
+    print("\n" + "=" * 60)
+    print("  ORIGINAL CODE  (what you submitted, after truncation)")
+    print("=" * 60)
+    print(code_to_test)
+    print()
+    print("=" * 60)
+    print(f"  PERTURBED COPY #1  (1 of {n_perturb} perturbations)")
+    print("  (random spaces/newlines inserted — semantics unchanged)")
+    print("=" * 60)
+    print(p_texts[0])
+    print("=" * 60)
+
+    # ------------------------------------------------------------------
+    # Step 3: perturbed log ranks
+    # ------------------------------------------------------------------
+    print("\n[Step 3] Computing perturbed log ranks...")
     p_ranks = get_ranks(p_texts, args, model_config, log=True)
-    mean_p_rank = np.mean([r for r in p_ranks if not math.isnan(r)])
-    
+    valid_p_ranks = [r for r in p_ranks if not math.isnan(r)]
+    if len(valid_p_ranks) < n_perturb:
+        print(f"         WARNING: {n_perturb - len(valid_p_ranks)} of {n_perturb} "
+              f"perturbed ranks were NaN and were excluded.")
+    mean_p_rank = np.mean(valid_p_ranks)
+    print(f"         mean perturbed log rank = {mean_p_rank:.6f} "
+          f"(over {len(valid_p_ranks)} valid perturbations)")
+
+    # ------------------------------------------------------------------
+    # NPR score
+    # ------------------------------------------------------------------
     npr_score = mean_p_rank / orig_logrank
-    
-    print("\n" + "*"*60)
+
+    # ------------------------------------------------------------------
+    # Result
+    # ------------------------------------------------------------------
+    print("\n" + "*" * 60)
     print("                    DETECTION RESULT                    ")
-    print("*"*60)
-    print(f">> NPR Score: {npr_score:.4f}")
-    
+    print("*" * 60)
+    print(f"  Original log rank:        {orig_logrank:.6f}")
+    print(f"  Mean perturbed log rank:  {mean_p_rank:.6f}")
+    print(f"  NPR Score:                {npr_score:.6f}")
+    print(f"  Threshold (Youden's J):   1.3875   "
+          f"({'ABOVE' if npr_score > 1.3875 else 'BELOW'})")
+    print(f"  Threshold (high conf):    {args.threshold:.4f}   "
+          f"({'ABOVE' if npr_score > args.threshold else 'BELOW'})")
+    print("-" * 60)
+
     if npr_score > args.threshold:
-        prediction = f"MACHINE-GENERATED (Score > {args.threshold})"
-    elif npr_score > 1.3875:  # Youden's J optimal point from your logs
-        prediction = "LIKELY MACHINE-GENERATED (Warning Zone)"
+        verdict = "MACHINE-GENERATED"
+        reason  = f"NPR {npr_score:.4f} > high-confidence threshold {args.threshold:.4f}"
+    elif npr_score > 1.3875:
+        verdict = "LIKELY MACHINE-GENERATED  [Warning Zone]"
+        reason  = f"NPR {npr_score:.4f} > Youden's J threshold 1.3875 but ≤ {args.threshold:.4f}"
     else:
-        prediction = "HUMAN-WRITTEN"
-        
-    print(f">> Prediction: {prediction}")
-    print("*"*60 + "\n")
+        verdict = "HUMAN-WRITTEN"
+        reason  = f"NPR {npr_score:.4f} ≤ Youden's J threshold 1.3875"
+
+    print(f"  Verdict: {verdict}")
+    print(f"  Reason:  {reason}")
+    print("*" * 60 + "\n")
 
 
 def main():
