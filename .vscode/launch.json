@@ -21,6 +21,7 @@
             },
 
             "args": [
+                "--interactive",
                 "--dataset", "CodeSearchNet",
                 "--dataset_key", "CodeLlama-7b-hf-2000-tp0.2",
                 "--data_path", "${workspaceFolder}/output/CodeSearchNet/CodeLlama-7b-hf-2000-tp0.2/outputs.txt",
