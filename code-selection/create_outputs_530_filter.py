@@ -139,16 +139,34 @@ def main() -> None:
         action="store_true",
         help="Also include source_line_no, filter_index, HWC/MGC NPR scores, and winner.",
     )
+    parser.add_argument(
+        "--project_root",
+        default=None,
+        help="Optional project root path to abbreviate as PRJ in printed output.",
+    )
     args = parser.parse_args()
 
     outputs_path = Path(args.outputs_txt).expanduser()
     csv_path = Path(args.npr_csv).expanduser()
     out_path = Path(args.out_jsonl).expanduser()
 
+    project_root = Path(args.project_root).expanduser().resolve() if args.project_root else None
+
+    def display_path(path: Path) -> str:
+        if project_root is None:
+            return str(path)
+
+        try:
+            resolved_path = path.resolve()
+            relative_path = resolved_path.relative_to(project_root)
+            return f"PRJ/{relative_path}"
+        except ValueError:
+            return str(path)
+
     if not outputs_path.exists():
-        raise FileNotFoundError(f"outputs.txt not found: {outputs_path}")
+        raise FileNotFoundError(f"outputs.txt not found: {display_path(outputs_path)}")
     if not csv_path.exists():
-        raise FileNotFoundError(f"NPR CSV not found: {csv_path}")
+        raise FileNotFoundError(f"NPR CSV not found: {display_path(csv_path)}")
 
     outputs_records = read_jsonl(outputs_path)
     csv_rows = read_filter_csv(csv_path)
@@ -157,7 +175,7 @@ def main() -> None:
 
     print(f"Loaded outputs.txt records: {len(outputs_records)}")
     print(f"Loaded filtered CSV rows:  {len(csv_rows)}")
-    print(f"Wrote filtered JSONL:      {out_path}")
+    print(f"Wrote filtered JSONL:      {display_path(out_path)}")
     print(f"Filtered JSONL records:    {len(filtered)}")
 
     if len(filtered) != 530:

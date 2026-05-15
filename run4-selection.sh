@@ -48,18 +48,20 @@ OUT_JSONL="${OUTPUT_DIR}/outputs_530_filter.jsonl"
 mkdir -p "${OUTPUT_DIR}"
 
 echo "============================================================"
-echo "OUTPUTS_TXT:      ${OUTPUTS_TXT}"
-echo "NPR_CSV:          ${NPR_CSV}"
-echo "OUT_JSONL:        ${OUT_JSONL}"
+echo "PRJ:              ${PROJECT_ROOT}"
+echo "OUTPUTS_TXT:      ${OUTPUTS_TXT/$PROJECT_ROOT/PRJ}"
+echo "NPR_CSV:          ${NPR_CSV/$PROJECT_ROOT/PRJ}"
+echo "OUT_JSONL:        ${OUT_JSONL/$PROJECT_ROOT/PRJ}"
 echo "============================================================"
 
 python "${SELECTION_SCRIPT}" \
---outputs_txt "${OUTPUTS_TXT}" \
---npr_csv "${NPR_CSV}" \
---out_jsonl "${OUT_JSONL}" \
---include_scores
+  --project_root "${PROJECT_ROOT}" \
+  --outputs_txt "${OUTPUTS_TXT}" \
+  --npr_csv "${NPR_CSV}" \
+  --out_jsonl "${OUT_JSONL}" \
+  --include_scores
 
 echo "============================================================"
 echo "Filtered benchmark written to:"
-echo "${OUT_JSONL}"
+echo "${OUT_JSONL/$PROJECT_ROOT/PRJ}"
 echo "============================================================"
