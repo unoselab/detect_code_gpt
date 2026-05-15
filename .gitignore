@@ -140,3 +140,4 @@ data/
 *back*/
 *.pt
 *.pkl
+.DS_Store
