@@ -150,9 +150,9 @@ def compute_token_regions(parts: List[str]) -> List[Dict[str, Any]]:
         end = start + n_tokens
         regions.append({
             "label": spec["label"],
-            "start_token_split_space_v1": start,
-            "end_token_split_space_v1": end,
-            "n_tokens_split_space_v1": n_tokens,
+            "start_token": start,
+            "end_token": end,
+            "n_tokens": n_tokens,
         })
         cursor = end
     return regions
@@ -186,10 +186,11 @@ def merge_regions(
             "start_char":    char_r["start_char"],
             "end_char":      char_r["end_char"],
             "n_chars":       char_r["n_chars"],
-            "start_token_split_space_v1": token_r["start_token_split_space_v1"],
-            "end_token_split_space_v1":   token_r["end_token_split_space_v1"],
-            "n_tokens_split_space_v1":    token_r["n_tokens_split_space_v1"],
+            "start_token":   token_r["start_token"],
+            "end_token":     token_r["end_token"],
+            "n_tokens":      token_r["n_tokens"],
         })
+
     return merged
 
 
@@ -234,7 +235,7 @@ def build_level1_record(record: Dict[str, Any], index: int) -> Dict[str, Any]:
         "target_label":     "MGC",
         "target_regions":   [r for r in regions if r["label"] == "MGC"],
         "n_chars_total":    len(mixed_code),
-        "n_tokens_total_split_space_v1": count_split_space_tokens(mixed_code),
+        "n_tokens_total": count_split_space_tokens(mixed_code),
         "n_tokens_total_regex":          count_whitespace_tokens_regex(mixed_code),
     }
 
