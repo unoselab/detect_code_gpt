@@ -1,0 +1,48 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "DetectCodeGPT: run2-detect",
+            "type": "debugpy",
+            "request": "launch",
+
+            // Equivalent to:
+            // cd ~/project-workspace/detect_code_gpt/code-detection
+            "program": "${workspaceFolder}/code-detection/main.py",
+            "cwd": "${workspaceFolder}/code-detection",
+
+            "console": "integratedTerminal",
+            "justMyCode": false,
+
+            // Equivalent to:
+            // export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0"
+            },
+
+            "args": [
+                "--dataset", "CodeSearchNet",
+                "--dataset_key", "CodeLlama-7b-hf-2000-tp0.2",
+                "--data_path", "${workspaceFolder}/output/CodeSearchNet/CodeLlama-7b-hf-2000-tp0.2/outputs.txt",
+
+                "--base_model_name", "codellama/CodeLlama-7b-hf",
+                "--mask_filling_model_name", "Salesforce/codet5p-770m",
+
+                "--n_samples", "2000",
+                "--n_perturbation_list", "50",
+                "--pct_words_masked", "0.5",
+                "--pct_identifiers_masked", "0.75",
+                "--span_length", "2",
+                "--batch_size", "50",
+                "--chunk_size", "10",
+
+                "--baselines", "LRR,DetectGPT,NPR",
+                "--perturb_type", "random-insert-space+newline",
+                "--output_name", "codellama-7b-hf_csn_t02_n2000_run",
+
+                "--detectcodegpt_only",
+                "--load_cached_results", "../logs/results_cache_codellama-7b-hf_csn_t02_n2000_run.pkl"
+            ]
+        }
+    ]
+}

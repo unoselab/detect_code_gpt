@@ -535,7 +535,7 @@ def run_interactive_mode(args, model_config):
     lines = []
     while True:
         line = input()
-        if line.strip() == "EOF":
+        if line.strip().upper() == "EOF":
             break
         lines.append(line)
         
