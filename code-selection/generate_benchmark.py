@@ -129,23 +129,45 @@ def compute_char_regions(parts: List[str]) -> List[Dict[str, Any]]:
     return regions
 
 
-def compute_token_regions(parts: List[str]) -> List[Dict[str, Any]]:
-    """Cumulative split_space_v1 token offsets for each part, in order.
+def compute_token_regions(mixed_code: str, char_regions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Compute token spans for each region against mixed_code.split(" ").
 
-    IMPORTANT: this counts tokens in each part INDEPENDENTLY, then sums.
-    This is NOT the same as tokenizing the concatenated string and slicing,
-    because concatenation can fuse the last token of one part with the first
-    token of the next when there's no whitespace at the boundary.
+    Tokenizes mixed_code ONCE (matching what main.py's run_interactive_mode does),
+    then assigns each token to the region containing its start character. Tokens
+    that straddle a region boundary are assigned to the region where they begin,
+    so the token assignments cleanly partition [0, n_tokens_total) with no overlap.
 
-    We do it this way intentionally — the regions become a clean tiling of
-    token indices. Consumers who care about the concatenated-string view
-    should tokenize mixed_code themselves; the per-region 'n_tokens_*' fields
-    here describe each part's own token count.
+    Requires char_regions to have been computed already (start_char / end_char
+    fields) so token-to-region assignment can use char positions.
     """
+    if not char_regions:
+        return []
+
+    # Tokenize mixed_code globally, tracking each token's start_char.
+    tokens = mixed_code.split(" ")
+    token_start_chars = []
+    cursor = 0
+    for token in tokens:
+        token_start_chars.append(cursor)
+        cursor += len(token) + 1  # +1 for the separator space
+
+    # Count tokens per region by checking each token's start_char against region bounds.
+    # A token belongs to the region [start_char, end_char) that contains its start_char.
+    counts_by_region = [0] * len(char_regions)
+    for tok_start in token_start_chars:
+        for region_idx, char_r in enumerate(char_regions):
+            if char_r["start_char"] <= tok_start < char_r["end_char"]:
+                counts_by_region[region_idx] += 1
+                break
+
+    # Tokens whose start_char exactly equals n_chars_total (rare, only if the last
+    # region's end_char equals n_chars_total AND a token starts there — impossible by
+    # construction since split(" ") never produces a token at the end-of-string boundary
+    # unless there's a trailing space). The for/else above handles it by leaving it unassigned.
+
     regions = []
     cursor = 0
-    for spec, part in zip(REGION_SPECS, parts):
-        n_tokens = count_split_space_tokens(part)
+    for spec, char_r, n_tokens in zip(REGION_SPECS, char_regions, counts_by_region):
         start = cursor
         end = start + n_tokens
         regions.append({
@@ -155,6 +177,7 @@ def compute_token_regions(parts: List[str]) -> List[Dict[str, Any]]:
             "n_tokens": n_tokens,
         })
         cursor = end
+
     return regions
 
 
@@ -216,8 +239,19 @@ def build_level1_record(record: Dict[str, Any], index: int) -> Dict[str, Any]:
     mixed_code = "".join(parts)
 
     char_regions  = compute_char_regions(parts)
-    token_regions = compute_token_regions(parts)
+    token_regions = compute_token_regions(mixed_code, char_regions)
     regions       = merge_regions(char_regions, token_regions)
+
+    # Sanity check: regions must cleanly partition the token index space
+    # produced by mixed_code.split(" "). max(end_token) must equal n_tokens_total.
+    n_tokens_total = count_split_space_tokens(mixed_code)
+    last_end_token = regions[-1]["end_token"]
+    if last_end_token != n_tokens_total:
+        raise ValueError(
+            f"Record {index}: token span mismatch. "
+            f"max(end_token)={last_end_token} but n_tokens_total={n_tokens_total}. "
+            f"Per-region n_tokens: {[r['n_tokens'] for r in regions]}"
+        )
 
     mixed_record: Dict[str, Any] = {
         "id":               index,
