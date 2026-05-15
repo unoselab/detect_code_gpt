@@ -37,7 +37,7 @@ RUN_NAME="codellama-7b-hf_csn_t02_n2000_run"
 # -----------------------------
 # Files
 # -----------------------------
-SELECTION_SCRIPT="${CODE_SELECTION_DIR}/create_outputs_530_filter.py"
+SELECTION_SCRIPT="${CODE_SELECTION_DIR}/create_filtered_outputs.py"
 
 OUTPUT_DIR="${OUTPUT_ROOT}/${DATASET_NAME}/${DATASET_KEY}"
 
