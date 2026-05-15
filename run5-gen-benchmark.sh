@@ -28,9 +28,9 @@ TIMESTAMP=$(date +%m-%d_%H:%M)        # captured at script start
 LOG_FILE="${LOG_DIR}/generate_benchmark_${COMPLEXITY}_${TIMESTAMP}.log"
 echo "=== Benchmark generation configuration ==="
 echo "  COMPLEXITY:         ${COMPLEXITY}"
-echo "  INPUT_JSONL:        ${INPUT_JSONL}"
-echo "  BENCHMARK_OUT_JSONL:${BENCHMARK_OUT_JSONL}"
-echo "  LOG_FILE:           ${LOG_FILE}"
+echo "  INPUT_JSONL:        ${INPUT_JSONL/${PROJECT_ROOT}/PRJ}"
+echo "  BENCHMARK_OUT_JSONL:${BENCHMARK_OUT_JSONL/${PROJECT_ROOT}/PRJ}"
+echo "  LOG_FILE:           ${LOG_FILE/${PROJECT_ROOT}/PRJ}"
 echo "=========================================="
 echo ""
 
