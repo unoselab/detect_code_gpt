@@ -79,31 +79,72 @@ def count_whitespace_tokens(text: str) -> int:
     return len(re.findall(r"\S+", text))
 
 
-def token_span_for_char_span(token_matches: List[re.Match[str]], start_char: int, end_char: int) -> Tuple[Optional[int], Optional[int]]:
-    """Return token span [start, end) overlapping the character span.
+def token_span_for_char_span(
+    token_spans: List[Dict[str, Any]],
+    start_char: int,
+    end_char: int,
+) -> tuple:
+    overlapping = []
 
-    A region can start or end with whitespace, so this function returns the span
-    of non-whitespace tokens that overlap the region. If the region has no
-    non-whitespace tokens, returns (None, None).
-    """
-    overlapping: List[int] = []
-    for idx, match in enumerate(token_matches):
-        if match.end() <= start_char:
+    for token in token_spans:
+        tok_start = int(token["start_char"])
+        tok_end = int(token["end_char"])
+
+        # Skip zero-length empty tokens unless the region itself is empty.
+        if tok_start == tok_end:
             continue
-        if match.start() >= end_char:
-            break
-        overlapping.append(idx)
+
+        if tok_start < end_char and tok_end > start_char:
+            overlapping.append(int(token["index"]))
 
     if not overlapping:
         return None, None
-    return overlapping[0], overlapping[-1] + 1
+
+    return min(overlapping), max(overlapping) + 1
+
+
+def split_space_token_spans(text: str) -> List[Dict[str, Any]]:
+    """
+    Return token spans using the same tokenization logic as batch mode:
+
+        tokens = text.split(" ")
+
+    Important:
+    - This splits only on literal spaces.
+    - Newlines remain inside tokens.
+    - Consecutive spaces create empty tokens.
+
+    Empty tokens get zero-length char spans.
+    """
+    spans = []
+    cursor = 0
+
+    tokens = text.split(" ")
+    for token_index, token in enumerate(tokens):
+        start = cursor
+        end = start + len(token)
+
+        spans.append({
+            "index": token_index,
+            "text": token,
+            "start_char": start,
+            "end_char": end,
+        })
+
+        # Move past token plus the separator space.
+        # For the last token, this may move one char beyond the text length,
+        # but cursor is not used after the loop.
+        cursor = end + 1
+
+    return spans
 
 
 def add_token_spans(mixed_code: str, regions: List[Dict[str, Any]]) -> None:
-    token_matches = list(re.finditer(r"\S+", mixed_code))
+    token_spans = split_space_token_spans(mixed_code)
+
     for region in regions:
         token_start, token_end = token_span_for_char_span(
-            token_matches,
+            token_spans,
             int(region["start_char"]),
             int(region["end_char"]),
         )
