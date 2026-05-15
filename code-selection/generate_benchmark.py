@@ -70,87 +70,127 @@ def require_string(record: Dict[str, Any], key: str, index: int) -> str:
     return value
 
 
-def count_whitespace_tokens(text: str) -> int:
-    """Match run_interactive_mode's current rough tokenization purposefully.
+# -----------------------------------------------------------------------------
+# Tokenization scheme
+# -----------------------------------------------------------------------------
 
-    The detector chunks by whitespace tokens. For benchmark metadata, this count
-    is informational; character spans remain the source of truth for evaluation.
+TOKENIZATION_SCHEME = "split_space_v1"
+TOKENIZATION_DESCRIPTION = (
+    "tokens = text.split(' '). Matches run_interactive_mode in main.py. "
+    "Empty tokens from consecutive spaces are preserved. Newlines stay "
+    "inside tokens."
+)
+
+
+def count_split_space_tokens(text: str) -> int:
+    """Token count under the split_space_v1 scheme."""
+    return len(text.split(" "))
+
+
+def count_whitespace_tokens_regex(text: str) -> int:
+    """Informational count using regex non-whitespace runs.
+
+    Different from split_space_v1: this collapses any whitespace run (including
+    newlines) and produces no empty tokens. Kept only for the top-level
+    'n_tokens_total_regex' field as a sanity-check companion.
     """
     return len(re.findall(r"\S+", text))
 
 
-def token_span_for_char_span(
-    token_spans: List[Dict[str, Any]],
-    start_char: int,
-    end_char: int,
-) -> tuple:
-    overlapping = []
+# -----------------------------------------------------------------------------
+# Region computation — char and token, computed independently
+# -----------------------------------------------------------------------------
 
-    for token in token_spans:
-        tok_start = int(token["start_char"])
-        tok_end = int(token["end_char"])
-
-        # Skip zero-length empty tokens unless the region itself is empty.
-        if tok_start == tok_end:
-            continue
-
-        if tok_start < end_char and tok_end > start_char:
-            overlapping.append(int(token["index"]))
-
-    if not overlapping:
-        return None, None
-
-    return min(overlapping), max(overlapping) + 1
+REGION_SPECS = [
+    {"label": "prompt", "role": "context",    "source_field": "prompt"},
+    {"label": "HWC",    "role": "non_target", "source_field": "solution"},
+    {"label": "MGC",    "role": "target",     "source_field": "output"},
+]
 
 
-def split_space_token_spans(text: str) -> List[Dict[str, Any]]:
+def compute_char_regions(parts: List[str]) -> List[Dict[str, Any]]:
+    """Cumulative character offsets for each part, in order.
+
+    For parts = [prompt, hwc, mgc], returns three regions whose char spans
+    tile [0, len(prompt) + len(hwc) + len(mgc)) without gaps or overlaps.
     """
-    Return token spans using the same tokenization logic as batch mode:
-
-        tokens = text.split(" ")
-
-    Important:
-    - This splits only on literal spaces.
-    - Newlines remain inside tokens.
-    - Consecutive spaces create empty tokens.
-
-    Empty tokens get zero-length char spans.
-    """
-    spans = []
+    regions = []
     cursor = 0
-
-    tokens = text.split(" ")
-    for token_index, token in enumerate(tokens):
+    for spec, part in zip(REGION_SPECS, parts):
         start = cursor
-        end = start + len(token)
-
-        spans.append({
-            "index": token_index,
-            "text": token,
+        end = start + len(part)
+        regions.append({
+            "label": spec["label"],
             "start_char": start,
             "end_char": end,
+            "n_chars": end - start,
         })
-
-        # Move past token plus the separator space.
-        # For the last token, this may move one char beyond the text length,
-        # but cursor is not used after the loop.
-        cursor = end + 1
-
-    return spans
+        cursor = end
+    return regions
 
 
-def add_token_spans(mixed_code: str, regions: List[Dict[str, Any]]) -> None:
-    token_spans = split_space_token_spans(mixed_code)
+def compute_token_regions(parts: List[str]) -> List[Dict[str, Any]]:
+    """Cumulative split_space_v1 token offsets for each part, in order.
 
-    for region in regions:
-        token_start, token_end = token_span_for_char_span(
-            token_spans,
-            int(region["start_char"]),
-            int(region["end_char"]),
+    IMPORTANT: this counts tokens in each part INDEPENDENTLY, then sums.
+    This is NOT the same as tokenizing the concatenated string and slicing,
+    because concatenation can fuse the last token of one part with the first
+    token of the next when there's no whitespace at the boundary.
+
+    We do it this way intentionally — the regions become a clean tiling of
+    token indices. Consumers who care about the concatenated-string view
+    should tokenize mixed_code themselves; the per-region 'n_tokens_*' fields
+    here describe each part's own token count.
+    """
+    regions = []
+    cursor = 0
+    for spec, part in zip(REGION_SPECS, parts):
+        n_tokens = count_split_space_tokens(part)
+        start = cursor
+        end = start + n_tokens
+        regions.append({
+            "label": spec["label"],
+            "start_token_split_space_v1": start,
+            "end_token_split_space_v1": end,
+            "n_tokens_split_space_v1": n_tokens,
+        })
+        cursor = end
+    return regions
+
+
+def merge_regions(
+    char_regions: List[Dict[str, Any]],
+    token_regions: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Combine the two independent passes into one region list per spec.
+
+    Both lists must be in REGION_SPECS order.
+    """
+    if len(char_regions) != len(REGION_SPECS) or len(token_regions) != len(REGION_SPECS):
+        raise ValueError(
+            f"Expected {len(REGION_SPECS)} regions in each pass; "
+            f"got char={len(char_regions)}, token={len(token_regions)}"
         )
-        region["start_token"] = token_start
-        region["end_token"] = token_end
-        region["n_tokens"] = None if token_start is None else token_end - token_start
+
+    merged = []
+    for spec, char_r, token_r in zip(REGION_SPECS, char_regions, token_regions):
+        if char_r["label"] != spec["label"] or token_r["label"] != spec["label"]:
+            raise ValueError(
+                f"Region label mismatch: spec={spec['label']!r}, "
+                f"char={char_r['label']!r}, token={token_r['label']!r}"
+            )
+        merged.append({
+            "label":         spec["label"],
+            "role":          spec["role"],
+            "source_field":  spec["source_field"],
+            "start_char":    char_r["start_char"],
+            "end_char":      char_r["end_char"],
+            "n_chars":       char_r["n_chars"],
+            "start_token_split_space_v1": token_r["start_token_split_space_v1"],
+            "end_token_split_space_v1":   token_r["end_token_split_space_v1"],
+            "n_tokens_split_space_v1":    token_r["n_tokens_split_space_v1"],
+        })
+    return merged
 
 
 # -----------------------------------------------------------------------------
@@ -164,78 +204,45 @@ def build_level1_record(record: Dict[str, Any], index: int) -> Dict[str, Any]:
         prompt + solution(HWC) + output(MGC)
 
     The MGC target is a single contiguous region at the end of mixed_code.
+    Char and token regions are computed by two independent passes over the
+    three input parts, then merged.
     """
     prompt = require_string(record, "prompt", index)
-    hwc = require_string(record, "solution", index)
-    mgc = require_string(record, "output", index)
+    hwc    = require_string(record, "solution", index)
+    mgc    = require_string(record, "output", index)
 
-    prompt_start = 0
-    prompt_end = prompt_start + len(prompt)
+    parts = [prompt, hwc, mgc]
+    mixed_code = "".join(parts)
 
-    hwc_start = prompt_end
-    hwc_end = hwc_start + len(hwc)
-
-    mgc_start = hwc_end
-    mgc_end = mgc_start + len(mgc)
-
-    mixed_code = prompt + hwc + mgc
-
-    regions: List[Dict[str, Any]] = [
-        {
-            "label": "prompt",
-            "role": "context",
-            "source_field": "prompt",
-            "start_char": prompt_start,
-            "end_char": prompt_end,
-            "n_chars": prompt_end - prompt_start,
-        },
-        {
-            "label": "HWC",
-            "role": "non_target",
-            "source_field": "solution",
-            "start_char": hwc_start,
-            "end_char": hwc_end,
-            "n_chars": hwc_end - hwc_start,
-        },
-        {
-            "label": "MGC",
-            "role": "target",
-            "source_field": "output",
-            "start_char": mgc_start,
-            "end_char": mgc_end,
-            "n_chars": mgc_end - mgc_start,
-        },
-    ]
-    add_token_spans(mixed_code, regions)
+    char_regions  = compute_char_regions(parts)
+    token_regions = compute_token_regions(parts)
+    regions       = merge_regions(char_regions, token_regions)
 
     mixed_record: Dict[str, Any] = {
-        "id": index,
-        "complexity": "level1",
-        "mix_strategy": "prompt_solution_output_concat",
-        "description": "Level 1: direct concatenation of prompt + HWC(solution) + MGC(output).",
-        "source_line_no": record.get("source_line_no"),
-        "filter_index": record.get("filter_index", record.get("index")),
-        "prompt": prompt,
-        "hwc": hwc,
-        "mgc": mgc,
-        "mixed_code": mixed_code,
-        "regions": regions,
-        "target_label": "MGC",
-        "target_regions": [region for region in regions if region["label"] == "MGC"],
-        "n_chars_total": len(mixed_code),
-        "n_tokens_total": count_whitespace_tokens(mixed_code),
+        "id":               index,
+        "complexity":       "level1",
+        "mix_strategy":     "prompt_solution_output_concat",
+        "description":      "Level 1: direct concatenation of prompt + HWC(solution) + MGC(output).",
+        "tokenization":     TOKENIZATION_SCHEME,
+        "source_line_no":   record.get("source_line_no"),
+        "filter_index":     record.get("filter_index", record.get("index")),
+        "prompt":           prompt,
+        "hwc":              hwc,
+        "mgc":              mgc,
+        "mixed_code":       mixed_code,
+        "regions":          regions,
+        "target_label":     "MGC",
+        "target_regions":   [r for r in regions if r["label"] == "MGC"],
+        "n_chars_total":    len(mixed_code),
+        "n_tokens_total_split_space_v1": count_split_space_tokens(mixed_code),
+        "n_tokens_total_regex":          count_whitespace_tokens_regex(mixed_code),
     }
 
-    # Preserve useful DetectCodeGPT score metadata if outputs_530_filter.jsonl
-    # was created with --include_scores.
+    # Preserve DetectCodeGPT score metadata when present.
     for key in [
-        "hwc_npr",
-        "mgc_npr",
-        "winner",
-        "hwc_logrank",
-        "mgc_logrank",
-        "hwc_perturbed_logrank",
-        "mgc_perturbed_logrank",
+        "hwc_npr", "mgc_npr", "winner",
+        "hwc_logrank", "mgc_logrank",
+        "hwc_perturbed_logrank", "mgc_perturbed_logrank",
     ]:
         if key in record:
             mixed_record[key] = record[key]
