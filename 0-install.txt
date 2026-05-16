@@ -92,22 +92,24 @@ wc -l data/CodeSearchNet/python/*.jsonl
 ```
 
 ---
-## Note: StarCoder2 requires a newer Hugging Face stack
+## Note: StarCoder2 environment setup
 
-The original `detectcodegpt` conda environment was pinned for the CodeLlama reproduction and used:
+StarCoder2 requires a newer Hugging Face stack.
+
+The original `detectcodegpt` conda environment was pinned for the CodeLlama reproduction:
 
 ```text
-transformers==4.36.2
 torch==2.1.2
+transformers==4.36.2
 ````
 
-This environment works for CodeLlama, but it cannot load StarCoder2:
+That environment works for CodeLlama, but it cannot load StarCoder2:
 
 ```text
 KeyError: 'starcoder2'
 ```
 
-Reason: `transformers==4.36.2` does not recognize the `model_type="starcoder2"` field in `bigcode/starcoder2-7b`.
+Reason: `transformers==4.36.2` does not recognize the `model_type="starcoder2"` field used by `bigcode/starcoder2-7b`.
 
 To avoid breaking the original CodeLlama reproduction environment, we cloned it:
 
@@ -116,53 +118,88 @@ conda create --name detectcodegpt_starcoder --clone detectcodegpt
 conda activate detectcodegpt_starcoder
 ```
 
-Then we upgraded the Hugging Face stack in the cloned environment.
+At first, upgrading without version bounds installed:
 
-Important caveat: installing the newest `transformers` pulled `transformers==5.8.1`, which recognizes StarCoder2, but it also prints:
+```text
+transformers==5.8.1
+```
+
+This recognized `starcoder2`, but introduced a new problem:
 
 ```text
 [transformers] Disabling PyTorch because PyTorch >= 2.4 is required but found 2.1.2
+ImportError: AutoModelForCausalLM requires the PyTorch library but it was not found
 ```
 
-So StarCoder2 config loading works, but model loading/generation will not work until either:
+So Transformers 5.x is too new for this environment because it requires PyTorch >= 2.4.
 
-1. PyTorch is upgraded to a version supported by this Transformers release, or
-2. Transformers is downgraded to a StarCoder2-compatible 4.x version that still supports `torch==2.1.2`.
-
-Recommended safe path for this branch:
+The working fix is to use a StarCoder2-compatible Transformers 4.x release:
 
 ```bash
-conda activate detectcodegpt_starcoder
-pip install -U "transformers>=4.42.4,<5" "accelerate>=0.29.0" "tokenizers>=0.19.0" "huggingface_hub>=0.23.0,<1.0"
+pip uninstall -y transformers tokenizers huggingface_hub accelerate
+
+pip install \
+  "transformers==4.42.4" \
+  "tokenizers>=0.19,<0.20" \
+  "huggingface_hub>=0.23,<1.0" \
+  "accelerate>=0.29,<1.0" \
+  "safetensors>=0.4"
 ```
 
-Then verify:
+Verification command:
 
 ```bash
 python - <<'PY'
-import transformers
 import torch
-from transformers import AutoConfig
+import transformers
+from transformers import AutoConfig, AutoModelForCausalLM
 
-print("transformers:", transformers.__version__)
 print("torch:", torch.__version__)
+print("cuda available:", torch.cuda.is_available())
+print("transformers:", transformers.__version__)
+
 cfg = AutoConfig.from_pretrained("bigcode/starcoder2-7b")
 print("model_type:", cfg.model_type)
+
+print("AutoModelForCausalLM import/load path is available.")
 PY
 ```
 
-Expected:
+Expected working output:
 
 ```text
+torch: 2.1.2
+cuda available: True
+transformers: 4.42.4
 model_type: starcoder2
+AutoModelForCausalLM import/load path is available.
 ```
 
-Keep environments separate:
+Environment roles:
 
 ```text
-detectcodegpt              = original CodeLlama reproduction environment
+detectcodegpt              = frozen original CodeLlama reproduction environment
 detectcodegpt_starcoder    = StarCoder2-compatible environment
 ```
+
+Use `detectcodegpt_starcoder` for:
+
+```bash
+./run1-generate.sh
+```
+
+when `GEN_MODEL_HF="bigcode/starcoder2-7b"`.
+
+
+
+
+
+
+
+
+
+
+
 
 ---
 
