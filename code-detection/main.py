@@ -117,18 +117,18 @@ def setup_args():
     # 2026-05-15 msong: batch-benchmark mode for MGC localization evaluation.
     parser.add_argument('--batch_benchmark', action='store_true',
                         help='Run detector across all records in a benchmark JSONL, '
-                            'producing per-chunk NPR scores. Reads --benchmark_jsonl, '
-                            'writes per-chunk CSV and pickle cache.')
+                            'producing per-chunk NPR scores. Reads --benchmark_jsonl.')
     parser.add_argument('--benchmark_jsonl', type=str, default=None,
-                        help='Path to benchmark JSONL produced by generate_benchmark.py. '
-                            'Required when --batch_benchmark is set.')
+                        help='Path to benchmark JSONL produced by generate_benchmark.py.')
+    parser.add_argument('--outputs_txt_path', type=str, default=None,
+                        help='Path to original outputs.txt for authoritative MGC text. '
+                            'Defaults to outputs.txt in the same dir as --benchmark_jsonl.')
     parser.add_argument('--benchmark_results_csv', type=str, default=None,
                         help='Output CSV path. Defaults to ../logs/benchmark_results_<output_name>.csv')
     parser.add_argument('--benchmark_results_pkl', type=str, default=None,
-                        help='Output pickle cache path. Defaults to '
-                            '../logs/benchmark_results_<output_name>.pkl')
+                        help='Output pickle cache path.')
     parser.add_argument('--load_benchmark_results', type=str, default=None,
-                        help='Load benchmark results from a pickle file, skip scoring')
+                        help='Skip scoring, load from pickle, just regenerate CSV.')
 
     # 2026-05-12 msong, drop the args_dict override in setup_args.
     args = parser.parse_args()
@@ -148,6 +148,8 @@ def setup_args():
     # 2026-05-15 msong: batch-benchmark mode for MGC localization evaluation.
     if args.benchmark_jsonl is not None:
         args.benchmark_jsonl = os.path.expanduser(args.benchmark_jsonl)
+    if args.outputs_txt_path is not None:
+        args.outputs_txt_path = os.path.expanduser(args.outputs_txt_path)
     if args.benchmark_results_csv is not None:
         args.benchmark_results_csv = os.path.expanduser(args.benchmark_results_csv)
     if args.benchmark_results_pkl is not None:
@@ -551,9 +553,12 @@ def vislualize_distribution(predictions, title, ax):
     ax.set_ylabel("Density")
     ax.legend()
 
-
 def run_batch_benchmark(args, model_config):
     """Score every chunk of every record in a benchmark JSONL.
+
+    Per-chunk NPR scoring with positional MGC overlap measurement.
+    Ground truth for MGC content comes from outputs.txt (authoritative source),
+    not from the benchmark file's stored offsets.
 
     Output: per-chunk CSV + pickle cache. Each row is one chunk's NPR result,
     plus ground-truth metadata so localization evaluation is a CSV join.
@@ -565,22 +570,26 @@ def run_batch_benchmark(args, model_config):
     if not args.benchmark_jsonl:
         logger.error("--benchmark_jsonl is required with --batch_benchmark")
         return
+
     if not os.path.isfile(args.benchmark_jsonl):
         logger.error(f"Benchmark JSONL not found: {args.benchmark_jsonl}")
         return
 
-    # Resolve output paths with defaults
     output_csv = args.benchmark_results_csv or f"../logs/benchmark_results_{args.output_name}.csv"
     output_pkl = args.benchmark_results_pkl or f"../logs/benchmark_results_{args.output_name}.pkl"
 
+    # ------------------------------------------------------------------
     # Short-circuit: load cached results
+    # ------------------------------------------------------------------
     if args.load_benchmark_results is not None:
         logger.info(f"Loading cached benchmark results from {args.load_benchmark_results}")
         with open(args.load_benchmark_results, "rb") as f:
             all_chunk_results = pickle.load(f)
         logger.info(f"Loaded {len(all_chunk_results)} chunk results")
     else:
+        # --------------------------------------------------------------
         # Load benchmark records
+        # --------------------------------------------------------------
         records = []
         with open(args.benchmark_jsonl, "r") as f:
             for line in f:
@@ -589,6 +598,31 @@ def run_batch_benchmark(args, model_config):
                     continue
                 records.append(json.loads(line))
         logger.info(f"Loaded {len(records)} benchmark records from {args.benchmark_jsonl}")
+
+        # --------------------------------------------------------------
+        # 2026-05-15 msong: load outputs.txt as the AUTHORITATIVE source
+        # of MGC text. The benchmark's record["mgc"] field should match this,
+        # but we go to outputs.txt directly per your request — this is robust
+        # to any future benchmark-generation bug that might corrupt offsets.
+        # --------------------------------------------------------------
+        outputs_txt_path = args.outputs_txt_path
+        if not outputs_txt_path:
+            bench_dir = os.path.dirname(args.benchmark_jsonl)
+            outputs_txt_path = os.path.join(bench_dir, "outputs.txt")
+        if not os.path.isfile(outputs_txt_path):
+            logger.error(f"outputs.txt not found at {outputs_txt_path}; "
+                         f"pass --outputs_txt_path explicitly")
+            return
+        logger.info(f"Loading ground-truth MGC text from {outputs_txt_path}")
+        line_no_to_mgc = {}
+        with open(outputs_txt_path, "r") as f:
+            for ln, line in enumerate(f):
+                line = line.strip()
+                if not line:
+                    continue
+                obj = json.loads(line)
+                line_no_to_mgc[ln] = obj.get("output", "")
+        logger.info(f"Loaded ground-truth MGC for {len(line_no_to_mgc)} outputs.txt lines")
 
         n_perturb = max([int(x) for x in str(args.n_perturbation_list).split(",")])
         max_len = args.max_len
@@ -600,42 +634,129 @@ def run_batch_benchmark(args, model_config):
         )
         logger.info(f"Estimated total chunks to score: {total_chunks_est}")
 
+        n_records_mgc_not_found = 0
+
+        # --------------------------------------------------------------
+        # Per-record loop
+        # --------------------------------------------------------------
         for record_idx, record in enumerate(tqdm(records, desc="Records")):
             mixed_code = record["mixed_code"]
             all_tokens = mixed_code.split(" ")
             n_tokens_total = len(all_tokens)
 
-            mgc_region = next(reg for reg in record["regions"] if reg["label"] == "MGC")
-            mgc_start_token = mgc_region["start_token"]
-            mgc_end_token   = mgc_region["end_token"]
+            # ----------------------------------------------------------
+            # Pre-compute per-token char offsets (cumulative).
+            # token_char_starts[i] is the char position in mixed_code where
+            # token i begins, under the split_space_v1 tokenization.
+            # ----------------------------------------------------------
+            token_char_starts = []
+            cursor = 0
+            for tok in all_tokens:
+                token_char_starts.append(cursor)
+                cursor += len(tok) + 1  # +1 for the separator space
 
-            # Chunk: stride = max_len, no overlap
+            # ----------------------------------------------------------
+            # Locate the authoritative MGC text inside mixed_code.
+            # Using start-char rule for token-MGC membership: a token belongs
+            # to MGC if its start_char falls inside MGC's char range.
+            # This matches the benchmark's region-partitioning convention.
+            # ----------------------------------------------------------
+            source_line_no = record.get("source_line_no")
+            mgc_text_authoritative = line_no_to_mgc.get(source_line_no, "")
+
+            mgc_char_start = -1
+            mgc_char_end = -1
+            mgc_token_set = set()
+            mgc_n_tokens_total = 0
+
+            if mgc_text_authoritative:
+                mgc_char_start = mixed_code.find(mgc_text_authoritative)
+                if mgc_char_start >= 0:
+                    mgc_char_end = mgc_char_start + len(mgc_text_authoritative)
+                    mgc_token_set = {
+                        i for i, tok_start in enumerate(token_char_starts)
+                        if mgc_char_start <= tok_start < mgc_char_end
+                    }
+                    mgc_n_tokens_total = len(mgc_token_set)
+                else:
+                    n_records_mgc_not_found += 1
+                    if n_records_mgc_not_found <= 3:
+                        logger.warning(
+                            f"Record {record['id']} (source_line_no={source_line_no}): "
+                            f"MGC text from outputs.txt not found inside mixed_code; "
+                            f"intersection metrics will be zero for all chunks."
+                        )
+            else:
+                logger.warning(
+                    f"Record {record['id']}: no source_line_no or empty MGC in outputs.txt"
+                )
+
+            # Benchmark's stored MGC region (for legacy comparison)
+            mgc_region = next(reg for reg in record["regions"] if reg["label"] == "MGC")
+            bench_mgc_start_token = mgc_region["start_token"]
+            bench_mgc_end_token   = mgc_region["end_token"]
+
+            # ----------------------------------------------------------
+            # Per-chunk loop
+            # ----------------------------------------------------------
             for chunk_idx, start in enumerate(range(0, n_tokens_total, max_len)):
                 chunk_tokens = all_tokens[start:start + max_len]
                 end = start + len(chunk_tokens)
                 chunk_text = " ".join(chunk_tokens)
 
-                # Skip pathologically tiny chunks — NPR is unreliable
+                # ------------------------------------------------------
+                # Positional MGC overlap (NEW metric).
+                # Count chunk tokens (by index) that are also in mgc_token_set.
+                # ------------------------------------------------------
+                n_chunk_tokens_in_mgc = sum(1 for i in range(start, end) if i in mgc_token_set)
+                intersect_ratio_chunk = (
+                    n_chunk_tokens_in_mgc / len(chunk_tokens)
+                    if len(chunk_tokens) > 0 else 0.0
+                )
+                intersect_ratio_mgc = (
+                    n_chunk_tokens_in_mgc / mgc_n_tokens_total
+                    if mgc_n_tokens_total > 0 else 0.0
+                )
+                overlaps_mgc_by_tokens = intersect_ratio_chunk > 0.5  # tunable threshold
+
+                # Legacy: token-index overlap using benchmark's stored offsets
+                legacy_overlap_start = max(start, bench_mgc_start_token)
+                legacy_overlap_end = min(end, bench_mgc_end_token)
+                legacy_n_overlap = max(0, legacy_overlap_end - legacy_overlap_start)
+                legacy_overlaps_mgc = legacy_n_overlap > 0
+
+                # ------------------------------------------------------
+                # Score chunks below the size floor as low-confidence
+                # ------------------------------------------------------
                 if len(chunk_tokens) < 20:
                     all_chunk_results.append({
                         "record_id":         record["id"],
                         "chunk_idx":         chunk_idx,
                         "start_token":       start,
                         "end_token":         end,
-                        "n_tokens":          len(chunk_tokens),
+                        "chunk_n_tokens":    len(chunk_tokens),
                         "npr":               float("nan"),
                         "orig_logrank":      float("nan"),
                         "mean_p_logrank":    float("nan"),
                         "low_conf":          True,
-                        "overlaps_mgc":      end > mgc_start_token and start < mgc_end_token,
-                        "fully_in_mgc":      start >= mgc_start_token and end <= mgc_end_token,
-                        "n_mgc_tokens_in_chunk": max(0, min(end, mgc_end_token) - max(start, mgc_start_token)),
-                        "mgc_start_token":   mgc_start_token,
-                        "mgc_end_token":     mgc_end_token,
+                        # Positional MGC overlap
+                        "mgc_n_tokens":              mgc_n_tokens_total,
+                        "n_chunk_tokens_in_mgc":     n_chunk_tokens_in_mgc,
+                        "intersect_ratio_chunk":     intersect_ratio_chunk,
+                        "intersect_ratio_mgc":       intersect_ratio_mgc,
+                        "overlaps_mgc_by_tokens":    overlaps_mgc_by_tokens,
+                        # Legacy
+                        "legacy_overlaps_mgc_by_index":  legacy_overlaps_mgc,
+                        "legacy_n_mgc_tokens_in_chunk":  legacy_n_overlap,
+                        "mgc_start_token":   bench_mgc_start_token,
+                        "mgc_end_token":     bench_mgc_end_token,
+                        "source_line_no":    source_line_no,
                     })
                     continue
 
-                # Score this chunk
+                # ------------------------------------------------------
+                # Score this chunk (NPR computation)
+                # ------------------------------------------------------
                 orig_logrank = get_rank(chunk_text, args, model_config, log=True)
                 inputs_to_perturb = [chunk_text for _ in range(n_perturb)]
                 p_texts = perturb_texts(inputs_to_perturb, args, model_config)
@@ -644,59 +765,86 @@ def run_batch_benchmark(args, model_config):
                 mean_p_rank = np.mean(valid_p_ranks) if valid_p_ranks else float("nan")
                 npr = mean_p_rank / orig_logrank if orig_logrank else float("nan")
 
-                # Compute overlap with MGC ground truth (in token indices)
-                overlap_start = max(start, mgc_start_token)
-                overlap_end = min(end, mgc_end_token)
-                n_mgc_in_chunk = max(0, overlap_end - overlap_start)
-
                 all_chunk_results.append({
                     "record_id":         record["id"],
                     "chunk_idx":         chunk_idx,
                     "start_token":       start,
                     "end_token":         end,
-                    "n_tokens":          len(chunk_tokens),
+                    "chunk_n_tokens":    len(chunk_tokens),
                     "npr":               npr,
                     "orig_logrank":      orig_logrank,
                     "mean_p_logrank":    mean_p_rank,
                     "low_conf":          False,
-                    "overlaps_mgc":      n_mgc_in_chunk > 0,
-                    "fully_in_mgc":      start >= mgc_start_token and end <= mgc_end_token,
-                    "n_mgc_tokens_in_chunk": n_mgc_in_chunk,
-                    "mgc_start_token":   mgc_start_token,
-                    "mgc_end_token":     mgc_end_token,
+                    # Positional MGC overlap
+                    "mgc_n_tokens":              mgc_n_tokens_total,
+                    "n_chunk_tokens_in_mgc":     n_chunk_tokens_in_mgc,
+                    "intersect_ratio_chunk":     intersect_ratio_chunk,
+                    "intersect_ratio_mgc":       intersect_ratio_mgc,
+                    "overlaps_mgc_by_tokens":    overlaps_mgc_by_tokens,
+                    # Legacy
+                    "legacy_overlaps_mgc_by_index":  legacy_overlaps_mgc,
+                    "legacy_n_mgc_tokens_in_chunk":  legacy_n_overlap,
+                    "mgc_start_token":   bench_mgc_start_token,
+                    "mgc_end_token":     bench_mgc_end_token,
+                    "source_line_no":    source_line_no,
                 })
 
             if (record_idx + 1) % 50 == 0:
                 logger.info(f"Progress: {record_idx + 1}/{len(records)} records, "
                             f"{len(all_chunk_results)} chunks scored")
 
+        if n_records_mgc_not_found > 0:
+            logger.warning(
+                f"Total records where MGC text not found in mixed_code: "
+                f"{n_records_mgc_not_found}/{len(records)}"
+            )
+
+        # --------------------------------------------------------------
         # Save pickle cache
+        # --------------------------------------------------------------
         os.makedirs(os.path.dirname(output_pkl) or ".", exist_ok=True)
         with open(output_pkl, "wb") as f:
             pickle.dump(all_chunk_results, f)
         logger.info(f"Cached benchmark results to {output_pkl}")
 
-    # Always write CSV (from cached or fresh data)
+    # ------------------------------------------------------------------
+    # Write CSV (from fresh or cached data)
+    # ------------------------------------------------------------------
     os.makedirs(os.path.dirname(output_csv) or ".", exist_ok=True)
     with open(output_csv, "w") as f:
-        f.write("record_id,chunk_idx,start_token,end_token,n_tokens,npr,"
-                "orig_logrank,mean_p_logrank,low_conf,"
-                "overlaps_mgc,fully_in_mgc,n_mgc_tokens_in_chunk,"
-                "mgc_start_token,mgc_end_token,"
-                "predict_mgc_youden,predict_mgc_highconf\n")
+        f.write("record_id,chunk_idx,start_token,end_token,chunk_n_tokens,"
+                "npr,orig_logrank,mean_p_logrank,low_conf,"
+                "mgc_n_tokens,n_chunk_tokens_in_mgc,intersect_ratio_chunk,intersect_ratio_mgc,"
+                "overlaps_mgc_by_tokens,legacy_overlaps_mgc_by_index,"
+                "legacy_n_mgc_tokens_in_chunk,mgc_start_token,mgc_end_token,"
+                "source_line_no,predict_mgc_youden,predict_mgc_highconf\n")
         for r in all_chunk_results:
             pred_youden = (not r["low_conf"]) and (not math.isnan(r["npr"])) and (r["npr"] > args.threshold_youden)
             pred_high   = (not r["low_conf"]) and (not math.isnan(r["npr"])) and (r["npr"] > args.threshold)
-            f.write(f"{r['record_id']},{r['chunk_idx']},{r['start_token']},{r['end_token']},"
-                    f"{r['n_tokens']},{r['npr']:.6f},{r['orig_logrank']:.6f},{r['mean_p_logrank']:.6f},"
-                    f"{int(r['low_conf'])},{int(r['overlaps_mgc'])},{int(r['fully_in_mgc'])},"
-                    f"{r['n_mgc_tokens_in_chunk']},{r['mgc_start_token']},{r['mgc_end_token']},"
-                    f"{int(pred_youden)},{int(pred_high)}\n")
+            f.write(
+                f"{r['record_id']},{r['chunk_idx']},{r['start_token']},{r['end_token']},"
+                f"{r['chunk_n_tokens']},{r['npr']:.6f},{r['orig_logrank']:.6f},"
+                f"{r['mean_p_logrank']:.6f},{int(r['low_conf'])},"
+                f"{r['mgc_n_tokens']},{r['n_chunk_tokens_in_mgc']},"
+                f"{r['intersect_ratio_chunk']:.4f},{r['intersect_ratio_mgc']:.4f},"
+                f"{int(r['overlaps_mgc_by_tokens'])},{int(r['legacy_overlaps_mgc_by_index'])},"
+                f"{r['legacy_n_mgc_tokens_in_chunk']},{r['mgc_start_token']},"
+                f"{r['mgc_end_token']},{r['source_line_no']},"
+                f"{int(pred_youden)},{int(pred_high)}\n"
+            )
     logger.info(f"Wrote benchmark CSV to {output_csv}")
 
+    # ------------------------------------------------------------------
     # Quick summary
+    # ------------------------------------------------------------------
     n_chunks = len(all_chunk_results)
     n_valid = sum(1 for r in all_chunk_results if not r["low_conf"] and not math.isnan(r["npr"]))
+    n_overlap_new = sum(1 for r in all_chunk_results if r["overlaps_mgc_by_tokens"])
+    n_overlap_legacy = sum(1 for r in all_chunk_results if r["legacy_overlaps_mgc_by_index"])
+    n_disagree = sum(
+        1 for r in all_chunk_results
+        if r["overlaps_mgc_by_tokens"] != r["legacy_overlaps_mgc_by_index"]
+    )
     n_pred_youden = sum(
         1 for r in all_chunk_results
         if not r["low_conf"] and not math.isnan(r["npr"]) and r["npr"] > args.threshold_youden
@@ -705,16 +853,17 @@ def run_batch_benchmark(args, model_config):
         1 for r in all_chunk_results
         if not r["low_conf"] and not math.isnan(r["npr"]) and r["npr"] > args.threshold
     )
-    n_overlap = sum(1 for r in all_chunk_results if r["overlaps_mgc"])
 
     print("\n" + "=" * 70)
     print("                    BATCH BENCHMARK SUMMARY")
     print("=" * 70)
-    print(f"  Total chunks scored:           {n_chunks}")
-    print(f"  Valid scores (not low_conf):   {n_valid}")
-    print(f"  Chunks overlapping MGC:        {n_overlap}")
-    print(f"  Flagged (NPR > {args.threshold_youden:.4f}): {n_pred_youden}")
-    print(f"  Flagged (NPR > {args.threshold:.4f}):       {n_pred_high}")
+    print(f"  Total chunks scored:                    {n_chunks}")
+    print(f"  Valid scores (not low_conf):            {n_valid}")
+    print(f"  Chunks overlapping MGC (positional):    {n_overlap_new}")
+    print(f"  Chunks overlapping MGC (legacy index):  {n_overlap_legacy}")
+    print(f"  Disagreement between new vs legacy:     {n_disagree}")
+    print(f"  Flagged (NPR > {args.threshold_youden:.4f}, Youden's J):  {n_pred_youden}")
+    print(f"  Flagged (NPR > {args.threshold:.4f}, high-conf):       {n_pred_high}")
     print("=" * 70)
 
 

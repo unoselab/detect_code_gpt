@@ -1,5 +1,6 @@
 #!/bin/bash
-# Run DetectCodeGPT against the level1 benchmark, producing per-chunk NPR scores.
+# Run DetectCodeGPT across the level1 benchmark JSONL, scoring 128-token chunks
+# and measuring positional MGC overlap. Outputs per-chunk CSV + pickle cache.
 
 set -euo pipefail
 
@@ -25,10 +26,11 @@ MAX_LEN=128
 THRESHOLD_YOUDEN=1.3875
 THRESHOLD_HIGH=1.60
 
-# Toggle: set to a pickle path to skip scoring and just regenerate CSV/metrics
-LOAD_CACHED=""
+LOAD_CACHED=""  # Set to a pickle path to skip scoring
 
-BENCHMARK_JSONL="${OUTPUT_ROOT}/${DATASET_NAME}/${DATASET_KEY}/outputs_530_benchmark_${COMPLEXITY}.jsonl"
+DATA_DIR="${OUTPUT_ROOT}/${DATASET_NAME}/${DATASET_KEY}"
+BENCHMARK_JSONL="${DATA_DIR}/outputs_530_benchmark_${COMPLEXITY}.jsonl"
+OUTPUTS_TXT="${DATA_DIR}/outputs.txt"
 OUTPUT_NAME="benchmark_${COMPLEXITY}_${GEN_MODEL,,}"
 TIMESTAMP=$(date +%m-%d_%H:%M)
 LOG_FILE="${LOG_DIR}/${OUTPUT_NAME}_${TIMESTAMP}.log"
@@ -39,21 +41,26 @@ LOG_FILE="${LOG_DIR}/${OUTPUT_NAME}_${TIMESTAMP}.log"
 
 echo "=== Batch benchmark configuration ==="
 echo "  BENCHMARK_JSONL:  ${BENCHMARK_JSONL/${PROJECT_ROOT}/PRJ}"
+echo "  OUTPUTS_TXT:      ${OUTPUTS_TXT/${PROJECT_ROOT}/PRJ}"
 echo "  BASE_MODEL:       ${BASE_MODEL_NAME}"
 echo "  N_PERTURBATIONS:  ${N_PERTURBATIONS}"
 echo "  MAX_LEN:          ${MAX_LEN}"
+echo "  THRESHOLD_YOUDEN: ${THRESHOLD_YOUDEN}"
+echo "  THRESHOLD_HIGH:   ${THRESHOLD_HIGH}"
 echo "  CUDA_DEVICE:      ${CUDA_DEVICE}"
 echo "  OUTPUT_NAME:      ${OUTPUT_NAME}"
 echo "  LOG_FILE:         ${LOG_FILE/${PROJECT_ROOT}/PRJ}"
-[[ -n "${LOAD_CACHED}" ]] && echo "  LOAD_CACHED:      ${LOAD_CACHED}"
-echo "===================================="
+[[ -n "${LOAD_CACHED}" ]] && echo "  LOAD_CACHED:      ${LOAD_CACHED/${PROJECT_ROOT}/PRJ}"
+echo "====================================="
 echo ""
 
-if [[ ! -f "${BENCHMARK_JSONL}" ]]; then
-    echo "ERROR: benchmark JSONL not found:"
-    echo "  ${BENCHMARK_JSONL}"
-    exit 1
-fi
+for required_file in "${BENCHMARK_JSONL}" "${OUTPUTS_TXT}"; do
+    if [[ ! -f "${required_file}" ]]; then
+        echo "ERROR: required file not found:"
+        echo "  ${required_file}"
+        exit 1
+    fi
+done
 
 cd "${PROJECT_ROOT}"
 mkdir -p "${LOG_DIR}"
@@ -74,6 +81,7 @@ head -10 "${BENCHMARK_JSONL}" > ~/Desktop/benchmark_test.jsonl
 python main.py \
     --batch_benchmark \
     --benchmark_jsonl "/home/user1-system12/Desktop/benchmark_test.jsonl" \
+    --outputs_txt_path "${OUTPUTS_TXT}" \
     --base_model_name "${BASE_MODEL_NAME}" \
     --n_perturbation_list "${N_PERTURBATIONS}" \
     --max_len "${MAX_LEN}" \
