@@ -640,7 +640,7 @@ def run_batch_benchmark(args, model_config):
         # Per-record loop
         # --------------------------------------------------------------
         for record_idx, record in enumerate(tqdm(records, desc="Records")):
-            mixed_code = record["mixed_code"]
+            mixed_code = record["hwc"] + record["mgc"]
             all_tokens = mixed_code.split(" ")
             n_tokens_total = len(all_tokens)
 
@@ -813,11 +813,10 @@ def run_batch_benchmark(args, model_config):
     os.makedirs(os.path.dirname(output_csv) or ".", exist_ok=True)
     with open(output_csv, "w") as f:
         f.write("record_id,chunk_idx,start_token,end_token,chunk_n_tokens,"
-                "npr,orig_logrank,mean_p_logrank,low_conf,"
-                "mgc_n_tokens,n_chunk_tokens_in_mgc,intersect_ratio_chunk,intersect_ratio_mgc,"
-                "overlaps_mgc_by_tokens,legacy_overlaps_mgc_by_index,"
-                "legacy_n_mgc_tokens_in_chunk,mgc_start_token,mgc_end_token,"
-                "source_line_no,predict_mgc_youden,predict_mgc_highconf\n")
+        "npr,orig_logrank,mean_p_logrank,low_conf,"
+        "mgc_n_tokens,n_chunk_tokens_in_mgc,intersect_ratio_chunk,intersect_ratio_mgc,"
+        "overlaps_mgc_by_tokens,source_line_no,"
+        "predict_mgc_youden,predict_mgc_highconf\n")
         for r in all_chunk_results:
             pred_youden = (not r["low_conf"]) and (not math.isnan(r["npr"])) and (r["npr"] > args.threshold_youden)
             pred_high   = (not r["low_conf"]) and (not math.isnan(r["npr"])) and (r["npr"] > args.threshold)
@@ -827,9 +826,7 @@ def run_batch_benchmark(args, model_config):
                 f"{r['mean_p_logrank']:.6f},{int(r['low_conf'])},"
                 f"{r['mgc_n_tokens']},{r['n_chunk_tokens_in_mgc']},"
                 f"{r['intersect_ratio_chunk']:.4f},{r['intersect_ratio_mgc']:.4f},"
-                f"{int(r['overlaps_mgc_by_tokens'])},{int(r['legacy_overlaps_mgc_by_index'])},"
-                f"{r['legacy_n_mgc_tokens_in_chunk']},{r['mgc_start_token']},"
-                f"{r['mgc_end_token']},{r['source_line_no']},"
+                f"{int(r['overlaps_mgc_by_tokens'])},{r['source_line_no']},"
                 f"{int(pred_youden)},{int(pred_high)}\n"
             )
     logger.info(f"Wrote benchmark CSV to {output_csv}")
