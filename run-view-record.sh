@@ -14,3 +14,5 @@ with open('$path') as f:
 }
 
 view_record $1
+
+python code-detection/view_benchmark_record.py --record_id $1 --verbose
