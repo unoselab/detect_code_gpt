@@ -114,6 +114,22 @@ def setup_args():
                     help="Youden's J threshold for NPR score in interactive mode "
                          "(Default: 1.3875 from the n=530 batch run)")
 
+    # 2026-05-15 msong: batch-benchmark mode for MGC localization evaluation.
+    parser.add_argument('--batch_benchmark', action='store_true',
+                        help='Run detector across all records in a benchmark JSONL, '
+                            'producing per-chunk NPR scores. Reads --benchmark_jsonl, '
+                            'writes per-chunk CSV and pickle cache.')
+    parser.add_argument('--benchmark_jsonl', type=str, default=None,
+                        help='Path to benchmark JSONL produced by generate_benchmark.py. '
+                            'Required when --batch_benchmark is set.')
+    parser.add_argument('--benchmark_results_csv', type=str, default=None,
+                        help='Output CSV path. Defaults to ../logs/benchmark_results_<output_name>.csv')
+    parser.add_argument('--benchmark_results_pkl', type=str, default=None,
+                        help='Output pickle cache path. Defaults to '
+                            '../logs/benchmark_results_<output_name>.pkl')
+    parser.add_argument('--load_benchmark_results', type=str, default=None,
+                        help='Load benchmark results from a pickle file, skip scoring')
+
     # 2026-05-12 msong, drop the args_dict override in setup_args.
     args = parser.parse_args()
     # 2026-05-12 msong, expand ~ in path-style args. HuggingFace's symlink-based
@@ -129,6 +145,16 @@ def setup_args():
         args.load_cached_results = os.path.expanduser(args.load_cached_results)
     if args.npr_csv_dir is not None:
         args.npr_csv_dir = os.path.expanduser(args.npr_csv_dir)
+    # 2026-05-15 msong: batch-benchmark mode for MGC localization evaluation.
+    if args.benchmark_jsonl is not None:
+        args.benchmark_jsonl = os.path.expanduser(args.benchmark_jsonl)
+    if args.benchmark_results_csv is not None:
+        args.benchmark_results_csv = os.path.expanduser(args.benchmark_results_csv)
+    if args.benchmark_results_pkl is not None:
+        args.benchmark_results_pkl = os.path.expanduser(args.benchmark_results_pkl)
+    if args.load_benchmark_results is not None:
+        args.load_benchmark_results = os.path.expanduser(args.load_benchmark_results)
+
     return args
 
 
@@ -526,6 +552,172 @@ def vislualize_distribution(predictions, title, ax):
     ax.legend()
 
 
+def run_batch_benchmark(args, model_config):
+    """Score every chunk of every record in a benchmark JSONL.
+
+    Output: per-chunk CSV + pickle cache. Each row is one chunk's NPR result,
+    plus ground-truth metadata so localization evaluation is a CSV join.
+    """
+    print("\n" + "=" * 70)
+    print("    DetectCodeGPT Batch Benchmark — MGC Localization Scoring    ")
+    print("=" * 70)
+
+    if not args.benchmark_jsonl:
+        logger.error("--benchmark_jsonl is required with --batch_benchmark")
+        return
+    if not os.path.isfile(args.benchmark_jsonl):
+        logger.error(f"Benchmark JSONL not found: {args.benchmark_jsonl}")
+        return
+
+    # Resolve output paths with defaults
+    output_csv = args.benchmark_results_csv or f"../logs/benchmark_results_{args.output_name}.csv"
+    output_pkl = args.benchmark_results_pkl or f"../logs/benchmark_results_{args.output_name}.pkl"
+
+    # Short-circuit: load cached results
+    if args.load_benchmark_results is not None:
+        logger.info(f"Loading cached benchmark results from {args.load_benchmark_results}")
+        with open(args.load_benchmark_results, "rb") as f:
+            all_chunk_results = pickle.load(f)
+        logger.info(f"Loaded {len(all_chunk_results)} chunk results")
+    else:
+        # Load benchmark records
+        records = []
+        with open(args.benchmark_jsonl, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                records.append(json.loads(line))
+        logger.info(f"Loaded {len(records)} benchmark records from {args.benchmark_jsonl}")
+
+        n_perturb = max([int(x) for x in str(args.n_perturbation_list).split(",")])
+        max_len = args.max_len
+
+        all_chunk_results = []
+        total_chunks_est = sum(
+            -(-r['n_tokens_total'] // max_len)  # ceiling division
+            for r in records
+        )
+        logger.info(f"Estimated total chunks to score: {total_chunks_est}")
+
+        for record_idx, record in enumerate(tqdm(records, desc="Records")):
+            mixed_code = record["mixed_code"]
+            all_tokens = mixed_code.split(" ")
+            n_tokens_total = len(all_tokens)
+
+            mgc_region = next(reg for reg in record["regions"] if reg["label"] == "MGC")
+            mgc_start_token = mgc_region["start_token"]
+            mgc_end_token   = mgc_region["end_token"]
+
+            # Chunk: stride = max_len, no overlap
+            for chunk_idx, start in enumerate(range(0, n_tokens_total, max_len)):
+                chunk_tokens = all_tokens[start:start + max_len]
+                end = start + len(chunk_tokens)
+                chunk_text = " ".join(chunk_tokens)
+
+                # Skip pathologically tiny chunks — NPR is unreliable
+                if len(chunk_tokens) < 20:
+                    all_chunk_results.append({
+                        "record_id":         record["id"],
+                        "chunk_idx":         chunk_idx,
+                        "start_token":       start,
+                        "end_token":         end,
+                        "n_tokens":          len(chunk_tokens),
+                        "npr":               float("nan"),
+                        "orig_logrank":      float("nan"),
+                        "mean_p_logrank":    float("nan"),
+                        "low_conf":          True,
+                        "overlaps_mgc":      end > mgc_start_token and start < mgc_end_token,
+                        "fully_in_mgc":      start >= mgc_start_token and end <= mgc_end_token,
+                        "n_mgc_tokens_in_chunk": max(0, min(end, mgc_end_token) - max(start, mgc_start_token)),
+                        "mgc_start_token":   mgc_start_token,
+                        "mgc_end_token":     mgc_end_token,
+                    })
+                    continue
+
+                # Score this chunk
+                orig_logrank = get_rank(chunk_text, args, model_config, log=True)
+                inputs_to_perturb = [chunk_text for _ in range(n_perturb)]
+                p_texts = perturb_texts(inputs_to_perturb, args, model_config)
+                p_ranks = get_ranks(p_texts, args, model_config, log=True)
+                valid_p_ranks = [r for r in p_ranks if not math.isnan(r)]
+                mean_p_rank = np.mean(valid_p_ranks) if valid_p_ranks else float("nan")
+                npr = mean_p_rank / orig_logrank if orig_logrank else float("nan")
+
+                # Compute overlap with MGC ground truth (in token indices)
+                overlap_start = max(start, mgc_start_token)
+                overlap_end = min(end, mgc_end_token)
+                n_mgc_in_chunk = max(0, overlap_end - overlap_start)
+
+                all_chunk_results.append({
+                    "record_id":         record["id"],
+                    "chunk_idx":         chunk_idx,
+                    "start_token":       start,
+                    "end_token":         end,
+                    "n_tokens":          len(chunk_tokens),
+                    "npr":               npr,
+                    "orig_logrank":      orig_logrank,
+                    "mean_p_logrank":    mean_p_rank,
+                    "low_conf":          False,
+                    "overlaps_mgc":      n_mgc_in_chunk > 0,
+                    "fully_in_mgc":      start >= mgc_start_token and end <= mgc_end_token,
+                    "n_mgc_tokens_in_chunk": n_mgc_in_chunk,
+                    "mgc_start_token":   mgc_start_token,
+                    "mgc_end_token":     mgc_end_token,
+                })
+
+            if (record_idx + 1) % 50 == 0:
+                logger.info(f"Progress: {record_idx + 1}/{len(records)} records, "
+                            f"{len(all_chunk_results)} chunks scored")
+
+        # Save pickle cache
+        os.makedirs(os.path.dirname(output_pkl) or ".", exist_ok=True)
+        with open(output_pkl, "wb") as f:
+            pickle.dump(all_chunk_results, f)
+        logger.info(f"Cached benchmark results to {output_pkl}")
+
+    # Always write CSV (from cached or fresh data)
+    os.makedirs(os.path.dirname(output_csv) or ".", exist_ok=True)
+    with open(output_csv, "w") as f:
+        f.write("record_id,chunk_idx,start_token,end_token,n_tokens,npr,"
+                "orig_logrank,mean_p_logrank,low_conf,"
+                "overlaps_mgc,fully_in_mgc,n_mgc_tokens_in_chunk,"
+                "mgc_start_token,mgc_end_token,"
+                "predict_mgc_youden,predict_mgc_highconf\n")
+        for r in all_chunk_results:
+            pred_youden = (not r["low_conf"]) and (not math.isnan(r["npr"])) and (r["npr"] > args.threshold_youden)
+            pred_high   = (not r["low_conf"]) and (not math.isnan(r["npr"])) and (r["npr"] > args.threshold)
+            f.write(f"{r['record_id']},{r['chunk_idx']},{r['start_token']},{r['end_token']},"
+                    f"{r['n_tokens']},{r['npr']:.6f},{r['orig_logrank']:.6f},{r['mean_p_logrank']:.6f},"
+                    f"{int(r['low_conf'])},{int(r['overlaps_mgc'])},{int(r['fully_in_mgc'])},"
+                    f"{r['n_mgc_tokens_in_chunk']},{r['mgc_start_token']},{r['mgc_end_token']},"
+                    f"{int(pred_youden)},{int(pred_high)}\n")
+    logger.info(f"Wrote benchmark CSV to {output_csv}")
+
+    # Quick summary
+    n_chunks = len(all_chunk_results)
+    n_valid = sum(1 for r in all_chunk_results if not r["low_conf"] and not math.isnan(r["npr"]))
+    n_pred_youden = sum(
+        1 for r in all_chunk_results
+        if not r["low_conf"] and not math.isnan(r["npr"]) and r["npr"] > args.threshold_youden
+    )
+    n_pred_high = sum(
+        1 for r in all_chunk_results
+        if not r["low_conf"] and not math.isnan(r["npr"]) and r["npr"] > args.threshold
+    )
+    n_overlap = sum(1 for r in all_chunk_results if r["overlaps_mgc"])
+
+    print("\n" + "=" * 70)
+    print("                    BATCH BENCHMARK SUMMARY")
+    print("=" * 70)
+    print(f"  Total chunks scored:           {n_chunks}")
+    print(f"  Valid scores (not low_conf):   {n_valid}")
+    print(f"  Chunks overlapping MGC:        {n_overlap}")
+    print(f"  Flagged (NPR > {args.threshold_youden:.4f}): {n_pred_youden}")
+    print(f"  Flagged (NPR > {args.threshold:.4f}):       {n_pred_high}")
+    print("=" * 70)
+
+
 def run_interactive_mode(args, model_config):
     print("\n" + "=" * 60)
     print("    DetectCodeGPT Interactive Mode — MGC Localization    ")
@@ -709,6 +901,18 @@ def main():
     """Main function to run the code detection pipeline."""
     args = setup_args()
 
+    # =====================================================================
+    # 2026-05-15 msong: BATCH_BENCHMARK MODE
+    # =====================================================================
+    if getattr(args, 'batch_benchmark', False):
+        cache_dir, _, _ = preprocess_and_save(args)
+        model_config = {'cache_dir': cache_dir}
+
+        logger.info("Batch benchmark mode: loading base scoring model only...")
+        model_config = load_base_model_and_tokenizer(args, model_config)
+
+        run_batch_benchmark(args, model_config)
+        return
     # =====================================================================
     # 2026-05-14 msong: INTERACTIVE MODE
     # =====================================================================
