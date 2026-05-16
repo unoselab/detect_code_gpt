@@ -560,8 +560,12 @@ def run_batch_benchmark(args, model_config):
     Ground truth for MGC content comes from outputs.txt (authoritative source),
     not from the benchmark file's stored offsets.
 
-    Output: per-chunk CSV + pickle cache. Each row is one chunk's NPR result,
-    plus ground-truth metadata so localization evaluation is a CSV join.
+    2026-05-15 msong: The scoring input is record['hwc'] + record['mgc'], NOT
+    record['mixed_code']. The prompt (function header + docstring) is excluded
+    because it's known to be human in any realistic deployment scenario, and
+    including it introduces false-positive NPR scores from docstring NL content.
+
+    Output: per-chunk CSV + pickle cache.
     """
     print("\n" + "=" * 70)
     print("    DetectCodeGPT Batch Benchmark — MGC Localization Scoring    ")
@@ -640,6 +644,11 @@ def run_batch_benchmark(args, model_config):
         # Per-record loop
         # --------------------------------------------------------------
         for record_idx, record in enumerate(tqdm(records, desc="Records")):
+            # 2026-05-15 msong: exclude prompt; score HWC + MGC only.
+            # Rationale: prompt is the function header + docstring, known to be human
+            # in any realistic deployment scenario. Including it introduces false-positive
+            # NPR scores from docstring NL content. All offsets below are relative to
+            # this re-concatenated string, not the benchmark's stored `mixed_code` field.
             mixed_code = record["hwc"] + record["mgc"]
             all_tokens = mixed_code.split(" ")
             n_tokens_total = len(all_tokens)
@@ -691,11 +700,6 @@ def run_batch_benchmark(args, model_config):
                     f"Record {record['id']}: no source_line_no or empty MGC in outputs.txt"
                 )
 
-            # Benchmark's stored MGC region (for legacy comparison)
-            mgc_region = next(reg for reg in record["regions"] if reg["label"] == "MGC")
-            bench_mgc_start_token = mgc_region["start_token"]
-            bench_mgc_end_token   = mgc_region["end_token"]
-
             # ----------------------------------------------------------
             # Per-chunk loop
             # ----------------------------------------------------------
@@ -719,12 +723,6 @@ def run_batch_benchmark(args, model_config):
                 )
                 overlaps_mgc_by_tokens = intersect_ratio_chunk > 0.5  # tunable threshold
 
-                # Legacy: token-index overlap using benchmark's stored offsets
-                legacy_overlap_start = max(start, bench_mgc_start_token)
-                legacy_overlap_end = min(end, bench_mgc_end_token)
-                legacy_n_overlap = max(0, legacy_overlap_end - legacy_overlap_start)
-                legacy_overlaps_mgc = legacy_n_overlap > 0
-
                 # ------------------------------------------------------
                 # Score chunks below the size floor as low-confidence
                 # ------------------------------------------------------
@@ -745,11 +743,6 @@ def run_batch_benchmark(args, model_config):
                         "intersect_ratio_chunk":     intersect_ratio_chunk,
                         "intersect_ratio_mgc":       intersect_ratio_mgc,
                         "overlaps_mgc_by_tokens":    overlaps_mgc_by_tokens,
-                        # Legacy
-                        "legacy_overlaps_mgc_by_index":  legacy_overlaps_mgc,
-                        "legacy_n_mgc_tokens_in_chunk":  legacy_n_overlap,
-                        "mgc_start_token":   bench_mgc_start_token,
-                        "mgc_end_token":     bench_mgc_end_token,
                         "source_line_no":    source_line_no,
                     })
                     continue
@@ -781,11 +774,6 @@ def run_batch_benchmark(args, model_config):
                     "intersect_ratio_chunk":     intersect_ratio_chunk,
                     "intersect_ratio_mgc":       intersect_ratio_mgc,
                     "overlaps_mgc_by_tokens":    overlaps_mgc_by_tokens,
-                    # Legacy
-                    "legacy_overlaps_mgc_by_index":  legacy_overlaps_mgc,
-                    "legacy_n_mgc_tokens_in_chunk":  legacy_n_overlap,
-                    "mgc_start_token":   bench_mgc_start_token,
-                    "mgc_end_token":     bench_mgc_end_token,
                     "source_line_no":    source_line_no,
                 })
 
@@ -837,11 +825,6 @@ def run_batch_benchmark(args, model_config):
     n_chunks = len(all_chunk_results)
     n_valid = sum(1 for r in all_chunk_results if not r["low_conf"] and not math.isnan(r["npr"]))
     n_overlap_new = sum(1 for r in all_chunk_results if r["overlaps_mgc_by_tokens"])
-    n_overlap_legacy = sum(1 for r in all_chunk_results if r["legacy_overlaps_mgc_by_index"])
-    n_disagree = sum(
-        1 for r in all_chunk_results
-        if r["overlaps_mgc_by_tokens"] != r["legacy_overlaps_mgc_by_index"]
-    )
     n_pred_youden = sum(
         1 for r in all_chunk_results
         if not r["low_conf"] and not math.isnan(r["npr"]) and r["npr"] > args.threshold_youden
@@ -857,8 +840,6 @@ def run_batch_benchmark(args, model_config):
     print(f"  Total chunks scored:                    {n_chunks}")
     print(f"  Valid scores (not low_conf):            {n_valid}")
     print(f"  Chunks overlapping MGC (positional):    {n_overlap_new}")
-    print(f"  Chunks overlapping MGC (legacy index):  {n_overlap_legacy}")
-    print(f"  Disagreement between new vs legacy:     {n_disagree}")
     print(f"  Flagged (NPR > {args.threshold_youden:.4f}, Youden's J):  {n_pred_youden}")
     print(f"  Flagged (NPR > {args.threshold:.4f}, high-conf):       {n_pred_high}")
     print("=" * 70)
