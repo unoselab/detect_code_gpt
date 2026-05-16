@@ -20,3 +20,472 @@ python -c "import torch; print('PyTorch:', torch.__version__); print('CUDA avail
 # 6. Download CodeSearchNet data
 # It downloads 'data/CodeSearchNet/python/train.jsonl' (human written code)
 python scripts/download_codesearchnet.py
+
+
+
+# DetectCodeGPT Replication & StarCoder Extension — Restart Guide
+
+This guide walks through re-running the DetectCodeGPT pipeline on a fresh system
+and extending it to a new LLM (StarCoder2-7B). It's written assuming you have
+the code-base already cloned at `~/project-workspace/detect_code_gpt` and that
+your conda env `detectcodegpt` is created (see `0-install.txt` if not).
+
+The migration is structured in three tracks:
+
+  Track A:  Reproduce CodeLlama pipeline on the new system  (sanity check)
+  Track B:  Replicate full pipeline with StarCoder2-7B      (main goal)
+  Track C:  Cross-model detection experiments               (optional)
+
+All three tracks share Phases 1-3. They diverge at Phase 4.
+
+---
+
+## Phase 0 — Pre-flight on the new system
+
+Before anything, verify the environment matches what we've used:
+
+```bash
+# Verify CUDA & GPU
+nvidia-smi
+# Should show ≥1 GPU with ≥40 GB free for 7B models in fp16.
+
+# Verify conda env
+conda activate detectcodegpt
+python -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.device_count())"
+# Should show: 2.1.2  True  3   (or however many GPUs you have)
+
+# Verify key packages
+python -c "import transformers, accelerate, tree_sitter_languages; print(transformers.__version__)"
+# Should show: 4.36.2 (or compatible)
+```
+
+If anything's missing, install from `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+```
+
+Notes on caveats from the original system:
+- If you hit MKL ABI errors, downgrade: `pip install mkl==2023.1.0`
+- `tree_sitter_languages` 1.10.2 ships pre-built parsers; `tree-sitter` alone won't work
+
+---
+
+## Phase 1 — Data: CodeSearchNet Python
+
+Same as the original run. The HuggingFace mirror is more reliable than the S3
+mirror (the latter has been intermittently dead).
+
+```bash
+cd ~/project-workspace/detect_code_gpt
+python code-download-rawdata/download_codesearchnet.py
+```
+
+Expected output: ~412,000 Python functions in
+`data/CodeSearchNet/python/{train,valid,test}.jsonl`.
+
+Verify:
+
+```bash
+wc -l data/CodeSearchNet/python/*.jsonl
+# train should be ~412K lines
+```
+
+---
+## Note: StarCoder2 requires a newer Hugging Face stack
+
+The original `detectcodegpt` conda environment was pinned for the CodeLlama reproduction and used:
+
+```text
+transformers==4.36.2
+torch==2.1.2
+````
+
+This environment works for CodeLlama, but it cannot load StarCoder2:
+
+```text
+KeyError: 'starcoder2'
+```
+
+Reason: `transformers==4.36.2` does not recognize the `model_type="starcoder2"` field in `bigcode/starcoder2-7b`.
+
+To avoid breaking the original CodeLlama reproduction environment, we cloned it:
+
+```bash
+conda create --name detectcodegpt_starcoder --clone detectcodegpt
+conda activate detectcodegpt_starcoder
+```
+
+Then we upgraded the Hugging Face stack in the cloned environment.
+
+Important caveat: installing the newest `transformers` pulled `transformers==5.8.1`, which recognizes StarCoder2, but it also prints:
+
+```text
+[transformers] Disabling PyTorch because PyTorch >= 2.4 is required but found 2.1.2
+```
+
+So StarCoder2 config loading works, but model loading/generation will not work until either:
+
+1. PyTorch is upgraded to a version supported by this Transformers release, or
+2. Transformers is downgraded to a StarCoder2-compatible 4.x version that still supports `torch==2.1.2`.
+
+Recommended safe path for this branch:
+
+```bash
+conda activate detectcodegpt_starcoder
+pip install -U "transformers>=4.42.4,<5" "accelerate>=0.29.0" "tokenizers>=0.19.0" "huggingface_hub>=0.23.0,<1.0"
+```
+
+Then verify:
+
+```bash
+python - <<'PY'
+import transformers
+import torch
+from transformers import AutoConfig
+
+print("transformers:", transformers.__version__)
+print("torch:", torch.__version__)
+cfg = AutoConfig.from_pretrained("bigcode/starcoder2-7b")
+print("model_type:", cfg.model_type)
+PY
+```
+
+Expected:
+
+```text
+model_type: starcoder2
+```
+
+Keep environments separate:
+
+```text
+detectcodegpt              = original CodeLlama reproduction environment
+detectcodegpt_starcoder    = StarCoder2-compatible environment
+```
+
+---
+
+## Phase 2 — Generate MGC samples with the chosen LLM
+
+### Track A (CodeLlama, replication of original)
+
+```bash
+./run1-generate.sh
+```
+
+This produces:
+- `output/CodeSearchNet/CodeLlama-7b-hf-2000-tp0.2/outputs.txt`  (~2000 MGC samples)
+- Runtime: ~80 min on a single A6000
+
+The model auto-downloads to `~/.cache/huggingface/hub/models--codellama--CodeLlama-7b-hf/`.
+
+### Track B (StarCoder2-7B)
+
+Edit `run1-generate.sh` to point at StarCoder. The relevant variables:
+
+```bash
+# In run1-generate.sh, change:
+GEN_MODEL="starcoder2-7b"
+GEN_MODEL_HF="bigcode/starcoder2-7b"
+# Keep these the same:
+GEN_MAX_NUM=2000
+GEN_TEMPERATURE=0.2
+```
+
+Then run:
+
+```bash
+./run1-generate.sh
+```
+
+Expected:
+- `output/CodeSearchNet/starcoder2-7b-2000-tp0.2/outputs.txt`
+- Runtime: ~80 min on a single A6000
+
+Why StarCoder2-7B specifically: same parameter scale as CodeLlama-7B (apples-to-apples
+for the cross-model comparison), modern architecture, MIT-licensed, supports
+the same chat template-free completion-style generation our scripts use.
+
+Other StarCoder variants are possible:
+- `bigcode/starcoder2-3b` — faster, lower quality
+- `bigcode/starcoder2-15b` — better quality, needs multi-GPU or quantization
+- `bigcode/starcoder` (original, 15.5B) — older, deprecated, only if comparing
+  against historical papers
+
+### Sanity check after generation
+
+```bash
+head -1 output/CodeSearchNet/<key>/outputs.txt | python -m json.tool
+```
+
+Confirm each line is a JSON object with fields:
+- `prompt` (function header + docstring)
+- `solution` (HWC ground truth from CodeSearchNet)
+- `output` (MGC sampled from the LLM)
+
+---
+
+## Phase 3 — DetectCodeGPT detection run (sanity check on Track A)
+
+This validates the detection pipeline works on the new system. Skip on Track B
+if you trust the migration; otherwise run for a small (say, 100-sample) batch
+to confirm.
+
+```bash
+./run2-detect.sh
+```
+
+Expected: AUROC ≈ 0.90 on Track A (paper reports 0.9095, our reproduction got
+0.9007 on 530 valid samples). If your number is in [0.85, 0.95], the pipeline
+is functional.
+
+If you get an error, common culprits already fixed in our codebase:
+- `tree-sitter` compile failure → already using `tree_sitter_languages`
+- Hardcoded `decoder_start_token_id=50256` → already removed (codet5p-770m has
+  vocab=32100)
+- `CUDA_VISIBLE_DEVICES` set after torch import → already moved to top of `main.py`
+
+---
+
+## Phase 4 — Filter selected pairs for benchmark construction
+
+```bash
+./run4-selection.sh
+```
+
+Output:
+- `output/CodeSearchNet/<key>/outputs_530_filter.jsonl`  (Track A)
+- Or proportional number for Track B (the filter looks for pairs where HWC and
+  MGC are both well-formed; expect a similar yield with StarCoder)
+
+The filter rule: keep records where both HWC and MGC have NPR scores computed
+successfully (i.e., not low-confidence rejects).
+
+---
+
+## Phase 5 — Build the level1 localization benchmark
+
+```bash
+./run5-gen-benchmark.sh
+```
+
+Output: `outputs_530_benchmark_level1.jsonl` in the same directory as
+`outputs_530_filter.jsonl`.
+
+This file is what the localization detector consumes. Each record has:
+- `mixed_code` (= `prompt` + `hwc` + `mgc`, byte-exact concatenation)
+- `mixed_code_annotated` (same with region headers, for debugging only — never
+  pass to the detector)
+- `regions` (token + char spans for each of prompt, HWC, MGC)
+- `tokenization` (must be `split_space_v1` — see `code-selection/generate_benchmark.py`)
+
+Sanity check after generation:
+
+```bash
+./run-check.sh
+# Should print: Bad records: 0 / 530
+# Bad records means token-span partition violates n_tokens_total invariant.
+```
+
+---
+
+## Phase 6 — Batch detection on the benchmark
+
+```bash
+./run6-batch-benchmark.sh
+```
+
+Output:
+- `logs/benchmark_results_benchmark_level1_<gen_model>.csv` — per-chunk NPR scores
+- `logs/benchmark_results_benchmark_level1_<gen_model>.pkl` — pickle cache for
+  re-running threshold analysis without re-scoring
+
+Runtime: ~90 min on a single A6000.
+
+Default chunking: 128 split_space_v1 tokens per chunk, non-overlapping. Scoring
+input: `hwc + mgc` only (prompt excluded — see comment in `run_batch_benchmark`
+about why; in short, docstring NL would generate false-positive NPR scores).
+
+---
+
+## Phase 7 — Evaluation and threshold calibration
+
+Pure CPU work. Reads the CSV/pickle from Phase 6.
+
+```bash
+# Aggregate metrics at standard thresholds
+python code-detection/evaluate_benchmark.py
+
+# Examine per-record performance (find pathological cases)
+python code-detection/evaluate_benchmark.py --per_record --top_n_worst 15
+
+# Plot precision/recall/F1 trajectories across truth_ratio
+python code-detection/plot_threshold_sweep.py --threshold_min 1.0 --threshold_max 2.0
+# Output: logs/threshold_sweep.png
+
+# Inspect a specific record's chunks visually
+./run-view-record.sh <record_id>
+```
+
+### Threshold recalibration for the new LLM
+
+The thresholds we calibrated on CodeLlama:
+- **Balanced:** NPR > 1.25 (F1 ≈ 0.66 at truth_ratio=0.5)
+- **High-precision:** NPR > 1.60 (precision ≈ 0.83, recall ≈ 0.15)
+
+**These almost certainly need recalibration for StarCoder.** Different generative
+distributions produce different NPR ranges. The recalibration procedure is the
+same as the original — find best-F1 threshold on the new CSV:
+
+```bash
+python code-detection/evaluate_benchmark.py
+# Read the "Best F1 from sweep over [min(NPR), max(NPR)]" line.
+```
+
+If StarCoder's best-F1 threshold differs significantly from CodeLlama's 1.25,
+that's worth analyzing — it tells us how detector calibration depends on the
+generation model.
+
+---
+
+## Cross-model variants (Track C, optional)
+
+The most interesting research question: **does a threshold calibrated on one
+LLM transfer to detecting another LLM's output?**
+
+To run:
+
+1. Generate MGC with model X (e.g., CodeLlama).
+2. Score the resulting `mixed_code` chunks using model Y (e.g., StarCoder) as
+   the *scoring* model (separate from the generating model).
+3. Apply the threshold calibrated for model Y as the scorer.
+
+In `main.py`, this means passing `--base_model_name bigcode/starcoder2-7b` to
+the scoring run while keeping the inputs generated by CodeLlama. The script
+already supports this — only the model in `load_base_model_and_tokenizer` is
+swapped.
+
+Empirical question to answer: does StarCoder, as the scoring model, produce
+better NPR separation for CodeLlama-generated outputs (cross-model) than for
+its own StarCoder-generated outputs (self-model)? If yes, that suggests the
+NPR signal is in the *scoring* model's surprise pattern, not the generating
+model's specific quirks.
+
+---
+
+## Files & paths quick reference
+
+```
+PROJECT_ROOT = ~/project-workspace/detect_code_gpt
+Generation:    output/CodeSearchNet/<model_key>/outputs.txt
+Filter:        output/CodeSearchNet/<model_key>/outputs_530_filter.jsonl
+Benchmark:     output/CodeSearchNet/<model_key>/outputs_530_benchmark_level1.jsonl
+NPR scores:    logs/benchmark_results_benchmark_level1_<model_key>.csv
+NPR cache:     logs/benchmark_results_benchmark_level1_<model_key>.pkl
+Threshold viz: logs/threshold_sweep.png
+Where <model_key> = e.g. "CodeLlama-7b-hf" or "starcoder2-7b"
+```
+
+---
+
+## Estimated end-to-end runtime (Track B, full StarCoder pipeline)
+
+- Phase 1 (data download):       5 min (cached after first run)
+- Phase 2 (generation):          ~80 min (2000 samples @ T=0.2)
+- Phase 3 (detection sanity):    ~15 min (skip if confident)
+- Phase 4 (filter):              1 min
+- Phase 5 (benchmark build):     30 seconds
+- Phase 6 (batch detection):     ~90 min
+- Phase 7 (evaluation):          ~5 min
+
+Total: ~3.5 hours for one model. Two models (CodeLlama + StarCoder) = ~7 hours
+of total compute, plus interactive analysis time.
+
+---
+
+## Known issues & gotchas
+
+These are documented for future debugging. All are already fixed in the codebase
+but worth knowing if you hit a regression:
+
+1. **`tree-sitter` compile failure** — must use `tree_sitter_languages` package
+   instead. Already integrated.
+
+2. **CodeT5p-770m vocab mismatch** — original DetectCodeGPT code hardcoded
+   `decoder_start_token_id=50256`, but codet5p has vocab=32100. Already removed
+   from `load_mask_filling_model`.
+
+3. **`CUDA_VISIBLE_DEVICES` ordering** — must be set at top of `main.py` before
+   any torch import. Already done.
+
+4. **`UnboundLocalError: n_perturbation`** — in `--load_cached_results` path.
+   Already bound explicitly.
+
+5. **Trailing-space edge case** — 43/530 records have `mixed_code` ending in
+   whitespace, producing an empty trailing token. `compute_token_regions`
+   assigns these to the last region. Verified by `run-check.sh`.
+
+6. **HWC-MGC boundary token absorption** — for ~10% of records, the boundary
+   token absorbs cross-region content. Char spans remain byte-exact; token
+   reconstruction may be off by a few characters. Documented; does not affect
+   evaluation metrics.
+
+---
+
+## What's documented elsewhere in the repo
+
+- `0-install.txt` — initial conda environment setup commands
+- `summary-mayXX-XXXXam.md` (if present) — running log of bugs fixed and
+  decisions made
+- Each `run*.sh` script has its own configuration header explaining what it does
+
+## What to do after Phase 7
+
+The most likely follow-up directions, in order of payoff:
+
+1. **Compare CodeLlama vs StarCoder operating points side by side.** Plot both
+   F1-vs-threshold curves on one chart. This is the paragraph for your paper.
+
+2. **Test cross-model detection** (Track C). Score CodeLlama outputs with
+   StarCoder as detector and vice versa. Reveals whether the detection signal
+   transfers across LLM families.
+
+3. **Try AST-aware chunking** to break the F1 ≈ 0.66 ceiling. Replace the
+   128-token fixed chunker with a function-call-aware splitter.
+
+4. **Add level2 benchmark complexity** — interleaved HWC/MGC blocks, MGC inside
+   HWC, etc. The current level1 has MGC as a single trailing region; level2
+   tests harder localization.
+
+
+
+
+Where I'd save this
+bash~/project-workspace/detect_code_gpt/README-restart.md
+Or split it: README-restart.md for the operational guide, README-research.md for the research extension. I'd start with one file and split only if it gets unwieldy.
+A few specific things to verify before using this README
+
+The variable names in run1-generate.sh. I assumed GEN_MODEL and GEN_MODEL_HF exist. Check that they match your actual script — adjust the README to your real variable names.
+StarCoder2-7B availability. This model exists and is well-documented, but verify it works in your version of transformers (4.36.2). StarCoder2 needed transformers ≥ 4.39 at release; you may need an upgrade. Quick test:
+
+bash   python -c "from transformers import AutoTokenizer; t = AutoTokenizer.from_pretrained('bigcode/starcoder2-7b'); print('OK')"
+If it fails with "unknown architecture", upgrade transformers (pip install -U transformers) before generation.
+
+The "Phase 3 sanity check" expectation. AUROC 0.9007 on 530 valid samples is your reproduction baseline. The number depends on data shuffling, seed, and CodeLlama version. On the new system, expect within ±0.02.
+Cache directory. If ~/.cache/huggingface/ is small or NFS-mounted, you'll want to set HF_HOME to a local SSD. CodeLlama-7B + StarCoder2-7B is ~30GB combined.
+
+Two suggestions for tomorrow's actual work
+When you start tomorrow, I'd recommend two pre-flight steps before kicking off generation:
+
+Run the original pipeline end-to-end on the new system first (Track A only), even if only on 100 samples. This catches environment drift before you've sunk 80 minutes into StarCoder generation only to discover the detection scripts have a missing dependency.
+Read the original outputs.txt from the old system on the new system to verify file transfer worked. The benchmark generator depends on the exact bytes — if line endings got changed (CRLF vs LF) by an scp through Windows, you'll get cryptic errors later.
+
+Both take 10 minutes and save hours of frustration.
+What's not in the README that you might want
+
+Pre-flight checks as a script. Could be run0-preflight.sh that runs all the verifications in Phase 0 in one shot.
+A "diff between Track A and Track B" callout. If reviewers ask "how is StarCoder different from CodeLlama in your setup," a one-paragraph "everything is identical except the model identifier and the threshold recalibration" answer is useful.
+
+Worth adding if you find yourself explaining them often. For now, the README captures the essentials.
+Anything in this draft that needs adjustment for your specific paths or tooling? I made some assumptions about variable names in the shell scripts that you should verify against your actual files.
