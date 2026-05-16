@@ -11,6 +11,7 @@ Produces a 2x2 figure:
 Each subplot has one line per truth_ratio in --truth_ratios.
 
 Usage:
+    python code-detection/plot_threshold_sweep.py --threshold_min 1.0 --threshold_max 2.0    
     python plot_threshold_sweep.py
     python plot_threshold_sweep.py --truth_ratios 0.3 0.5 0.7 0.9
     python plot_threshold_sweep.py --output_image my_chart.png
