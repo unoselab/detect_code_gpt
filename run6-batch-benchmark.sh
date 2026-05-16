@@ -76,11 +76,11 @@ fi
 # Quick way: head the benchmark JSONL to a temp file
 head -10 "${BENCHMARK_JSONL}" > ~/Desktop/benchmark_test.jsonl
 # Then run with --benchmark_jsonl /tmp/benchmark_test.jsonl
-# --benchmark_jsonl "${BENCHMARK_JSONL}" \
+# --benchmark_jsonl "/home/user1-system12/Desktop/benchmark_test.jsonl" \
 
 python main.py \
     --batch_benchmark \
-    --benchmark_jsonl "/home/user1-system12/Desktop/benchmark_test.jsonl" \
+    --benchmark_jsonl "${BENCHMARK_JSONL}" \
     --outputs_txt_path "${OUTPUTS_TXT}" \
     --base_model_name "${BASE_MODEL_NAME}" \
     --n_perturbation_list "${N_PERTURBATIONS}" \
