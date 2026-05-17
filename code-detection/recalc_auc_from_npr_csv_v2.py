@@ -8,10 +8,10 @@ and re-run AUROC for direct comparison.
 
 Usage:
     # First 530 in source order
-    python recompute_auroc_subset.py --csv logs/npr_scores_starcoder2-7b_csn_t02_n3000_run.csv --n 530
+    python recalc_auc_from_npr_csv_v2.py --csv logs/npr_scores_starcoder2-7b_csn_t02_n3000_run.csv --n 530
 
     # Paired intersection with a second CSV
-    python recompute_auroc_subset.py --csv logs/npr_scores_starcoder2-7b_csn_t02_n3000_run.csv \
+    python recalc_auc_from_npr_csv_v2.py --csv logs/npr_scores_starcoder2-7b_csn_t02_n3000_run.csv \
         --pair_csv logs/npr_scores_codellama-7b-hf_csn_t02_n2000_run.csv
 """
 
