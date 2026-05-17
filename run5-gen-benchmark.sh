@@ -1,5 +1,5 @@
 #!/bin/bash
-# Generates a mixed HWC/MGC localization benchmark from the 530-pair filter file.
+# Generates a mixed HWC/MGC localization benchmark from the filtered pair file.
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
