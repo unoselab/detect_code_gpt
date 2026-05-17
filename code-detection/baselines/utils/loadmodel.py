@@ -41,6 +41,16 @@ def load_base_model_and_tokenizer(args, model_config):
     elif "llama" in name.lower():
         base_model = transformers.AutoModelForCausalLM.from_pretrained(name, **base_model_kwargs, cache_dir=model_config['cache_dir'], trust_remote_code=True, torch_dtype=torch.float16)
         base_model.to(args.DEVICE)
+    elif 'starcoder' in name.lower():
+        # 2026-05-16 msong: StarCoder family. Load in bf16 to fit comfortably
+        #  on a single 48GB A6000 with room for KV cache and perturbation batches.
+        #  bf16 (over fp16) chosen for wider dynamic range — NPR's perturbation
+        #  step has occasionally hit fp16 overflow on long sequences.
+        base_model = transformers.AutoModelForCausalLM.from_pretrained(
+            name, **base_model_kwargs, cache_dir=model_config['cache_dir'], 
+            trust_remote_code=True, torch_dtype=torch.bfloat16
+        )
+        base_model.to(args.DEVICE)
     else:
         base_model = transformers.AutoModelForCausalLM.from_pretrained(name, **base_model_kwargs, cache_dir=model_config['cache_dir'], trust_remote_code=True)
         base_model.to(args.DEVICE)
@@ -55,7 +65,18 @@ def load_base_model_and_tokenizer(args, model_config):
         base_tokenizer = transformers.LlamaTokenizer.from_pretrained(name, **optional_tok_kwargs, cache_dir=model_config['cache_dir'])
     else:
         base_tokenizer = transformers.AutoTokenizer.from_pretrained(name, **optional_tok_kwargs, cache_dir=model_config['cache_dir'])
-    base_tokenizer.pad_token_id = base_tokenizer.eos_token_id
+
+    # 2026-05-16 msong: only set pad_token if missing; do not overwrite a model's
+    # native pad_token. Was unconditional `pad_token_id = eos_token_id`, which
+    # broke attention masking on StarCoder2 (where eos == <|endoftext|> token 0).
+    # base_tokenizer.pad_token_id = base_tokenizer.eos_token_id
+    if base_tokenizer.pad_token_id is None:
+        base_tokenizer.pad_token_id = base_tokenizer.eos_token_id
+        print(f"  Tokenizer pad_token_id was None; set to eos_token_id={base_tokenizer.eos_token_id}")
+    else:
+        print(f"  Tokenizer has native pad_token_id={base_tokenizer.pad_token_id} "
+            f"(eos_token_id={base_tokenizer.eos_token_id}); preserving.")
+
     model_config['base_model'] = base_model
     model_config['base_tokenizer'] = base_tokenizer
     return model_config
