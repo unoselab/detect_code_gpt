@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -47,6 +48,46 @@ def load_npr_csv(path: Path) -> List[dict]:
                 print(f"Skipping malformed row: {raw!r} ({e})")
     return rows
 
+
+
+
+def load_prompts(path: Path) -> dict[int, str]:
+    """Load prompts from outputs.txt, keyed by zero-based line number."""
+    prompts = {}
+    with path.open("r") as f:
+        for line_no, line in enumerate(f):
+            if line.strip():
+                prompts[line_no] = json.loads(line)["prompt"]
+    return prompts
+
+
+def verify_prompt_alignment(outputs_a: Path, outputs_b: Path, rows_a: List[dict], rows_b: List[dict]) -> None:
+    """Fail loudly if paired source_line_no values do not point to identical prompts."""
+    prompts_a = load_prompts(outputs_a)
+    prompts_b = load_prompts(outputs_b)
+
+    sln_a = {r["source_line_no"] for r in rows_a}
+    sln_b = {r["source_line_no"] for r in rows_b}
+    common = sorted(sln_a & sln_b)
+
+    missing = [s for s in common if s not in prompts_a or s not in prompts_b]
+    mismatched = [s for s in common if s in prompts_a and s in prompts_b and prompts_a[s] != prompts_b[s]]
+
+    print("\nPrompt-alignment safety check")
+    print(f"  outputs A rows:      {len(prompts_a)}")
+    print(f"  outputs B rows:      {len(prompts_b)}")
+    print(f"  paired source lines: {len(common)}")
+    print(f"  missing prompts:     {len(missing)}")
+    print(f"  prompt mismatches:   {len(mismatched)}")
+
+    if missing or mismatched:
+        print("\nFirst problematic source_line_no values:")
+        for s in (missing + mismatched)[:10]:
+            print(f"  {s}")
+        raise SystemExit(
+            "Prompt alignment failed. Do not trust paired AUROC until the two outputs.txt "
+            "files are verified to share identical prompts at paired source_line_no values."
+        )
 
 # -----------------------------------------------------------------------------
 # Subsetting strategies
@@ -148,6 +189,12 @@ def main() -> None:
     parser.add_argument("--pair_csv", type=str, default=None,
                         help="Optional second CSV; if given, restrict both to "
                              "shared source_line_no.")
+    parser.add_argument("--outputs", type=str, default=None,
+                        help="outputs.txt corresponding to --csv. Required with --pair_csv "
+                             "for prompt-alignment safety check.")
+    parser.add_argument("--pair_outputs", type=str, default=None,
+                        help="outputs.txt corresponding to --pair_csv. Required with --pair_csv "
+                             "for prompt-alignment safety check.")
     args = parser.parse_args()
 
     csv_path = Path(args.csv).expanduser()
@@ -168,6 +215,19 @@ def main() -> None:
             raise SystemExit(f"Pair CSV not found: {pair_path}")
         pair_rows = load_npr_csv(pair_path)
         print(f"Loaded {len(pair_rows)} rows from {pair_path.name} (for pairing)")
+
+        if not args.outputs or not args.pair_outputs:
+            raise SystemExit(
+                "For safe paired assessment, pass both --outputs and --pair_outputs "
+                "so the script can verify identical prompts at paired source_line_no values."
+            )
+        outputs_path = Path(args.outputs).expanduser()
+        pair_outputs_path = Path(args.pair_outputs).expanduser()
+        if not outputs_path.is_file():
+            raise SystemExit(f"outputs.txt not found: {outputs_path}")
+        if not pair_outputs_path.is_file():
+            raise SystemExit(f"pair outputs.txt not found: {pair_outputs_path}")
+        verify_prompt_alignment(outputs_path, pair_outputs_path, rows, pair_rows)
 
         sub_a, sub_b = paired_intersection(rows, pair_rows)
         print(f"Paired intersection: {len(sub_a)} samples in common\n")
