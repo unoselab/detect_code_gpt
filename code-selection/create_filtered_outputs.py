@@ -20,6 +20,7 @@ import csv
 import json
 from pathlib import Path
 from typing import Any, Dict, List
+import re
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -178,8 +179,12 @@ def main() -> None:
     print(f"Wrote filtered JSONL:      {display_path(out_path)}")
     print(f"Filtered JSONL records:    {len(filtered)}")
 
-    if len(filtered) != 530:
-        print(f"WARNING: expected 530 records, but wrote {len(filtered)} records.")
+    m = re.search(r"outputs_(\d+)_filter\.jsonl$", out_path.name)
+    if m and len(filtered) != int(m.group(1)):
+        print(
+            f"WARNING: expected {int(m.group(1))} records from output filename, "
+            f"but wrote {len(filtered)} records."
+        )
 
 
 if __name__ == "__main__":
