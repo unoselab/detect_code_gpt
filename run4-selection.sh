@@ -49,7 +49,7 @@ OUTPUT_DIR="${OUTPUT_ROOT}/${DATASET_NAME}/${DATASET_KEY}"
 
 OUTPUTS_TXT="${OUTPUT_DIR}/outputs.txt"
 NPR_CSV="${LOG_DIR}/npr_scores_${RUN_NAME}.csv"
-OUT_JSONL="${OUTPUT_DIR}/outputs_530_filter.jsonl"
+OUT_JSONL="${OUTPUT_DIR}/outputs_${N_FILTERED}_filter.jsonl"
 
 mkdir -p "${OUTPUT_DIR}"
 
