@@ -22,7 +22,9 @@ GEN_MODEL_HF="bigcode/starcoder2-7b"
 # The FIRST EVALUATION
 # GEN_MODEL_HF="codellama/CodeLlama-7b-hf"
 
-GEN_MAX_NUM=2000
+# GEN_MAX_NUM=2000      # ColdLlama used 2000
+                        # StarCoder needed 3000
+GEN_MAX_NUM=3000
 GEN_TEMPERATURE=0.2
 GEN_MAX_LENGTH=128
 GEN_BATCH_SIZE=1

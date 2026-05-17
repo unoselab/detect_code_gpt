@@ -1146,19 +1146,24 @@ def main():
             "source_line_no": data["source_line_no"][idx],  # 2026-05-13 msong: pass through for CSV
         })
 
-    selected_index = 1
-    selected_perturb = 3
+    if len(original_text) >= 2 and len(p_original_text) >= int(args.n_perturbation_list) * 2:
+        selected_index = 1
+        selected_perturb = 3
 
-    print(original_text[selected_index])
-    # p_original_text[:5]
-    print(p_original_text[int(args.n_perturbation_list)*selected_index+selected_perturb])
-    # print the difference between the original and perturbed text
-    print("\nDifference between original and perturbed text:")
-    print([x for x in p_original_text[int(args.n_perturbation_list)*selected_index+selected_perturb].split(' ') if x not in original_text[selected_index].split(' ')])
+        print(original_text[selected_index])
+        # p_original_text[:5]
+        print(p_original_text[int(args.n_perturbation_list)*selected_index+selected_perturb])
+        # print the difference between the original and perturbed text
+        print("\nDifference between original and perturbed text:")
+        print([x for x in p_original_text[int(args.n_perturbation_list)*selected_index+selected_perturb].split(' ') if x not in original_text[selected_index].split(' ')])
 
-    # show the length of the original and perturbed text
-    print(f"original text length: {len(original_text)}")
-    print(f"perturbed text length: {len(p_original_text)}")
+        # show the length of the original and perturbed text
+        print(f"original text length: {len(original_text)}")
+        print(f"perturbed text length: {len(p_original_text)}")
+    else:
+        logger.info(f"Debug print skipped (samples={len(original_text)}, "
+                    f"perturbations={len(p_original_text)}; need >=2 and "
+                    f">={int(args.n_perturbation_list)*2})")
 
     model_config['mask_model'] = model_config['mask_model'].cpu()
     torch.cuda.empty_cache()

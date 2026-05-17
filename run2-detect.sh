@@ -26,8 +26,7 @@ GEN_MAX_NUM=2000                      # how many samples generate.py produced
                                       # current (n~520 valid):   2000
 GEN_TEMPERATURE=0.2                   # generation temperature
 DATASET_KEY="${GEN_MODEL}-${GEN_MAX_NUM}-tp${GEN_TEMPERATURE}"
-DATA_PATH="${OUTPUT_BASE_DIR}/${DATASET}/${DATASET_KEY}/outputs-10samples.txt"
-# head -n 10 output/CodeSearchNet/starcoder2-7b-2000-tp0.2/outputs.txt > output/CodeSearchNet/starcoder2-7b-2000-tp0.2/outputs-10samples.txt
+DATA_PATH="${OUTPUT_BASE_DIR}/${DATASET}/${DATASET_KEY}/outputs.txt"
 
 # --- Model identities (HuggingFace IDs) ---
 # BASE_MODEL_NAME=codellama/CodeLlama-7b-hf
@@ -35,8 +34,8 @@ BASE_MODEL_NAME="bigcode/starcoder2-7b"
 MASK_FILLING_MODEL_NAME=Salesforce/codet5p-770m
 
 # --- Detection hyperparameters (paper-aligned defaults) ---
-# N_SAMPLES=2000                        # upper bound; actual count = min(N_SAMPLES, post-filter count)
-N_SAMPLES=10                        # upper bound; actual count = min(N_SAMPLES, post-filter count)
+N_SAMPLES=2000                        # upper bound; actual count = min(N_SAMPLES, post-filter count)
+# N_SAMPLES=50                        # upper bound; actual count = min(N_SAMPLES, post-filter count)
                                       # previous (first pass):  500  → 131 valid after filter
                                       # current (scaled pass):  2000 → ~520 valid after filter
 N_PERTURBATION_LIST=50                # k in the paper (number of perturbations per sample)
@@ -54,8 +53,8 @@ DETECTCODEGPT_ONLY=true               # true = skip baselines (~32 min saved). f
 LOAD_CACHED_RESULTS=""
 
 # --- Run identity ---
-# RUN_TAG="n${GEN_MAX_NUM}_run"         # previous: "n500_first_run" / "n500_scaled_run"
-RUN_TAG="n10_smoke"         # previous: "n500_first_run" / "n500_scaled_run"
+RUN_TAG="n${GEN_MAX_NUM}_run"         # previous: "n500_first_run" / "n500_scaled_run"
+# RUN_TAG="n50_smoke"         # previous: "n500_first_run" / "n500_scaled_run"
                                       # current:  "n2000_run"
 OUTPUT_NAME="${GEN_MODEL,,}_csn_t${GEN_TEMPERATURE/./}_${RUN_TAG}"   # lowercased + temp-without-dot
 TIMESTAMP=$(date +%m-%d_%H:%M)        # captured at script start; format: MM-DD_HH:MM
