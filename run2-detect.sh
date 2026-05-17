@@ -21,9 +21,10 @@ CUDA_DEVICE=0
 DATASET=CodeSearchNet
 # GEN_MODEL=CodeLlama-7b-hf             # short name used in dataset_key
 GEN_MODEL="starcoder2-7b"
-GEN_MAX_NUM=2000                      # how many samples generate.py produced
+GEN_MAX_NUM=3000                      # how many samples generate.py produced
                                       # previous (n=131 valid): 500
                                       # current (n~520 valid):   2000
+                                      # starcoder (~500 valid):  3000
 GEN_TEMPERATURE=0.2                   # generation temperature
 DATASET_KEY="${GEN_MODEL}-${GEN_MAX_NUM}-tp${GEN_TEMPERATURE}"
 DATA_PATH="${OUTPUT_BASE_DIR}/${DATASET}/${DATASET_KEY}/outputs.txt"
@@ -34,10 +35,11 @@ BASE_MODEL_NAME="bigcode/starcoder2-7b"
 MASK_FILLING_MODEL_NAME=Salesforce/codet5p-770m
 
 # --- Detection hyperparameters (paper-aligned defaults) ---
-N_SAMPLES=2000                        # upper bound; actual count = min(N_SAMPLES, post-filter count)
+N_SAMPLES=3000                        # upper bound; actual count = min(N_SAMPLES, post-filter count)
 # N_SAMPLES=50                        # upper bound; actual count = min(N_SAMPLES, post-filter count)
                                       # previous (first pass):  500  → 131 valid after filter
                                       # current (scaled pass):  2000 → ~520 valid after filter
+                                      # starcoder:  ~500 valid after filter
 N_PERTURBATION_LIST=50                # k in the paper (number of perturbations per sample)
 PCT_WORDS_MASKED=0.5                  # α — random-insert-space probability
 PCT_IDENTIFIERS_MASKED=0.75           # paper default
@@ -114,6 +116,10 @@ cd code-detection
 
 export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
 
+#     # Starcoder
+#     # $([ "${DETECTCODEGPT_ONLY}" = "true" ] && echo "--detectcodegpt_only") \
+#     #
+
 python main.py \
     --dataset "${DATASET}" \
     --dataset_key "${DATASET_KEY}" \
@@ -130,6 +136,5 @@ python main.py \
     --baselines "${BASELINES}" \
     --perturb_type "${PERTURB_TYPE}" \
     --output_name "${OUTPUT_NAME}" \
-    $([ "${DETECTCODEGPT_ONLY}" = "true" ] && echo "--detectcodegpt_only") \
     $([ -n "${LOAD_CACHED_RESULTS}" ] && echo "--load_cached_results ${LOAD_CACHED_RESULTS}") \
     2>&1 | tee "${LOG_FILE}"
