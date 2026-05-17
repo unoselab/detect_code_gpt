@@ -27,12 +27,18 @@ LOG_DIR="${PROJECT_ROOT}/logs"
 OUTPUT_ROOT="${PROJECT_ROOT}/output"
 
 DATASET_NAME="CodeSearchNet"
-GEN_MODEL="CodeLlama-7b-hf"
-GEN_MAX_NUM="2000"
+# GEN_MODEL="CodeLlama-7b-hf"     # Used for CodeLlama-7b-hf reproduction
+GEN_MODEL="starcoder2-7b"         # Current: StarCoder2 experiment
+# GEN_MAX_NUM="2000"              # Used for CodeLlama-7b-hf reproduction
+GEN_MAX_NUM="3000"                # Current: StarCoder2 generation pool
 GEN_TEMPERATURE="0.2"
 
 DATASET_KEY="${GEN_MODEL}-${GEN_MAX_NUM}-tp${GEN_TEMPERATURE}"
-RUN_NAME="codellama-7b-hf_csn_t02_n2000_run"
+# RUN_NAME="codellama-7b-hf_csn_t02_n2000_run"    # Used for CodeLlama-7b-hf
+RUN_NAME="starcoder2-7b_csn_t02_n3000_run"        # Current: StarCoder2
+
+# N_FILTERED="530"                # CodeLlama valid pairs after filtering
+N_FILTERED="638"                  # StarCoder2 valid pairs after filtering
 
 # -----------------------------
 # Files
