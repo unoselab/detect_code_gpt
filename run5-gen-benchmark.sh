@@ -9,8 +9,19 @@ OUTPUT_ROOT="${PROJECT_ROOT}/output"
 
 # --- Dataset / generation identity ---
 DATASET_NAME="CodeSearchNet"
-GEN_MODEL="CodeLlama-7b-hf"
-GEN_MAX_NUM="2000"
+# GEN_MODEL="CodeLlama-7b-hf"
+GEN_MODEL="starcoder2-7b"
+
+
+# GEN_MAX_NUM="2000"
+GEN_MAX_NUM="3000"
+
+
+
+# N_FILTERED="530"                # CodeLlama valid pairs after filtering
+N_FILTERED="638"                  # StarCoder2 valid pairs after filtering
+
+
 GEN_TEMPERATURE="0.2"
 DATASET_KEY="${GEN_MODEL}-${GEN_MAX_NUM}-tp${GEN_TEMPERATURE}"
 OUTPUT_DIR="${OUTPUT_ROOT}/${DATASET_NAME}/${DATASET_KEY}"
