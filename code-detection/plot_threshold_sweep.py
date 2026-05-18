@@ -166,6 +166,26 @@ def plot_pr_curve(
     ax.grid(True, alpha=0.3, linewidth=0.5)
 
 
+def subset_chunks_by_n_samples(chunks: List[Dict[str, Any]], n_samples: int | None) -> List[Dict[str, Any]]:
+    """Keep all chunks belonging to the first n unique record_id values."""
+    if n_samples is None:
+        return chunks
+
+    selected_record_ids = []
+    seen = set()
+
+    for c in chunks:
+        rid = c.get("record_id")
+        if rid not in seen:
+            seen.add(rid)
+            selected_record_ids.append(rid)
+        if len(selected_record_ids) >= n_samples:
+            break
+
+    selected_set = set(selected_record_ids)
+    return [c for c in chunks if c.get("record_id") in selected_set]
+
+
 # -----------------------------------------------------------------------------
 # Top-level plot
 # -----------------------------------------------------------------------------
@@ -228,6 +248,8 @@ def main() -> None:
     )
     parser.add_argument("--csv", type=str, default=str(DEFAULT_CSV),
                         help="Path to benchmark_results CSV.")
+    parser.add_argument("--n_samples", type=int, default=None,
+                    help="Use only the first N benchmark records, keeping all chunks for those records.")
     parser.add_argument("--truth_ratios", type=float, nargs="+",
                         default=DEFAULT_TRUTH_RATIOS,
                         help="Truth ratios to plot as separate lines.")
@@ -247,6 +269,8 @@ def main() -> None:
         raise SystemExit(f"CSV not found: {csv_path}")
 
     chunks = load_chunks(csv_path)
+    chunks = subset_chunks_by_n_samples(chunks, args.n_samples)
+    
     output_path = Path(args.output_image).expanduser()
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
