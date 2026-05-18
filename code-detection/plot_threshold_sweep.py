@@ -268,11 +268,56 @@ def main() -> None:
     if not csv_path.is_file():
         raise SystemExit(f"CSV not found: {csv_path}")
 
-    chunks = load_chunks(csv_path)
-    chunks = subset_chunks_by_n_samples(chunks, args.n_samples)
-    
+    raw_chunks = load_chunks(csv_path)
+    chunks = subset_chunks_by_n_samples(raw_chunks, args.n_samples)
+
     output_path = Path(args.output_image).expanduser()
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    raw_record_ids = []
+    raw_seen = set()
+    for c in raw_chunks:
+        rid = c.get("record_id")
+        if rid not in raw_seen:
+            raw_seen.add(rid)
+            raw_record_ids.append(rid)
+
+    selected_record_ids = []
+    selected_seen = set()
+    for c in chunks:
+        rid = c.get("record_id")
+        if rid not in selected_seen:
+            selected_seen.add(rid)
+            selected_record_ids.append(rid)
+
+    print()
+    print("=" * 72)
+    print("Threshold sweep input summary")
+    print("=" * 72)
+    print(f"Input CSV:              {csv_path}")
+    print(f"Output image:           {output_path}")
+    print(f"Requested n_samples:    {args.n_samples if args.n_samples is not None else 'ALL'}")
+    print(f"Raw records:            {len(raw_record_ids)}")
+    print(f"Raw chunks:             {len(raw_chunks)}")
+    print(f"Raw scorable chunks:    {sum(1 for c in raw_chunks if is_scorable(c))}")
+    print(f"Selected records:       {len(selected_record_ids)}")
+    print(f"Selected chunks:        {len(chunks)}")
+    print(f"Selected scorable:      {sum(1 for c in chunks if is_scorable(c))}")
+    print(f"Truth ratios:           {args.truth_ratios}")
+    print(f"Threshold range:        {args.threshold_min} to {args.threshold_max}")
+    print(f"Threshold step:         {args.threshold_step}")
+    print("=" * 72)
+    print()
+
+    if args.n_samples is not None and len(selected_record_ids) < args.n_samples:
+        print(
+            f"WARNING: requested {args.n_samples} records, "
+            f"but only found {len(selected_record_ids)} records in the CSV."
+        )
+        print()
+
+    if not chunks:
+        raise SystemExit("No chunks selected. Check --csv and --n_samples.")
 
     make_figure(
         chunks=chunks,
