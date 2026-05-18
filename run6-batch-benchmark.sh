@@ -14,23 +14,40 @@ OUTPUT_ROOT="${PROJECT_ROOT}/output"
 
 CUDA_DEVICE=0
 DATASET_NAME="CodeSearchNet"
-GEN_MODEL="CodeLlama-7b-hf"
-GEN_MAX_NUM="2000"
+
+# GEN_MODEL="CodeLlama-7b-hf"     # Historical: CodeLlama reproduction
+GEN_MODEL="starcoder2-7b"         # Current: StarCoder2 experiment
+
+# GEN_MAX_NUM="2000"              # Historical: CodeLlama generation pool
+GEN_MAX_NUM="3000"                # Current: StarCoder2 generation pool
+
 GEN_TEMPERATURE="0.2"
+
+# N_FILTERED="530"                # Historical: CodeLlama valid pairs after filtering
+N_FILTERED="638"                  # Current: StarCoder2 valid pairs after filtering
+
 DATASET_KEY="${GEN_MODEL}-${GEN_MAX_NUM}-tp${GEN_TEMPERATURE}"
 COMPLEXITY="level1"
 
-BASE_MODEL_NAME="codellama/CodeLlama-7b-hf"
+# BASE_MODEL_NAME="codellama/CodeLlama-7b-hf"  # Historical: CodeLlama scorer
+BASE_MODEL_NAME="bigcode/starcoder2-7b"        # Current: StarCoder2 scorer
+
 N_PERTURBATIONS=50
 MAX_LEN=128
-THRESHOLD_YOUDEN=1.3875
-THRESHOLD_HIGH=1.60
+
+# THRESHOLD_YOUDEN=1.3875     # CodeLlama
+# THRESHOLD_HIGH=1.60         # CodeLlama
+# StarCoder2 classification Youden threshold from n=638 run.
+# Final localization threshold should still be selected by threshold sweep later.
+THRESHOLD_YOUDEN=1.6390
+THRESHOLD_HIGH=1.80
 
 LOAD_CACHED=""  # Set to a pickle path to skip scoring
 
 DATA_DIR="${OUTPUT_ROOT}/${DATASET_NAME}/${DATASET_KEY}"
-BENCHMARK_JSONL="${DATA_DIR}/outputs_530_benchmark_${COMPLEXITY}.jsonl"
+BENCHMARK_JSONL="${DATA_DIR}/outputs_${N_FILTERED}_benchmark_${COMPLEXITY}.jsonl"
 OUTPUTS_TXT="${DATA_DIR}/outputs.txt"
+
 OUTPUT_NAME="benchmark_${COMPLEXITY}_${GEN_MODEL,,}"
 TIMESTAMP=$(date +%m-%d_%H:%M)
 LOG_FILE="${LOG_DIR}/${OUTPUT_NAME}_${TIMESTAMP}.log"
@@ -72,11 +89,6 @@ LOAD_FLAG=""
 if [[ -n "${LOAD_CACHED}" ]]; then
     LOAD_FLAG="--load_benchmark_results ${LOAD_CACHED}"
 fi
-
-# Quick way: head the benchmark JSONL to a temp file
-head -10 "${BENCHMARK_JSONL}" > ~/Desktop/benchmark_test.jsonl
-# Then run with --benchmark_jsonl /tmp/benchmark_test.jsonl
-# --benchmark_jsonl "/home/user1-system12/Desktop/benchmark_test.jsonl" \
 
 python main.py \
     --batch_benchmark \
