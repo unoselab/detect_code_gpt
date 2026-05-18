@@ -1,26 +1,30 @@
 #!/usr/bin/env python3
 """
-Figure 1: Threshold sensitivity per LLM.
+Per-LLM threshold-sensitivity plots — one metric per PNG.
 
-Two-panel side-by-side figure for cross-LLM comparison:
-  - Left:  F1 vs Threshold, one line per LLM (at fixed truth_ratio)
-  - Right: Precision-Recall trajectory, one line per LLM
+Produces four separate PNG files for composition via LaTeX \subfigure:
+  - F1 vs NPR threshold
+  - Precision vs NPR threshold
+  - Recall vs NPR threshold
+  - Precision-Recall trajectory
 
-Each LLM gets:
-  - A distinct color (fixed across all paper figures via LLM_COLORS)
-  - Peak-F1 marker (filled circle)
-  - High-precision marker (filled triangle, where precision first crosses target)
-  - Dashed vertical line for classification threshold (left panel only)
+Each plot overlays one line per LLM. Designed for 2x2 grid composition in
+LaTeX (each figure ~3.4 inches square at \\textwidth in sigconf two-column).
 
 Usage:
-    python plot_fig1_threshold_per_llm.py \\
-        --csv logs/benchmark_results_codellama.csv \\
-        --csv logs/benchmark_results_starcoder2.csv \\
+    python plot_threshold_multi_llms.py \\
+        --csv logs/results_codellama.csv \\
+        --csv logs/results_starcoder2.csv \\
         --label "CodeLlama-7B" --label "StarCoder2-7B" \\
-        --classification_threshold 1.3875 --classification_threshold 1.6470 \\
         --truth_ratio 0.5 \\
-        --high_precision_target 0.80 \\
-        --output_image logs/fig1_threshold_per_llm.png
+        --n_samples 530 \\
+        --output_image logs/threshold_f1.png \\
+        --output_image logs/threshold_preci.png \\
+        --output_image logs/threshold_recall.png \\
+        --output_image logs/preci_recall.png
+
+The four --output_image flags must appear in this order:
+    f1, precision, recall, pr
 """
 
 from __future__ import annotations
@@ -54,13 +58,23 @@ LLM_COLORS = {
 FALLBACK_COLORS = ["#e377c2", "#bcbd22", "#17becf", "#7f7f7f"]
 
 DEFAULT_THRESHOLD_RANGE = (1.0, 2.0)
-DEFAULT_THRESHOLD_STEP = 0.005   # fine enough that peak-finding is accurate
+DEFAULT_THRESHOLD_STEP = 0.005
+
+# Positional mapping for --output_image flags
+METRIC_ORDER = ["f1", "precision", "recall", "pr"]
+
+# Annotation offsets — used per-LLM-index to avoid overlap (5 LLMs supported)
+ANNOTATION_OFFSETS = [
+    (8, 10),
+    (8, -16),
+    (-90, 10),
+    (-90, -16),
+    (8, 30),
+]
 
 
 def color_for_label(label: str, fallback_idx: int) -> str:
-    if label in LLM_COLORS:
-        return LLM_COLORS[label]
-    return FALLBACK_COLORS[fallback_idx % len(FALLBACK_COLORS)]
+    return LLM_COLORS.get(label, FALLBACK_COLORS[fallback_idx % len(FALLBACK_COLORS)])
 
 
 # -----------------------------------------------------------------------------
@@ -72,7 +86,6 @@ def sweep_metrics(
     truth_ratio: float,
     thresholds: np.ndarray,
 ) -> Dict[str, np.ndarray]:
-    """Compute precision, recall, F1 across threshold range."""
     p = np.zeros_like(thresholds)
     r = np.zeros_like(thresholds)
     f1 = np.zeros_like(thresholds)
@@ -86,274 +99,261 @@ def sweep_metrics(
 
 
 def find_high_precision_threshold(
-    thresholds: np.ndarray,
-    precisions: np.ndarray,
-    target: float,
+    thresholds: np.ndarray, precisions: np.ndarray, target: float
 ) -> Optional[int]:
-    """Lowest threshold index where precision >= target. Returns None if unreachable."""
     above = np.where(precisions >= target)[0]
-    if above.size == 0:
-        return None
-    return int(above[0])
+    return int(above[0]) if above.size > 0 else None
 
 
 # -----------------------------------------------------------------------------
-# Plotting
+# Per-metric plotting (each produces one PNG)
 # -----------------------------------------------------------------------------
 
-def plot_left_panel_f1_vs_threshold(
+def _style_panel(ax: plt.Axes, xlabel: str, ylabel: str, title: str,
+                 x_range: tuple, y_range: tuple = (0.0, 1.0)) -> None:
+    """Consistent styling across all panels."""
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    ax.set_xlim(x_range)
+    ax.set_ylim(y_range)
+    ax.grid(True, alpha=0.3, linewidth=0.5)
+
+
+def plot_f1_panel(
     ax: plt.Axes,
     sweeps: Dict[str, Dict],
     thresholds: np.ndarray,
     label_to_color: Dict[str, str],
-    label_to_class_thresh: Dict[str, Optional[float]],
     show_annotations: bool,
 ) -> None:
-    """Left panel: F1 vs threshold, one line per LLM."""
-    for label, data in sweeps.items():
+    for idx, (label, data) in enumerate(sweeps.items()):
         color = label_to_color[label]
         f1 = data["f1"]
-
-        # F1 curve
         ax.plot(thresholds, f1, color=color, linewidth=2.0, label=label, zorder=2)
-
-        # Peak F1 marker
         peak_idx = int(np.argmax(f1))
-        peak_t = float(thresholds[peak_idx])
-        peak_f1 = float(f1[peak_idx])
-        ax.plot(peak_t, peak_f1, "o",
-                color=color, markersize=7,
-                markeredgecolor="black", markeredgewidth=0.8,
-                zorder=3)
-
+        peak_t, peak_f1 = float(thresholds[peak_idx]), float(f1[peak_idx])
+        ax.plot(peak_t, peak_f1, "o", color=color, markersize=7,
+                markeredgecolor="black", markeredgewidth=0.8, zorder=3)
         if show_annotations:
+            offset_x, offset_y = ANNOTATION_OFFSETS[idx % len(ANNOTATION_OFFSETS)]
             ax.annotate(
                 f"({peak_t:.2f}, {peak_f1:.2f})",
                 xy=(peak_t, peak_f1),
-                xytext=(8, 8), textcoords="offset points",
+                xytext=(offset_x, offset_y), textcoords="offset points",
                 fontsize=8.5, color=color, weight="bold",
             )
-
-        # Classification threshold reference (dashed, matching color)
-        ct = label_to_class_thresh.get(label)
-        if ct is not None:
-            ax.axvline(ct, color=color, linestyle="--", alpha=0.55, linewidth=1.0, zorder=1)
-
-    ax.set_xlabel("NPR threshold")
-    ax.set_ylabel("F1")
-    ax.set_title("F1 vs NPR threshold (per LLM)")
-    ax.set_xlim(thresholds.min(), thresholds.max())
-    ax.set_ylim(0.0, 1.0)
-    ax.grid(True, alpha=0.3, linewidth=0.5)
+    _style_panel(ax, "NPR threshold", "F1", "F1 vs NPR threshold",
+                 (thresholds.min(), thresholds.max()))
     ax.legend(loc="best", fontsize=9, framealpha=0.9)
 
 
-def plot_right_panel_pr_curve(
+def plot_precision_panel(
     ax: plt.Axes,
     sweeps: Dict[str, Dict],
     thresholds: np.ndarray,
     label_to_color: Dict[str, str],
-    high_precision_target: float,
-    show_annotations: bool,
+    high_precision_target: Optional[float],
 ) -> None:
-    """Right panel: Precision vs Recall trajectory, one line per LLM."""
-
-    # Horizontal reference line at the high-precision target
-    ax.axhline(high_precision_target, color="gray", linestyle="--",
-               alpha=0.4, linewidth=0.9, zorder=1,
-               label=f"P = {high_precision_target:.2f}")
-
+    if high_precision_target is not None:
+        ax.axhline(high_precision_target, color="gray", linestyle="--",
+                   alpha=0.4, linewidth=0.9, zorder=1,
+                   label=f"P = {high_precision_target:.2f}")
     for label, data in sweeps.items():
         color = label_to_color[label]
-        precision = data["precision"]
-        recall = data["recall"]
-        f1 = data["f1"]
+        ax.plot(thresholds, data["precision"], color=color, linewidth=2.0,
+                label=label, zorder=2)
+    _style_panel(ax, "NPR threshold", "Precision", "Precision vs NPR threshold",
+                 (thresholds.min(), thresholds.max()))
+    ax.legend(loc="lower right", fontsize=9, framealpha=0.9)
 
-        # PR curve
-        ax.plot(recall, precision, color=color, linewidth=2.0, label=label, zorder=2)
 
-        # Peak-F1 point
+def plot_recall_panel(
+    ax: plt.Axes,
+    sweeps: Dict[str, Dict],
+    thresholds: np.ndarray,
+    label_to_color: Dict[str, str],
+) -> None:
+    for label, data in sweeps.items():
+        color = label_to_color[label]
+        ax.plot(thresholds, data["recall"], color=color, linewidth=2.0,
+                label=label, zorder=2)
+    _style_panel(ax, "NPR threshold", "Recall", "Recall vs NPR threshold",
+                 (thresholds.min(), thresholds.max()))
+    ax.legend(loc="lower left", fontsize=9, framealpha=0.9)
+
+
+def plot_pr_panel(
+    ax: plt.Axes,
+    sweeps: Dict[str, Dict],
+    thresholds: np.ndarray,
+    label_to_color: Dict[str, str],
+    high_precision_target: Optional[float],
+    show_annotations: bool,
+) -> None:
+    if high_precision_target is not None:
+        ax.axhline(high_precision_target, color="gray", linestyle="--",
+                   alpha=0.4, linewidth=0.9, zorder=1,
+                   label=f"P = {high_precision_target:.2f}")
+    for idx, (label, data) in enumerate(sweeps.items()):
+        color = label_to_color[label]
+        precision, recall, f1 = data["precision"], data["recall"], data["f1"]
+        ax.plot(recall, precision, color=color, linewidth=2.0,
+                label=label, zorder=2)
+        # peak F1 dot
         peak_idx = int(np.argmax(f1))
         ax.plot(recall[peak_idx], precision[peak_idx], "o",
                 color=color, markersize=7,
                 markeredgecolor="black", markeredgewidth=0.8, zorder=3)
-
-        # High-precision point (where precision >= target, with highest recall)
-        hp_idx = find_high_precision_threshold(thresholds, precision, high_precision_target)
-        if hp_idx is not None:
-            ax.plot(recall[hp_idx], precision[hp_idx], "^",
-                    color=color, markersize=9,
-                    markeredgecolor="black", markeredgewidth=0.8, zorder=3)
-
-        if show_annotations:
-            # Peak F1 annotation
-            ax.annotate(
-                f"F1: ({recall[peak_idx]:.2f}, {precision[peak_idx]:.2f})",
-                xy=(recall[peak_idx], precision[peak_idx]),
-                xytext=(8, -12), textcoords="offset points",
-                fontsize=8.5, color=color, weight="bold",
-            )
-            # High-precision annotation
+        # high-precision triangle
+        if high_precision_target is not None:
+            hp_idx = find_high_precision_threshold(thresholds, precision,
+                                                    high_precision_target)
             if hp_idx is not None:
-                ax.annotate(
-                    f"HP: ({recall[hp_idx]:.2f}, {precision[hp_idx]:.2f})",
-                    xy=(recall[hp_idx], precision[hp_idx]),
-                    xytext=(8, 8), textcoords="offset points",
-                    fontsize=8.5, color=color, weight="bold",
-                )
-
-    ax.set_xlabel("Recall")
-    ax.set_ylabel("Precision")
-    ax.set_title("Precision-Recall trajectory (per LLM)")
-    ax.set_xlim(0.0, 1.0)
-    ax.set_ylim(0.0, 1.0)
-    ax.grid(True, alpha=0.3, linewidth=0.5)
+                ax.plot(recall[hp_idx], precision[hp_idx], "^",
+                        color=color, markersize=9,
+                        markeredgecolor="black", markeredgewidth=0.8, zorder=3)
+                if show_annotations:
+                    offset_x, offset_y = ANNOTATION_OFFSETS[idx % len(ANNOTATION_OFFSETS)]
+                    ax.annotate(
+                        f"({recall[hp_idx]:.2f}, {precision[hp_idx]:.2f})",
+                        xy=(recall[hp_idx], precision[hp_idx]),
+                        xytext=(offset_x, offset_y), textcoords="offset points",
+                        fontsize=8.5, color=color, weight="bold",
+                    )
+    _style_panel(ax, "Recall", "Precision", "Precision-Recall trajectory",
+                 (0.0, 1.0), (0.0, 1.0))
     ax.legend(loc="lower left", fontsize=9, framealpha=0.9)
 
 
-def make_figure(
-    csv_paths: List[Path],
-    labels: List[str],
-    classification_thresholds: List[Optional[float]],
-    truth_ratio: float,
-    threshold_range: tuple,
-    threshold_step: float,
-    high_precision_target: float,
+# -----------------------------------------------------------------------------
+# Per-PNG dispatcher
+# -----------------------------------------------------------------------------
+
+def save_one_panel(
+    metric: str,
     output_path: Path,
-    n_samples: Optional[int],
+    sweeps: Dict[str, Dict],
+    thresholds: np.ndarray,
+    label_to_color: Dict[str, str],
+    high_precision_target: Optional[float],
+    show_annotations: bool,
+    figsize: tuple = (5.0, 4.0),
 ) -> None:
-    # Per-LLM sweeps
-    thresholds = np.arange(threshold_range[0], threshold_range[1] + 1e-9, threshold_step)
-    sweeps: Dict[str, Dict] = {}
-    label_to_color: Dict[str, str] = {}
-    label_to_class_thresh: Dict[str, Optional[float]] = {}
-
-    for i, (csv_path, label, ct) in enumerate(zip(csv_paths, labels, classification_thresholds)):
-        chunks = load_chunks(csv_path)
-        # Optional: subset to first N records for parity across LLMs
-        if n_samples is not None:
-            keep_record_ids = sorted({c["record_id"] for c in chunks})[:n_samples]
-            keep_set = set(keep_record_ids)
-            chunks = [c for c in chunks if c["record_id"] in keep_set]
-        sweeps[label] = sweep_metrics(chunks, truth_ratio, thresholds)
-        label_to_color[label] = color_for_label(label, i)
-        label_to_class_thresh[label] = ct
-
-    # Annotation strategy: on-curve for ≤3 LLMs
-    show_annotations = len(labels) <= 3
-
-    # Figure
-    fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(11, 4.5))
-    fig.suptitle(
-        f"Per-LLM Threshold Sensitivity  (truth_ratio = {truth_ratio:.2f}, "
-        f"high-precision target = {high_precision_target:.2f})",
-        fontsize=11, y=1.0,
-    )
-
-    plot_left_panel_f1_vs_threshold(
-        ax_left, sweeps, thresholds,
-        label_to_color, label_to_class_thresh, show_annotations,
-    )
-    plot_right_panel_pr_curve(
-        ax_right, sweeps, thresholds,
-        label_to_color, high_precision_target, show_annotations,
-    )
-
-    plt.tight_layout(rect=(0, 0, 1, 0.96))
+    fig, ax = plt.subplots(1, 1, figsize=figsize)
+    if metric == "f1":
+        plot_f1_panel(ax, sweeps, thresholds, label_to_color, show_annotations)
+    elif metric == "precision":
+        plot_precision_panel(ax, sweeps, thresholds, label_to_color, high_precision_target)
+    elif metric == "recall":
+        plot_recall_panel(ax, sweeps, thresholds, label_to_color)
+    elif metric == "pr":
+        plot_pr_panel(ax, sweeps, thresholds, label_to_color,
+                       high_precision_target, show_annotations)
+    else:
+        raise ValueError(f"Unknown metric: {metric}")
+    plt.tight_layout()
     plt.savefig(output_path, dpi=200, bbox_inches="tight")
-    print(f"Wrote {output_path}")
-
-    # Print per-LLM summary for reference / paper table
-    print()
-    print("=" * 78)
-    print("Per-LLM operating points (truth_ratio = {:.2f})".format(truth_ratio))
-    print("=" * 78)
-    print(f"  {'LLM':<24}  {'best_F1':>8}  {'τ_F1':>6}  {'τ_HP':>6}  "
-          f"{'P@HP':>6}  {'R@HP':>6}  {'τ_class':>8}")
-    print("  " + "-" * 76)
-    for label, data in sweeps.items():
-        f1 = data["f1"]
-        peak_idx = int(np.argmax(f1))
-        peak_t = thresholds[peak_idx]
-        peak_f1 = f1[peak_idx]
-        hp_idx = find_high_precision_threshold(thresholds, data["precision"], high_precision_target)
-        if hp_idx is not None:
-            hp_t = thresholds[hp_idx]
-            hp_p = data["precision"][hp_idx]
-            hp_r = data["recall"][hp_idx]
-        else:
-            hp_t = hp_p = hp_r = float("nan")
-        ct = label_to_class_thresh[label]
-        ct_str = f"{ct:.4f}" if ct is not None else "      —"
-        print(f"  {label:<24}  {peak_f1:>8.4f}  {peak_t:>6.3f}  {hp_t:>6.3f}  "
-              f"{hp_p:>6.3f}  {hp_r:>6.3f}  {ct_str:>8}")
+    plt.close(fig)
+    print(f"  wrote {output_path}")
 
 
 # -----------------------------------------------------------------------------
-# CLI
+# Main pipeline
 # -----------------------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Plot Figure 1: per-LLM threshold sensitivity (F1 + PR trajectory).",
+        description="Per-LLM threshold sweep — one metric per PNG for LaTeX subfigure composition."
     )
     parser.add_argument("--csv", type=str, action="append", required=True,
                         help="Path to a benchmark_results CSV. Repeatable.")
     parser.add_argument("--label", type=str, action="append", required=True,
                         help="Label for the corresponding --csv. Repeatable.")
-    parser.add_argument("--classification_threshold", type=float, action="append",
-                        default=None,
-                        help="Classification threshold per LLM (from Youden's J on whole-snippet). "
-                             "Repeatable; pass once per --csv, in matching order. "
-                             "Pass 'nan' or omit to skip for a specific LLM.")
-    parser.add_argument("--truth_ratio", type=float, default=0.5,
-                        help="Truth ratio for ground-truth labeling (default 0.5).")
+    parser.add_argument("--output_image", type=str, action="append", required=True,
+                        help=f"Output PNG. Must be repeated exactly 4 times. "
+                             f"Positional order: {METRIC_ORDER}.")
+    parser.add_argument("--truth_ratio", type=float, default=0.5)
     parser.add_argument("--threshold_min", type=float, default=DEFAULT_THRESHOLD_RANGE[0])
     parser.add_argument("--threshold_max", type=float, default=DEFAULT_THRESHOLD_RANGE[1])
     parser.add_argument("--threshold_step", type=float, default=DEFAULT_THRESHOLD_STEP)
-    parser.add_argument("--high_precision_target", type=float, default=0.80,
-                        help="Target precision for high-precision operating point.")
+    parser.add_argument("--high_precision_target", type=float, default=None,
+                        help="If set, overlay P=target reference line and mark "
+                             "high-precision operating points on the PR panel.")
     parser.add_argument("--n_samples", type=int, default=None,
-                        help="If set, restrict each CSV to its first N records (parity).")
-    parser.add_argument("--output_image", type=str, default="logs/fig1_threshold_per_llm.png")
+                        help="If set, restrict each CSV to its first N records.")
     args = parser.parse_args()
 
+    # --- Validate inputs ---
     if len(args.csv) != len(args.label):
         raise SystemExit(f"Number of --csv ({len(args.csv)}) must equal --label ({len(args.label)})")
+    if len(args.output_image) != len(METRIC_ORDER):
+        raise SystemExit(
+            f"Expected exactly {len(METRIC_ORDER)} --output_image flags "
+            f"(one each for: {METRIC_ORDER}); got {len(args.output_image)}."
+        )
 
-    if args.classification_threshold is None:
-        classification_thresholds = [None] * len(args.csv)
-    else:
-        if len(args.classification_threshold) != len(args.csv):
-            raise SystemExit(
-                f"Number of --classification_threshold ({len(args.classification_threshold)}) "
-                f"must equal --csv ({len(args.csv)})"
-            )
-        classification_thresholds = [
-            None if (ct is None or (isinstance(ct, float) and ct != ct))
-            else ct
-            for ct in args.classification_threshold
-        ]
-
+    # --- Load and sweep per LLM ---
     csv_paths = [Path(p).expanduser() for p in args.csv]
     for p in csv_paths:
         if not p.is_file():
             raise SystemExit(f"CSV not found: {p}")
 
-    output_path = Path(args.output_image).expanduser()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    thresholds = np.arange(args.threshold_min, args.threshold_max + 1e-9,
+                            args.threshold_step)
+    sweeps: Dict[str, Dict] = {}
+    label_to_color: Dict[str, str] = {}
+    for i, (csv_path, label) in enumerate(zip(csv_paths, args.label)):
+        chunks = load_chunks(csv_path)
+        if args.n_samples is not None:
+            keep_record_ids = sorted({c["record_id"] for c in chunks})[:args.n_samples]
+            keep_set = set(keep_record_ids)
+            chunks = [c for c in chunks if c["record_id"] in keep_set]
+        sweeps[label] = sweep_metrics(chunks, args.truth_ratio, thresholds)
+        label_to_color[label] = color_for_label(label, i)
 
-    make_figure(
-        csv_paths=csv_paths,
-        labels=args.label,
-        classification_thresholds=classification_thresholds,
-        truth_ratio=args.truth_ratio,
-        threshold_range=(args.threshold_min, args.threshold_max),
-        threshold_step=args.threshold_step,
-        high_precision_target=args.high_precision_target,
-        output_path=output_path,
-        n_samples=args.n_samples,
-    )
+    # --- Per-metric save ---
+    show_annotations = len(args.label) <= 3
+    print(f"\nWriting {len(METRIC_ORDER)} panels:")
+    for metric, output_path_str in zip(METRIC_ORDER, args.output_image):
+        output_path = Path(output_path_str).expanduser()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        save_one_panel(
+            metric=metric,
+            output_path=output_path,
+            sweeps=sweeps,
+            thresholds=thresholds,
+            label_to_color=label_to_color,
+            high_precision_target=args.high_precision_target,
+            show_annotations=show_annotations,
+        )
+
+    # --- Summary ---
+    print()
+    print("=" * 78)
+    print(f"Per-LLM operating points (truth_ratio = {args.truth_ratio:.2f})")
+    print("=" * 78)
+    print(f"  {'LLM':<24}  {'best_F1':>8}  {'τ_F1':>6}  {'τ_HP':>6}  "
+          f"{'P@HP':>6}  {'R@HP':>6}")
+    print("  " + "-" * 68)
+    for label, data in sweeps.items():
+        f1 = data["f1"]
+        peak_idx = int(np.argmax(f1))
+        peak_t, peak_f1 = thresholds[peak_idx], f1[peak_idx]
+        if args.high_precision_target is not None:
+            hp_idx = find_high_precision_threshold(
+                thresholds, data["precision"], args.high_precision_target
+            )
+            if hp_idx is not None:
+                hp_t = thresholds[hp_idx]
+                hp_p = data["precision"][hp_idx]
+                hp_r = data["recall"][hp_idx]
+            else:
+                hp_t = hp_p = hp_r = float("nan")
+        else:
+            hp_t = hp_p = hp_r = float("nan")
+        print(f"  {label:<24}  {peak_f1:>8.4f}  {peak_t:>6.3f}  {hp_t:>6.3f}  "
+              f"{hp_p:>6.3f}  {hp_r:>6.3f}")
 
 
 if __name__ == "__main__":
