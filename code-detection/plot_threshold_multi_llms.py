@@ -38,7 +38,6 @@ import numpy as np
 
 from evaluate_benchmark import (
     confusion_at_threshold,
-    is_scorable,
     load_chunks,
     metrics_from_confusion,
 )
@@ -126,25 +125,81 @@ def plot_f1_panel(
     thresholds: np.ndarray,
     label_to_color: Dict[str, str],
     show_annotations: bool,
+    show_mean: bool = True,
 ) -> None:
     for idx, (label, data) in enumerate(sweeps.items()):
         color = label_to_color[label]
         f1 = data["f1"]
         ax.plot(thresholds, f1, color=color, linewidth=2.0, label=label, zorder=2)
+
         peak_idx = int(np.argmax(f1))
         peak_t, peak_f1 = float(thresholds[peak_idx]), float(f1[peak_idx])
-        ax.plot(peak_t, peak_f1, "o", color=color, markersize=7,
-                markeredgecolor="black", markeredgewidth=0.8, zorder=3)
+
+        ax.plot(
+            peak_t, peak_f1, "o",
+            color=color,
+            markersize=7,
+            markeredgecolor="black",
+            markeredgewidth=0.8,
+            zorder=3,
+        )
+
         if show_annotations:
             offset_x, offset_y = ANNOTATION_OFFSETS[idx % len(ANNOTATION_OFFSETS)]
             ax.annotate(
                 f"({peak_t:.2f}, {peak_f1:.2f})",
                 xy=(peak_t, peak_f1),
-                xytext=(offset_x, offset_y), textcoords="offset points",
-                fontsize=8.5, color=color, weight="bold",
+                xytext=(offset_x, offset_y),
+                textcoords="offset points",
+                fontsize=8.5,
+                color=color,
+                weight="bold",
             )
-    _style_panel(ax, "NPR threshold", "F1", "F1 vs NPR threshold",
-                 (thresholds.min(), thresholds.max()))
+
+    if show_mean and len(sweeps) >= 2:
+        mean_info = compute_mean_f1_curve(sweeps, thresholds)
+        mean_f1 = mean_info["mean_f1"]
+        tau_balanced = mean_info["tau_balanced"]
+        best_mean_f1 = mean_info["best_mean_f1"]
+
+        ax.plot(
+            thresholds,
+            mean_f1,
+            color="black",
+            linewidth=2.8,
+            linestyle="--",
+            label="Mean F1",
+            zorder=4,
+        )
+
+        ax.plot(
+            tau_balanced,
+            best_mean_f1,
+            "D",
+            color="black",
+            markersize=7,
+            markeredgecolor="white",
+            markeredgewidth=0.8,
+            zorder=5,
+        )
+
+        ax.annotate(
+            f"mean peak\n({tau_balanced:.2f}, {best_mean_f1:.2f})",
+            xy=(tau_balanced, best_mean_f1),
+            xytext=(10, -35),
+            textcoords="offset points",
+            fontsize=8.5,
+            color="black",
+            weight="bold",
+        )
+
+    _style_panel(
+        ax,
+        "NPR threshold",
+        "F1",
+        "F1 vs NPR threshold",
+        (thresholds.min(), thresholds.max()),
+    )
     ax.legend(loc="best", fontsize=9, framealpha=0.9)
 
 
@@ -242,7 +297,14 @@ def save_one_panel(
 ) -> None:
     fig, ax = plt.subplots(1, 1, figsize=figsize)
     if metric == "f1":
-        plot_f1_panel(ax, sweeps, thresholds, label_to_color, show_annotations)
+        plot_f1_panel(
+            ax,
+            sweeps,
+            thresholds,
+            label_to_color,
+            show_annotations,
+            show_mean=True,
+        )
     elif metric == "precision":
         plot_precision_panel(ax, sweeps, thresholds, label_to_color, high_precision_target)
     elif metric == "recall":
@@ -257,6 +319,57 @@ def save_one_panel(
     plt.close(fig)
     print(f"  wrote {output_path}")
 
+
+def compute_mean_f1_curve(
+    sweeps: Dict[str, Dict],
+    thresholds: np.ndarray,
+) -> Dict[str, object]:
+    """Compute the balanced cross-LLM operating point.
+
+    Each LLM receives equal weight, regardless of chunk count.
+    """
+    f1_curves = np.vstack([data["f1"] for data in sweeps.values()])
+    precision_curves = np.vstack([data["precision"] for data in sweeps.values()])
+    recall_curves = np.vstack([data["recall"] for data in sweeps.values()])
+
+    mean_f1 = np.mean(f1_curves, axis=0)
+    mean_precision = np.mean(precision_curves, axis=0)
+    mean_recall = np.mean(recall_curves, axis=0)
+
+    best_idx = int(np.argmax(mean_f1))
+
+    return {
+        "mean_f1": mean_f1,
+        "mean_precision": mean_precision,
+        "mean_recall": mean_recall,
+        "best_idx": best_idx,
+        "tau_balanced": float(thresholds[best_idx]),
+        "best_mean_f1": float(mean_f1[best_idx]),
+        "mean_precision_at_tau": float(mean_precision[best_idx]),
+        "mean_recall_at_tau": float(mean_recall[best_idx]),
+    }
+    
+    
+def compute_cross_llm_high_precision_threshold(
+    sweeps: Dict[str, Dict],
+    thresholds: np.ndarray,
+    target: float,
+) -> Optional[Dict[str, object]]:
+    """Find the lowest threshold where every LLM reaches precision >= target."""
+    precision_curves = np.vstack([data["precision"] for data in sweeps.values()])
+    min_precision = np.min(precision_curves, axis=0)
+
+    valid = np.where(min_precision >= target)[0]
+    if valid.size == 0:
+        return None
+
+    hp_idx = int(valid[0])
+    return {
+        "hp_idx": hp_idx,
+        "tau_hp_cross_llm": float(thresholds[hp_idx]),
+        "min_precision": float(min_precision[hp_idx]),
+    }
+        
 
 # -----------------------------------------------------------------------------
 # Main pipeline
@@ -354,6 +467,61 @@ def main() -> None:
             hp_t = hp_p = hp_r = float("nan")
         print(f"  {label:<24}  {peak_f1:>8.4f}  {peak_t:>6.3f}  {hp_t:>6.3f}  "
               f"{hp_p:>6.3f}  {hp_r:>6.3f}")
+
+    if len(sweeps) >= 2:
+        mean_info = compute_mean_f1_curve(sweeps, thresholds)
+        idx = mean_info["best_idx"]
+
+        print()
+        print("=" * 78)
+        print("Cross-LLM balanced operating point")
+        print("=" * 78)
+        print(f"  τ_balanced = {mean_info['tau_balanced']:.3f}")
+        print(f"  mean F1    = {mean_info['best_mean_f1']:.4f}")
+        print(f"  mean P     = {mean_info['mean_precision_at_tau']:.4f}")
+        print(f"  mean R     = {mean_info['mean_recall_at_tau']:.4f}")
+
+        print()
+        print("  Per-LLM metrics at τ_balanced:")
+        print(f"    {'LLM':<24}  {'P':>8}  {'R':>8}  {'F1':>8}")
+        print("    " + "-" * 50)
+
+        for label, data in sweeps.items():
+            print(
+                f"    {label:<24}  "
+                f"{data['precision'][idx]:>8.4f}  "
+                f"{data['recall'][idx]:>8.4f}  "
+                f"{data['f1'][idx]:>8.4f}"
+            )
+
+    if args.high_precision_target is not None and len(sweeps) >= 2:
+        hp_info = compute_cross_llm_high_precision_threshold(
+            sweeps,
+            thresholds,
+            args.high_precision_target,
+        )
+
+        print()
+        print("=" * 78)
+        print(f"Cross-LLM high-precision operating point "
+            f"(P >= {args.high_precision_target:.2f})")
+        print("=" * 78)
+
+        if hp_info is None:
+            print("  No threshold satisfies the precision floor for all LLMs.")
+        else:
+            idx = hp_info["hp_idx"]
+            print(f"  τ_HP,cross = {hp_info['tau_hp_cross_llm']:.3f}")
+            print(f"  min P      = {hp_info['min_precision']:.4f}")
+
+            print()
+            print("  Per-LLM precision/recall at τ_HP,cross:")
+            for label, data in sweeps.items():
+                print(
+                    f"    {label:<24} "
+                    f"P = {data['precision'][idx]:.4f}, "
+                    f"R = {data['recall'][idx]:.4f}"
+                )
 
 
 if __name__ == "__main__":

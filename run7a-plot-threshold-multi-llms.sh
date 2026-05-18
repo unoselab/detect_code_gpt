@@ -5,11 +5,11 @@ python code-detection/plot_threshold_multi_llms.py \
     --label "StarCoder2-7B" \
     --truth_ratio 0.5 \
     --n_samples 530 \
+    --high_precision_target 0.80 \
     --output_image logs/fig1/threshold_f1.png \
     --output_image logs/fig1/threshold_preci.png \
     --output_image logs/fig1/threshold_recall.png \
     --output_image logs/fig1/preci_recall.png
 
-    # --high_precision_target 0.80 \
     # --classification_threshold 1.3875 \
     # --classification_threshold 1.6438 \
