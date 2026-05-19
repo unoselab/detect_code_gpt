@@ -233,7 +233,7 @@ def plot_precision_panel(
         color = label_to_color[label]
         ax.plot(thresholds, data["precision"], color=color, linewidth=2.0,
                 label=label, zorder=2)
-    _style_panel(ax, "NPR threshold", "Precision", "Precision vs NPR threshold",
+    _style_panel(ax, "Threshold", "Precision", "Precision vs Threshold",
                  (thresholds.min(), thresholds.max()))
     ax.legend(loc="lower right", fontsize=9, framealpha=0.9)
 
