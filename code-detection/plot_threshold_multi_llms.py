@@ -283,7 +283,15 @@ def plot_pr_panel(
                         color=color, markersize=9,
                         markeredgecolor="black", markeredgewidth=0.8, zorder=3)
                 if show_annotations:
-                    offset_x, offset_y = ANNOTATION_OFFSETS[idx % len(ANNOTATION_OFFSETS)]
+                    # offset_x, offset_y = ANNOTATION_OFFSETS[idx % len(ANNOTATION_OFFSETS)]
+                    pr_annotation_offsets = [
+                        (-48, -18),   # CodeLlama: move blue label downward/right
+                        (8, 0),      # StarCoder2: move red label upward/right
+                        (-90, -18),
+                        (-90, 18),
+                    ]
+                    offset_x, offset_y = pr_annotation_offsets[idx % len(pr_annotation_offsets)]
+                    
                     ax.annotate(
                         f"({recall[hp_idx]:.2f}, {precision[hp_idx]:.2f})",
                         xy=(recall[hp_idx], precision[hp_idx]),
