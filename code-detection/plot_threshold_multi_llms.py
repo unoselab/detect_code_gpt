@@ -35,6 +35,7 @@ from typing import Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.lines import Line2D
 
 from evaluate_benchmark import (
     confusion_at_threshold,
@@ -300,7 +301,38 @@ def plot_pr_panel(
                     )
     _style_panel(ax, "Recall", "Precision", "Precision-Recall trajectory",
                  (0.0, 1.0), (0.0, 1.0))
-    ax.legend(loc="lower left", fontsize=9, framealpha=0.9)
+    # ax.legend(loc="lower left", fontsize=9, framealpha=0.9)
+    # Add legend entries for line colors and marker meanings.
+    handles, labels = ax.get_legend_handles_labels()
+
+    marker_handles = [
+        Line2D(
+            [0], [0],
+            marker="o",
+            color="none",
+            markerfacecolor="gray",
+            markeredgecolor="black",
+            markersize=7,
+            label="Best F1"
+        ),
+        Line2D(
+            [0], [0],
+            marker="^",
+            color="none",
+            markerfacecolor="gray",
+            markeredgecolor="black",
+            markersize=9,
+            label=f"High precision point"
+        ),
+    ]
+
+    ax.legend(
+        handles + marker_handles,
+        labels + ["Best F1", "High precision point"],
+        loc="lower left",
+        fontsize=9,
+        framealpha=0.9,
+    )
 
 
 # -----------------------------------------------------------------------------
