@@ -248,7 +248,7 @@ def plot_recall_panel(
         color = label_to_color[label]
         ax.plot(thresholds, data["recall"], color=color, linewidth=2.0,
                 label=label, zorder=2)
-    _style_panel(ax, "NPR threshold", "Recall", "Recall vs NPR threshold",
+    _style_panel(ax, "Threshold", "Recall", "Recall vs Threshold",
                  (thresholds.min(), thresholds.max()))
     ax.legend(loc="lower left", fontsize=9, framealpha=0.9)
 
