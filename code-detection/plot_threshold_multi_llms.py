@@ -127,6 +127,13 @@ def plot_f1_panel(
     show_annotations: bool,
     show_mean: bool = True,
 ) -> None:
+    # Panel-specific offsets to avoid overlap near the F1 peaks.
+    f1_annotation_offsets = [
+        (-5, 20),    # CodeLlama: above/left
+        (36, 8),   # StarCoder2: right/below
+        (-80, 18),
+        (16, -42),
+    ]
     for idx, (label, data) in enumerate(sweeps.items()):
         color = label_to_color[label]
         f1 = data["f1"]
@@ -145,7 +152,7 @@ def plot_f1_panel(
         )
 
         if show_annotations:
-            offset_x, offset_y = ANNOTATION_OFFSETS[idx % len(ANNOTATION_OFFSETS)]
+            offset_x, offset_y = f1_annotation_offsets[idx % len(f1_annotation_offsets)]
             ax.annotate(
                 f"({peak_t:.2f}, {peak_f1:.2f})",
                 xy=(peak_t, peak_f1),
@@ -154,6 +161,9 @@ def plot_f1_panel(
                 fontsize=8.5,
                 color=color,
                 weight="bold",
+                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.75),
+                arrowprops=dict(arrowstyle="-", color=color, lw=0.8, alpha=0.7),
+                zorder=6,
             )
 
     if show_mean and len(sweeps) >= 2:
@@ -183,21 +193,25 @@ def plot_f1_panel(
             zorder=5,
         )
 
-        ax.annotate(
-            f"mean peak\n({tau_balanced:.2f}, {best_mean_f1:.2f})",
-            xy=(tau_balanced, best_mean_f1),
-            xytext=(10, -35),
-            textcoords="offset points",
-            fontsize=8.5,
-            color="black",
-            weight="bold",
-        )
+        if show_annotations:
+            ax.annotate(
+                f"mean peak\n({tau_balanced:.2f}, {best_mean_f1:.2f})",
+                xy=(tau_balanced, best_mean_f1),
+                xytext=(-18, -55),
+                textcoords="offset points",
+                fontsize=8.3,
+                color="black",
+                weight="bold",
+                bbox=dict(boxstyle="round,pad=0.18", fc="white", ec="none", alpha=0.80),
+                arrowprops=dict(arrowstyle="-", color="black", lw=0.8, alpha=0.7),
+                zorder=6,
+            )
 
     _style_panel(
         ax,
-        "NPR threshold",
+        "Threshold",
         "F1",
-        "F1 vs NPR threshold",
+        "F1 vs Threshold",
         (thresholds.min(), thresholds.max()),
     )
     ax.legend(loc="best", fontsize=9, framealpha=0.9)
