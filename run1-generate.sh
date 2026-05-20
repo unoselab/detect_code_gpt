@@ -26,7 +26,8 @@ GEN_MODEL_HF="bigcode/starcoder2-7b"
                         # StarCoder needed 3000
 GEN_MAX_NUM=3000
 GEN_TEMPERATURE=0.2
-GEN_MAX_LENGTH=128
+# GEN_MAX_LENGTH=128    # Original value
+GEN_MAX_LENGTH=512      # 512 used to generate more valid MGC for ai-detector (icse '25)
 GEN_BATCH_SIZE=1
 
 LOG_FILE="logs/generate_${GEN_MODEL}_csn_t02_n${GEN_MAX_NUM}.log"
