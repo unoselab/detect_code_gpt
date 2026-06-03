@@ -112,7 +112,7 @@ def main():
         description="Perturb (human, lm) code pairs from a CSV using "
                     "DetectCodeGPT's random-insert-space+newline strategy."
     )
-    parser.add_argument("csv_path", help="Path to the merged pairs CSV")
+    parser.add_argument("--csv_path", help="Path to the merged pairs CSV")
     parser.add_argument("--n_perturbation", type=int, default=50,
                         help="Number of perturbed copies per snippet (k). Default: 50")
     parser.add_argument("--pct_words_masked", type=float, default=0.5,
@@ -163,6 +163,9 @@ def main():
             print(human_code)
             print("\n[HUMAN] perturbed copy #1:")
             print(perturbed_human[0])
+
+            print("[LM] original:")
+            print(lm_code)
             print("\n[LM] perturbed copy #1:")
             print(perturbed_lm[0])
             print()
