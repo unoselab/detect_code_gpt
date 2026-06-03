@@ -31,15 +31,12 @@ python main_adapter.py \
     --csv_path "${CSV_PATH}" \
     --base_model_name "${GEN_MODEL_HF}" \
     --output_name "${GEN_MODEL}_4500" \
-    --limit 3 --preview \
     2>&1 | tee "${LOG_FILE}"
 
-# python main_v2.py \
+# intermediate check: ~100 pairs first (~10 min) to confirm separation holds at scale
+# python main_adapter.py \
 #     --csv_path "${CSV_PATH}" \
-#     --limit 3 --preview \
+#     --base_model_name bigcode/starcoder2-7b \
+#     --output_name starcoder2_4500_n100 \
+#     --limit 100 \
 #     2>&1 | tee "${LOG_FILE}"
-
-# python main_v2.py \
-#     --csv_path "${CSV_PATH}" \
-#     2>&1 | tee "${LOG_FILE}"
-
