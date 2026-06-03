@@ -1,0 +1,4 @@
+line_num,human_npr,lm_npr,winner,human_logrank,lm_logrank,human_perturbed_logrank,lm_perturbed_logrank
+1,1.398943,1.807541,MGC,0.921755,0.331990,1.289484,0.600085
+10,1.546003,1.714886,MGC,0.608115,0.635969,0.940148,1.090615
+100,1.291505,1.265858,HWC,1.035717,1.241508,1.337633,1.571573
