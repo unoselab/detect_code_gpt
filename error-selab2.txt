@@ -1,0 +1,91 @@
+=================================================================================================
+serverlab-selab2
+=================================================================================================
+(detectcodegpt) myoungkyu@oisit-selab2 √ ~/project-workspace/detect_code_gpt $ nvidia-smi
+Wed Jun  3 22:19:52 2026
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 535.183.01             Driver Version: 535.183.01   CUDA Version: 12.2     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  NVIDIA GeForce RTX 4090        On  | 00000000:41:00.0 Off |                  Off |
+|  0%   35C    P8              26W / 480W |     11MiB / 24564MiB |      0%      Default |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|    0   N/A  N/A      1697      G   /usr/lib/xorg/Xorg                            4MiB |
++---------------------------------------------------------------------------------------+
+(detectcodegpt) myoungkyu@oisit-selab2 √ ~/project-workspace/detect_code_gpt $
+=================================================================================================
+
+(detectcodegpt) myoungkyu@oisit-selab2 √ ~/project-workspace/detect_code_gpt $ ./runmain_adapter_3.sh
+=== Detection run configuration ===
+  DATASET:        CodeSearchNet
+  LOG_FILE:       /home/myoungkyu@unomaha.edu/project-workspace/detect_code_gpt/logs/main_adapter_06-03_22:06.log
+  CSV_PATH:       /home/myoungkyu@unomaha.edu/project-workspace/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet/starcoder2-15b/validsyntax_4500_complexity/codesearchnet_starcoder2-15b_python_merged_4500.csv
+====================================
+
+2026-06-03 22:06:34.824 | INFO     | __main__:load_pairs:91 - Loaded 4500 valid (human, lm) pairs from /home/myoungkyu@unomaha.edu/project-workspace/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet/starcoder2-15b/validsyntax_4500_complexity/codesearchnet_starcoder2-15b_python_merged_4500.csv
+2026-06-03 22:06:34.825 | INFO     | __main__:main:265 - Limited to the first 3 pairs
+2026-06-03 22:06:34.826 | INFO     | __main__:main:268 - Config: scoring_model=bigcode/starcoder2-15b-instruct-v0.1, perturb_type=random-insert-space+newline, k=50, pct_words_masked=0.5, span/mean=2, chunk_size=10
+2026-06-03 22:06:34.826 | INFO     | __main__:main:277 - Loading base scoring model...
+Using cache dir /home/myoungkyu@unomaha.edu/.cache/huggingface/hub
+Loading BASE model bigcode/starcoder2-15b-instruct-v0.1...
+Downloading shards: 100%|██████████| 7/7 [09:49<00:00, 84.26s/it]
+Loading checkpoint shards: 100%|██████████| 7/7 [00:02<00:00,  2.51it/s]
+Traceback (most recent call last):
+  File "/home/myoungkyu@unomaha.edu/project-workspace/detect_code_gpt/code-detection/main_adapter.py", line 316, in <module>
+    main()
+  File "/home/myoungkyu@unomaha.edu/project-workspace/detect_code_gpt/code-detection/main_adapter.py", line 278, in main
+    model_config = load_base_model_and_tokenizer(args, model_config)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/myoungkyu@unomaha.edu/project-workspace/detect_code_gpt/code-detection/baselines/utils/loadmodel.py", line 53, in load_base_model_and_tokenizer
+    base_model.to(args.DEVICE)
+  File "/home/myoungkyu@unomaha.edu/anaconda3/envs/detectcodegpt/lib/python3.11/site-packages/transformers/modeling_utils.py", line 2796, in to
+    return super().to(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/myoungkyu@unomaha.edu/anaconda3/envs/detectcodegpt/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1160, in to
+    return self._apply(convert)
+           ^^^^^^^^^^^^^^^^^^^^
+  File "/home/myoungkyu@unomaha.edu/anaconda3/envs/detectcodegpt/lib/python3.11/site-packages/torch/nn/modules/module.py", line 810, in _apply
+    module._apply(fn)
+  File "/home/myoungkyu@unomaha.edu/anaconda3/envs/detectcodegpt/lib/python3.11/site-packages/torch/nn/modules/module.py", line 810, in _apply
+    module._apply(fn)
+  File "/home/myoungkyu@unomaha.edu/anaconda3/envs/detectcodegpt/lib/python3.11/site-packages/torch/nn/modules/module.py", line 810, in _apply
+    module._apply(fn)
+  [Previous line repeated 2 more times]
+  File "/home/myoungkyu@unomaha.edu/anaconda3/envs/detectcodegpt/lib/python3.11/site-packages/torch/nn/modules/module.py", line 833, in _apply
+    param_applied = fn(param)
+                    ^^^^^^^^^
+  File "/home/myoungkyu@unomaha.edu/anaconda3/envs/detectcodegpt/lib/python3.11/site-packages/torch/nn/modules/module.py", line 1158, in convert
+    return t.to(device, dtype if t.is_floating_point() or t.is_complex() else None, non_blocking)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(detectcodegpt) myoungkyu@oisit-selab2 √ ~/project-workspace/detect_code_gpt $ nvidia-smi
+Wed Jun  3 22:19:52 2026
++---------------------------------------------------------------------------------------+
+| NVIDIA-SMI 535.183.01             Driver Version: 535.183.01   CUDA Version: 12.2     |
+|-----------------------------------------+----------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |
+|                                         |                      |               MIG M. |
+|=========================================+======================+======================|
+|   0  NVIDIA GeForce RTX 4090        On  | 00000000:41:00.0 Off |                  Off |
+|  0%   35C    P8              26W / 480W |     11MiB / 24564MiB |      0%      Default |
+|                                         |                      |                  N/A |
++-----------------------------------------+----------------------+----------------------+
+
++---------------------------------------------------------------------------------------+
+| Processes:                                                                            |
+|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+|        ID   ID                                                             Usage      |
+|=======================================================================================|
+|    0   N/A  N/A      1697      G   /usr/lib/xorg/Xorg                            4MiB |
++---------------------------------------------------------------------------------------+
+(detectcodegpt) myoungkyu@oisit-selab2 √ ~/project-workspace/detect_code_gpt $
