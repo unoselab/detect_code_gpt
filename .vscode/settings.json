@@ -1,0 +1,8 @@
+{
+    "files.watcherExclude": {
+        "**/env*": false
+    },
+    "files.exclude": {
+        "**/env*": false
+    },
+}
