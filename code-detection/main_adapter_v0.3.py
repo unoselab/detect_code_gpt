@@ -183,10 +183,7 @@ def score_snippet(code, args, model_config, k, chunk_len, min_chunk_tokens, stri
 
     for n_tok_chunk in chunk_whitespace(body, chunk_len):
         chunk_text, n_tok = n_tok_chunk
-        # Skip chunks below the floor OR blank chunks (scoring "" breaks get_rank).
-        # With the default floor of 1, only genuinely empty chunks are skipped,
-        # so every non-empty chunk of a long function is scored (no token loss).
-        if n_tok < min_chunk_tokens or not chunk_text.strip():
+        if n_tok < min_chunk_tokens:
             chunks.append({"npr": float("nan"), "orig_logrank": float("nan"),
                            "mean_p_logrank": float("nan"), "n_tokens": n_tok,
                            "low_conf": True})
@@ -365,10 +362,8 @@ def main():
                              "Use --no-strip_body to score the whole CSV code.")
     parser.add_argument("--chunk_len", type=int, default=128,
                         help="Whitespace-token window size per chunk. Default: 128")
-    parser.add_argument("--min_chunk_tokens", type=int, default=1,
-                        help="Chunks below this are low-confidence and not scored. "
-                             "Default 1 = no floor (score every non-empty chunk). "
-                             "Set e.g. 20 to drop short, noisy chunks.")
+    parser.add_argument("--min_chunk_tokens", type=int, default=20,
+                        help="Chunks below this are low-confidence and not scored. Default: 20")
     parser.add_argument("--aggregate", choices=["weighted_mean", "mean", "max"],
                         default="weighted_mean",
                         help="How to aggregate per-chunk NPR into one snippet score.")

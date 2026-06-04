@@ -183,10 +183,7 @@ def score_snippet(code, args, model_config, k, chunk_len, min_chunk_tokens, stri
 
     for n_tok_chunk in chunk_whitespace(body, chunk_len):
         chunk_text, n_tok = n_tok_chunk
-        # Skip chunks below the floor OR blank chunks (scoring "" breaks get_rank).
-        # With the default floor of 1, only genuinely empty chunks are skipped,
-        # so every non-empty chunk of a long function is scored (no token loss).
-        if n_tok < min_chunk_tokens or not chunk_text.strip():
+        if n_tok < min_chunk_tokens:
             chunks.append({"npr": float("nan"), "orig_logrank": float("nan"),
                            "mean_p_logrank": float("nan"), "n_tokens": n_tok,
                            "low_conf": True})
@@ -262,23 +259,15 @@ def report_and_save(results, csv_path, chunk_csv_path, aggregate_method):
     real = np.array(real, dtype=float)
     samp = np.array(samp, dtype=float)
 
-    # NOTE: baselines.get_roc_metrics zips real_preds/sample_preds BY INDEX, so
-    # the two lists must stay aligned and equal-length. Drop NaNs PAIRWISE:
-    # if either side of a pair is NaN, exclude the whole pair.
-    keep = (~np.isnan(real)) & (~np.isnan(samp))
-    n_dropped = int((~keep).sum())
-    n_human_only = int((np.isnan(samp) & ~np.isnan(real)).sum())  # MGC body too short
-    n_lm_only = int((np.isnan(real) & ~np.isnan(samp)).sum())     # HWC body too short
-    real_v = real[keep]
-    samp_v = samp[keep]
-    if n_dropped:
-        logger.warning(
-            f"Dropped {n_dropped} pair(s) before AUROC where a body had no scorable "
-            f"chunk (MGC-empty: {n_human_only}, HWC-empty: {n_lm_only})"
-        )
+    real_v = real[~np.isnan(real)]
+    samp_v = samp[~np.isnan(samp)]
+    n_nan = (len(real) - len(real_v)) + (len(samp) - len(samp_v))
+    if n_nan:
+        logger.warning(f"Dropped {n_nan} NaN aggregate(s) before AUROC "
+                       f"(snippets with no scorable >= min_chunk_tokens body)")
 
-    if len(real_v) == 0:
-        logger.error("No valid (human, lm) pairs remain; cannot compute AUROC.")
+    if len(real_v) == 0 or len(samp_v) == 0:
+        logger.error("No valid NPR in one of the classes; cannot compute AUROC.")
         return float("nan")
 
     _, _, roc_auc = get_roc_metrics(list(real_v), list(samp_v))
@@ -365,10 +354,8 @@ def main():
                              "Use --no-strip_body to score the whole CSV code.")
     parser.add_argument("--chunk_len", type=int, default=128,
                         help="Whitespace-token window size per chunk. Default: 128")
-    parser.add_argument("--min_chunk_tokens", type=int, default=1,
-                        help="Chunks below this are low-confidence and not scored. "
-                             "Default 1 = no floor (score every non-empty chunk). "
-                             "Set e.g. 20 to drop short, noisy chunks.")
+    parser.add_argument("--min_chunk_tokens", type=int, default=20,
+                        help="Chunks below this are low-confidence and not scored. Default: 20")
     parser.add_argument("--aggregate", choices=["weighted_mean", "mean", "max"],
                         default="weighted_mean",
                         help="How to aggregate per-chunk NPR into one snippet score.")
