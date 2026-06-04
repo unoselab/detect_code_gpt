@@ -13,7 +13,7 @@ CSV_PATH="${CSV_PATH:-${CSV_ROOT_SUB}/codesearchnet_starcoder2-7b_python_merged_
 
 TIMESTAMP=$(date +%m-%d_%H:%M)
 LOG_DIR="${PROJECT_ROOT}/logs"
-LOG_FILE="${LOG_DIR}/main_v2_${TIMESTAMP}.log"
+LOG_FILE="${LOG_DIR}/main_adapter_${TIMESTAMP}.log"
 
 echo "=== Detection run configuration ==="
 echo "  DATASET:        ${DATASET}"

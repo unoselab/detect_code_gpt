@@ -1,39 +1,12 @@
-python -c "
-import json
-path = '/home/user1-system12/project-workspace/detect_code_gpt/output/CodeSearchNet/CodeLlama-7b-hf-2000-tp0.2/outputs_530_benchmark_level1.jsonl'
-
-n_checked = 0
-n_off_by_one_or_two = 0
-n_wildly_wrong = 0
-
-with open(path) as f:
-    for i, line in enumerate(f):
-        r = json.loads(line)
-        tokens = r['mixed_code'].split(' ')
-
-        # MGC region as ground truth
-        mgc_region = next(reg for reg in r['regions'] if reg['label'] == 'MGC')
-        mgc_tokens_slice = tokens[mgc_region['start_token']:mgc_region['end_token']]
-        mgc_reconstructed = ' '.join(mgc_tokens_slice)
-
-        # The MGC field itself, for comparison
-        mgc_original = r['mgc']
-
-        # Character lengths should match within ~3 chars (boundary token may carry
-        # a few chars from HWC's end into MGC's reconstruction).
-        diff = abs(len(mgc_reconstructed) - len(mgc_original))
-        if diff == 0:
-            pass  # exact match
-        elif diff <= 3:
-            n_off_by_one_or_two += 1
-        else:
-            n_wildly_wrong += 1
-            if n_wildly_wrong <= 3:
-                print(f'Record {i}: MGC len mismatch: original={len(mgc_original)}, reconstructed={len(mgc_reconstructed)}, diff={diff}')
-        n_checked += 1
-
-print(f'Checked: {n_checked} records')
-print(f'  Exact reconstruction: {n_checked - n_off_by_one_or_two - n_wildly_wrong}')
-print(f'  Off by <=3 chars (boundary tokens): {n_off_by_one_or_two}')
-print(f'  Off by >3 chars (real mismatch): {n_wildly_wrong}')
-"
+for csv in \
+  /home/user1-system12/project-workspace/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet/codellama-7b/validsyntax_4500_complexity/codesearchnet_codellama-7b_python_merged_4500.csv \
+  /home/user1-system12/project-workspace/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet/gemma/validsyntax_4500_complexity/codesearchnet_gemma_python_merged_4500.csv \
+  /home/user1-system12/project-workspace/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet/starcoder2-7b/validsyntax_4500_complexity/codesearchnet_starcoder2-7b_python_merged_4500.csv \
+  /home/user1-system12/project-workspace/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet/starcoder2-15b-instruct-v0.1/validsyntax_4500_complexity/codesearchnet_starcoder2-15b-instruct-v0.1_python_merged_4500.csv \
+  /home/user1-system12/project-workspace/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet/gpt-oss/validsyntax_4500_complexity/codesearchnet_gpt-oss_python_merged_4500.csv
+do
+  echo "============================================================"
+  echo "Preflight: $csv"
+  echo "============================================================"
+  python code-detection/main_adapter_v0.4.py --csv_path "$csv" --preflight_only
+done
