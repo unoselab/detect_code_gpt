@@ -27,10 +27,17 @@ mkdir -p "${LOG_DIR}"
 cd code-detection
 
 export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
+# python main_adapter.py \
+#     --csv_path "${CSV_PATH}" \
+#     --base_model_name "${GEN_MODEL_HF}" \
+#     --output_name "${GEN_MODEL}_4500" \
+#     2>&1 | tee "${LOG_FILE}"
+
 python main_adapter.py \
     --csv_path "${CSV_PATH}" \
     --base_model_name "${GEN_MODEL_HF}" \
-    --output_name "${GEN_MODEL}_4500" \
+    --output_name "${GEN_MODEL}_4500_n5" \
+    --limit 5 --preview \
     2>&1 | tee "${LOG_FILE}"
 
 # intermediate check: ~100 pairs first (~10 min) to confirm separation holds at scale
