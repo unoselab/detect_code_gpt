@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 PROJECT_ROOT=~/project-workspace/detect_code_gpt
-CUDA_DEVICE=0
+CUDA_DEVICE=0,1,2
 DATASET=CodeSearchNet
 
 
@@ -40,8 +40,8 @@ export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
 python main_adapter.py \
     --csv_path "${CSV_PATH}" \
     --base_model_name "${GEN_MODEL_HF}" \
-    --output_name "${GEN_MODEL}_4500_refreshed_n100" \
-    --limit 100 \
+    --output_name "${GEN_MODEL}_4500_refreshed_n5" \
+    --limit 5 \
     --preview \
     2>&1 | tee "${LOG_FILE}"
 

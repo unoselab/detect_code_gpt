@@ -35,6 +35,18 @@ def load_base_model_and_tokenizer(args, model_config):
         # 2026-06-05 msong. GPT-OSS models need the native Transformers loader.
         # Do not route openai/gpt-oss-120b through the generic "20b" branch:
         # "120b" contains "20b", and that branch is hardcoded for GPT-NeoX.
+        import os
+
+        print(f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}")
+        print(f"torch.cuda.device_count()={torch.cuda.device_count()}")
+
+        if "120b" in name.lower() and torch.cuda.device_count() < 3:
+            raise RuntimeError(
+                "openai/gpt-oss-120b requires the 3 A6000 GPUs to be visible here. "
+                f"Got torch.cuda.device_count()={torch.cuda.device_count()}, "
+                f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}"
+            )
+
         n_gpu = torch.cuda.device_count()
         max_memory = {i: "44GiB" for i in range(n_gpu)}
         max_memory["cpu"] = "128GiB"
