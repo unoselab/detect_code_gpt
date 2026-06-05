@@ -32,12 +32,13 @@ def load_base_model_and_tokenizer(args, model_config):
             # pad_token_id=50256
             )
     elif 'gpt-oss' in name.lower():
-        # GPT-OSS models need the native Transformers loader.
+        # 2026-06-05 msong. GPT-OSS models need the native Transformers loader.
         # Do not route openai/gpt-oss-120b through the generic "20b" branch:
         # "120b" contains "20b", and that branch is hardcoded for GPT-NeoX.
         n_gpu = torch.cuda.device_count()
         max_memory = {i: "44GiB" for i in range(n_gpu)}
         max_memory["cpu"] = "128GiB"
+        print(f"Using GPT-OSS multi-GPU loader; visible GPUs={n_gpu}, max_memory={max_memory}")
 
         base_model = transformers.AutoModelForCausalLM.from_pretrained(
             name,
