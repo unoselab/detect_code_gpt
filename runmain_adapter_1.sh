@@ -27,12 +27,45 @@ mkdir -p "${LOG_DIR}"
 cd code-detection
 
 export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
-# full
-python main_adapter.py \
-    --csv_path "${CSV_PATH}" \
-    --base_model_name "${GEN_MODEL_HF}" \
-    --output_name "${GEN_MODEL}_4500_refreshed" \
-    2>&1 | tee "${LOG_FILE}"
+## full. completed 2026-06-05.
+# python main_adapter.py \
+#     --csv_path "${CSV_PATH}" \
+#     --base_model_name "${GEN_MODEL_HF}" \
+#     --output_name "${GEN_MODEL}_4500_refreshed" \
+#     2>&1 | tee "${LOG_FILE}"
+
+## NPR and AUROC by code length (weighted_mean)
+echo "=== DETECTION AGGREGATE CONFIGURATION ==="
+echo "AGGREGATE: weighted_mean"
+echo "===================================="
+echo ""
+python analyze_by_length.py \
+    --cache "${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
+    --aggregate weighted_mean
+
+echo "=== DETECTION RUN CONFIGURATION ==="
+echo "AGGREGATE: max"
+echo "===================================="
+echo ""
+python analyze_by_length.py \
+    --cache "${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
+    --aggregate max
+
+echo "=== OUTPUTS ========================"
+echo "AGC SOURCE: starcoder2-7b"
+echo "===================================="
+echo ""
+cd ~/project-workspace/detect_code_gpt/analysis_results
+python make_paper_artifacts.py \
+    --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
+    --aggregate weighted_mean \
+    --out-dir .
+
+cd ~/project-workspace/detect_code_gpt/analysis_results
+python make_paper_artifacts.py \
+    --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
+    --aggregate max \
+    --out-dir .
 
 # check the empty HWC and MGC
 # python main_adapter.py \
