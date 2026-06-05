@@ -40,10 +40,10 @@ export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
 python main_adapter.py \
     --csv_path "${CSV_PATH}" \
     --base_model_name "${GEN_MODEL_HF}" \
-    --output_name "${GEN_MODEL}_4500_refreshed_n5" \
-    --limit 5 \
-    --preview \
+    --output_name "${GEN_MODEL}_4500_refreshed" \
     2>&1 | tee "${LOG_FILE}"
+
+    # --limit 50 \
 
 # check the empty HWC and MGC
 # python main_adapter.py \
