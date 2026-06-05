@@ -4,8 +4,9 @@ PROJECT_ROOT=~/project-workspace/detect_code_gpt
 CUDA_DEVICE=0
 DATASET=CodeSearchNet
 
+
 GEN_MODEL="${GEN_MODEL:-gpt-oss}"
-# GEN_MODEL_HF="${GEN_MODEL_HF:-bigcode/gpt-oss}"
+GEN_MODEL_HF="${GEN_MODEL_HF:-openai/gpt-oss-120b}"
 WORKSPACE_ROOT=~/project-workspace
 CSV_ROOT="${WORKSPACE_ROOT}/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet"
 # CSV_ROOT_SUB="${CSV_ROOT}/${GEN_MODEL}/validsyntax_4500_complexity"
