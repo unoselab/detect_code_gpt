@@ -6,7 +6,7 @@
 #     DeferredCudaCallError: device >= 0 && device < num_gpus ... device=1, num_gpus=
 #   This block fixes that by setting env vars FIRST.
 import os
-os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")  # preserve shell setting
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import sys

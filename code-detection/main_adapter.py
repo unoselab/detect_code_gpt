@@ -267,8 +267,10 @@ def build_full_args(cli):
     ]
     saved_argv = sys.argv
     try:
+        logger.info(f"Before setup_args: CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}, cli.device={cli.device}")
         sys.argv = ["main.py"] + injected
         args = setup_args()
+        logger.info(f"After setup_args: CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}, args.DEVICE={args.DEVICE}")
     finally:
         sys.argv = saved_argv
     return args
