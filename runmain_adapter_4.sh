@@ -42,7 +42,6 @@ python main_adapter.py \
     --base_model_name "${GEN_MODEL_HF}" \
     --output_name "${GEN_MODEL}_4500_refreshed_n5" \
     --limit 5 \
-    --device "${CUDA_DEVICE}" \
     --preview \
     2>&1 | tee "${LOG_FILE}"
 
