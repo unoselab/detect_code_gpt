@@ -216,30 +216,6 @@ def aggregate_npr(chunks, method):
     return wsum / tsum if tsum else float("nan")
 
 
-def count_scorable_chunks(code, chunk_len, min_chunk_tokens, strip):
-    """How many chunks WOULD be scored, without any NPR / model.
-
-    Mirrors score_snippet's chunk-eligibility logic exactly (strip_to_body +
-    chunk_whitespace + the same `n_tok < min_chunk_tokens or blank` skip), so a
-    snippet with 0 scorable chunks is precisely one that aggregate_npr() would
-    turn into NaN and report_and_save() would drop as *-empty. NPR is never computed.
-
-    Returns (n_scorable, reason).
-    """
-    if strip:
-        body, reason = strip_to_body(code)
-    else:
-        body, reason = code, "no_strip"
-    if not body.strip():
-        return 0, reason
-    n = 0
-    for chunk_text, n_tok in chunk_whitespace(body, chunk_len):
-        if n_tok < min_chunk_tokens or not chunk_text.strip():
-            continue
-        n += 1
-    return n, reason
-
-
 def n_scored(chunks):
     return sum(1 for c in chunks if (not c["low_conf"]) and (not math.isnan(c["npr"])))
 
@@ -407,9 +383,6 @@ def main():
                         help="Skip scoring; load cached per-chunk results and re-aggregate.")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--preview", action="store_true")
-    parser.add_argument("--count_empty_only", action="store_true",
-                        help="Only count empty / unscorable bodies (no NPR, no model, "
-                             "no GPU). Reports MGC-empty / HWC-empty / dropped pairs and exits.")
     cli = parser.parse_args()
 
     out_csv = os.path.expanduser(
@@ -434,51 +407,6 @@ def main():
     if cli.limit is not None:
         pairs = pairs[:cli.limit]
         logger.info(f"Limited to the first {len(pairs)} pairs")
-
-    # --- count-only fast path: empty/unscorable bodies, no NPR / no model / no GPU ---
-    if cli.count_empty_only:
-        logger.info(
-            f"Counting empty/unscorable bodies (no NPR): strip_body={cli.strip_body}, "
-            f"chunk_len={cli.chunk_len}, min_chunk_tokens={cli.min_chunk_tokens}"
-        )
-        h_reasons, l_reasons = {}, {}
-        mgc_empty = hwc_empty = both_empty = dropped = 0
-        for line_num, human_code, lm_code in tqdm(pairs, desc="Counting bodies"):
-            h_n, h_reason = count_scorable_chunks(
-                human_code, cli.chunk_len, cli.min_chunk_tokens, cli.strip_body)
-            l_n, l_reason = count_scorable_chunks(
-                lm_code, cli.chunk_len, cli.min_chunk_tokens, cli.strip_body)
-            h_reasons[h_reason] = h_reasons.get(h_reason, 0) + 1
-            l_reasons[l_reason] = l_reasons.get(l_reason, 0) + 1
-            h_empty = (h_n == 0)
-            l_empty = (l_n == 0)
-            if h_empty and l_empty:
-                both_empty += 1
-            elif l_empty:
-                mgc_empty += 1
-            elif h_empty:
-                hwc_empty += 1
-            if h_empty or l_empty:
-                dropped += 1
-        total = len(pairs)
-        kept = total - dropped
-        print()
-        print("=" * 72)
-        print(f"Empty/unscorable body count (NO NPR computed)")
-        print(f"  strip_body={cli.strip_body}, chunk_len={cli.chunk_len}, "
-              f"min_chunk_tokens={cli.min_chunk_tokens}")
-        print("=" * 72)
-        print(f"total pairs              : {total}")
-        print(f"pairs dropped (any empty): {dropped}  ({100.0 * dropped / total:.1f}%)")
-        print(f"  MGC-empty only         : {mgc_empty}")
-        print(f"  HWC-empty only         : {hwc_empty}")
-        print(f"  BOTH empty             : {both_empty}")
-        print(f"pairs kept for AUROC     : {kept}")
-        print()
-        print(f"HWC body-extraction reasons: {h_reasons}")
-        print(f"MGC body-extraction reasons: {l_reasons}")
-        print("=" * 72)
-        return
 
     args = build_full_args(cli)
     logger.info(

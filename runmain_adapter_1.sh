@@ -27,11 +27,17 @@ mkdir -p "${LOG_DIR}"
 cd code-detection
 
 export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
+# full
 python main_adapter.py \
     --csv_path "${CSV_PATH}" \
     --base_model_name "${GEN_MODEL_HF}" \
     --output_name "${GEN_MODEL}_4500_refreshed" \
     2>&1 | tee "${LOG_FILE}"
+
+# check the empty HWC and MGC
+# python main_adapter.py \
+#     --csv_path "${CSV_PATH}" \
+#     --count_empty_only    
 
 
 # Testing --min_chunk_tokens 10
