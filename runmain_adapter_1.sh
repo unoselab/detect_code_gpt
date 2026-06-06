@@ -6,7 +6,7 @@ DATASET=CodeSearchNet
 
 GEN_MODEL="${GEN_MODEL:-starcoder2-7b}"
 GEN_MODEL_HF="${GEN_MODEL_HF:-bigcode/starcoder2-7b}"
-WORKSPACE_ROOT=/home/user1-system12/project-workspace
+WORKSPACE_ROOT=~/project-workspace
 CSV_ROOT="${WORKSPACE_ROOT}/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet"
 CSV_ROOT_SUB="${CSV_ROOT}/${GEN_MODEL}/validsyntax_4500_complexity"
 CSV_PATH="${CSV_PATH:-${CSV_ROOT_SUB}/codesearchnet_starcoder2-7b_python_merged_4500.csv}"
@@ -35,27 +35,43 @@ export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
 #     2>&1 | tee "${LOG_FILE}"
 
 ## NPR and AUROC by code length (weighted_mean)
-echo "=== DETECTION RUN CONFIGURATION ==="
-echo "StarCoder2-7B"
-echo "===================================="
-echo ""
-python analyze_by_length.py \
-    --cache "${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
-    --aggregate weighted_mean
+echo "=== DETECTION ANALYSIS ==="
+# echo "StarCoder2-7B"
+# echo "===================================="
+# echo ""
+# python analyze_by_length.py \
+#     --cache "${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
+#     --aggregate weighted_mean
 
-echo "=== DETECTION RUN CONFIGURATION ==="
-echo "CodeLlama-7B"
-echo "===================================="
-echo ""
-python analyze_by_length.py \
-    --cache "${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
-    --aggregate weighted_mean
+# echo "CodeLlama-7B"
+# echo "===================================="
+# echo ""
+# python analyze_by_length.py \
+#     --cache "${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
+#     --aggregate weighted_mean
 
-echo "=== OUTPUTS ========================"
-echo "CodeLlama-7B & StarCoder2-7B"
+# echo "GPT-OSS-120B"
+# echo "===================================="
+# echo ""
+# python analyze_by_length.py \
+#     --cache "${LOG_DIR}/results_cache_main_adapter_gpt-oss_4500_refreshed.pkl" \
+#     --aggregate weighted_mean
+
+ANALYSIS_DIR="${PROJECT_ROOT}/analysis_results"
+
+cd "${PROJECT_ROOT}"
+rm -rf \
+  "${ANALYSIS_DIR}"/cl7b-mean \
+  "${ANALYSIS_DIR}"/sc7b-mean \
+  "${ANALYSIS_DIR}"/cl7b-sc7b-mean \
+  "${ANALYSIS_DIR}"/cl7b-sc7b-go120b-mean
+
+cd "${ANALYSIS_DIR}"
+
+echo "CodeLlama-7B & StarCoder2-7B & GPT-OSS-120B"
 echo "===================================="
 echo ""
-cd ~/project-workspace/detect_code_gpt/analysis_results
+
 python make_paper_artifacts.py \
     --cache "CodeLlama-7B=${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
     --aggregate weighted_mean \
@@ -67,10 +83,16 @@ python make_paper_artifacts.py \
     --out-dir ./sc7b-mean
 
 python make_paper_artifacts.py \
+    --cache "GPT-OSS-120B=${LOG_DIR}/results_cache_main_adapter_gpt-oss_4500_refreshed.pkl" \
+    --aggregate weighted_mean \
+    --out-dir ./go120b-mean
+
+python make_paper_artifacts.py \
     --cache "CodeLlama-7B=${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
     --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
+    --cache "GPT-OSS-120B=${LOG_DIR}/results_cache_main_adapter_gpt-oss_4500_refreshed.pkl" \
     --aggregate weighted_mean \
-    --out-dir ./cl7b-sc7b-mean
+    --out-dir ./cl7b-sc7b-go120b-mean
 
 # check the empty HWC and MGC
 # python main_adapter.py \
