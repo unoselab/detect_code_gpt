@@ -58,6 +58,16 @@ echo ""
 cd ~/project-workspace/detect_code_gpt/analysis_results
 python make_paper_artifacts.py \
     --cache "CodeLlama-7B=${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
+    --aggregate weighted_mean \
+    --out-dir ./cl7b-mean
+
+python make_paper_artifacts.py \
+    --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
+    --aggregate weighted_mean \
+    --out-dir ./sc7b-mean
+
+python make_paper_artifacts.py \
+    --cache "CodeLlama-7B=${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
     --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
     --aggregate weighted_mean \
     --out-dir ./cl7b-sc7b-mean
