@@ -35,8 +35,8 @@ export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
 #     2>&1 | tee "${LOG_FILE}"
 
 ## NPR and AUROC by code length (weighted_mean)
-echo "=== DETECTION AGGREGATE CONFIGURATION ==="
-echo "AGGREGATE: weighted_mean"
+echo "=== DETECTION RUN CONFIGURATION ==="
+echo "StarCoder2-7B"
 echo "===================================="
 echo ""
 python analyze_by_length.py \
@@ -44,40 +44,23 @@ python analyze_by_length.py \
     --aggregate weighted_mean
 
 echo "=== DETECTION RUN CONFIGURATION ==="
-echo "AGGREGATE: max"
+echo "CodeLlama-7B"
 echo "===================================="
 echo ""
 python analyze_by_length.py \
-    --cache "${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
-    --aggregate max
+    --cache "${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
+    --aggregate weighted_mean
 
 echo "=== OUTPUTS ========================"
-echo "AGC SOURCE: starcoder2-7b"
+echo "CodeLlama-7B & StarCoder2-7B"
 echo "===================================="
 echo ""
 cd ~/project-workspace/detect_code_gpt/analysis_results
 python make_paper_artifacts.py \
+    --cache "CodeLlama-7B=${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
     --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
     --aggregate weighted_mean \
-    --out-dir ./starcoder2-7b-mean
-
-python make_paper_artifacts.py \
-    --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
-    --aggregate max \
-    --out-dir ./starcoder2-7b-max
-
-## TBD:  
-# python make_paper_artifacts.py \
-#     --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
-#     --cache "CodeLlama-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
-#     --aggregate weighted_mean \
-#     --out-dir ./sc7b-cl7b-mean
-
-# python make_paper_artifacts.py \
-#     --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
-#     --cache "CodeLlama-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
-#     --aggregate max \
-#     --out-dir ./sc7b-cl7b-max
+    --out-dir ./cl7b-sc7b-mean
 
 # check the empty HWC and MGC
 # python main_adapter.py \
