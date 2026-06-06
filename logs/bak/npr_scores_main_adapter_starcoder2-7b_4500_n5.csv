@@ -1,0 +1,6 @@
+line_num,human_npr,lm_npr,winner,human_n_chunks_scored,lm_n_chunks_scored,human_n_lowconf,lm_n_lowconf
+1,1.478604,1.837677,MGC,1,1,0,0
+10,1.242668,nan,HWC,1,0,0,1
+100,1.247356,nan,HWC,1,0,0,1
+1000,1.390009,nan,HWC,1,0,0,1
+1001,1.283454,1.626843,MGC,1,1,0,0
