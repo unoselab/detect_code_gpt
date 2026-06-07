@@ -11,11 +11,11 @@ LOG_DIR="${PROJECT_ROOT}/logs"
 OUTPUT_ROOT="${PROJECT_ROOT}/output"
 TIMESTAMP=$(date +%m-%d_%H-%M)
 
-CUDA_DEVICE="${CUDA_DEVICE:-0,1}"
+CUDA_DEVICE="${CUDA_DEVICE:-0,1,2}"
 DATASET_NAME="${DATASET_NAME:-CodeSearchNet}"
 GEN_MODEL="${GEN_MODEL:-gpt-oss}"
 BASE_MODEL_NAME="${BASE_MODEL_NAME:-openai/gpt-oss-120b}"
-OUTPUT_NAME="${OUTPUT_NAME:-mixedcode_${GEN_MODEL}_count_only}"
+OUTPUT_NAME="${OUTPUT_NAME:-mixedcode_${GEN_MODEL}}"
 
 LOG_FILE="${LOG_DIR}/${OUTPUT_NAME}_${TIMESTAMP}.log"
 
@@ -67,35 +67,35 @@ mkdir -p "${LOG_DIR}" "${OUTPUT_ROOT}"
   #   --count_only
 
   ## SMALL SMOKE
-  echo ""
-  echo "=== SMALL SMOKE RUN ==="
-  echo "[RUN] CUDA_VISIBLE_DEVICES=${CUDA_DEVICE} python main_mixedcode_benchmark.py \\"
-  echo "        --benchmark_root \"${BENCHMARK_ROOT}\" \\"
-  echo "        --base_model_name \"${BASE_MODEL_NAME}\" \\"
-  echo "        --output_name mixedcode_${GEN_MODEL}_smoke \\"
-  echo "        --limit_functions 6 \\"
-  echo "        --preview"
-  echo ""
-  
-  CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}" python main_mixedcode_benchmark.py \
-    --benchmark_root "${BENCHMARK_ROOT}" \
-    --base_model_name "${BASE_MODEL_NAME}" \
-    --output_name "mixedcode_${GEN_MODEL}_smoke" \
-    --limit_functions 6 \
-    --preview
-
-  # ## FULL RUN
   # echo ""
-  # echo "=== FULL RUN ==="
+  # echo "=== SMALL SMOKE RUN ==="
   # echo "[RUN] CUDA_VISIBLE_DEVICES=${CUDA_DEVICE} python main_mixedcode_benchmark.py \\"
   # echo "        --benchmark_root \"${BENCHMARK_ROOT}\" \\"
   # echo "        --base_model_name \"${BASE_MODEL_NAME}\" \\"
-  # echo "        --output_name mixedcode_${GEN_MODEL}_50files"
+  # echo "        --output_name mixedcode_${GEN_MODEL}_smoke \\"
+  # echo "        --limit_functions 6 \\"
+  # echo "        --preview"
   # echo ""
   
   # CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}" python main_mixedcode_benchmark.py \
   #   --benchmark_root "${BENCHMARK_ROOT}" \
   #   --base_model_name "${BASE_MODEL_NAME}" \
-  #   --output_name "mixedcode_${GEN_MODEL}_50files"
+  #   --output_name "mixedcode_${GEN_MODEL}_smoke" \
+  #   --limit_functions 6 \
+  #   --preview
+
+  ## FULL RUN
+  echo ""
+  echo "=== FULL RUN ==="
+  echo "[RUN] CUDA_VISIBLE_DEVICES=${CUDA_DEVICE} python main_mixedcode_benchmark.py \\"
+  echo "        --benchmark_root \"${BENCHMARK_ROOT}\" \\"
+  echo "        --base_model_name \"${BASE_MODEL_NAME}\" \\"
+  echo "        --output_name mixedcode_${GEN_MODEL}_50files"
+  echo ""
+  
+  CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}" python main_mixedcode_benchmark.py \
+    --benchmark_root "${BENCHMARK_ROOT}" \
+    --base_model_name "${BASE_MODEL_NAME}" \
+    --output_name "mixedcode_${GEN_MODEL}_50files"
 
 } 2>&1 | tee "${LOG_FILE}"
