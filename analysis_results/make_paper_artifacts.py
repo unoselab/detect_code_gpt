@@ -275,8 +275,8 @@ def make_figure(models, bucket_labels, per_model_pair, out_pdf):
     M = len(models)
     x = np.arange(K)
     width = 0.8 / M
-    # colorblind-friendly palette
-    palette = ["#0072B2", "#D55E00", "#009E73", "#CC79A7", "#E69F00"]
+    # group/model palette
+    palette = ["#845ec2", "#d65db1", "#ff6f91", "#ff9671", "#ffc75f"]
 
     fig, ax = plt.subplots(figsize=(7.0, 3.2))
     for j, mdl in enumerate(models):
