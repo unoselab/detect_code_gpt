@@ -1,0 +1,33 @@
+================================================================================
+Function size analysis
+================================================================================
+Input CSV: /home/user1-system12/project-workspace/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet/starcoder2-7b/validsyntax_4500_complexity/codesearchnet_starcoder2-7b_python_merged_4500.csv
+Rows:      9000
+Pairs:     4500
+
+Parse outcomes:
+  human:ok                       4500
+  lm:ok                          4500
+
+HWC body tokens
+  n=4500 mean=144.99 std=166.46 min=4 p25=45.0 median=86.0 p75=178.2 p95=479.0 max=2084
+
+AGC body tokens
+  n=4500 mean=77.27 std=115.24 min=1 p25=13.0 median=42.0 p75=85.0 p95=292.0 max=2016
+
+Pair min(HWC, AGC) body tokens
+  n=4500 mean=56.18 std=70.93 min=1 p25=12.0 median=35.0 p75=68.0 p95=183.0 max=878
+
+Benchmark bucket capacity, assuming 3 HWC + 3 AGC per mixed file:
+  type01_110 range=100-110  HWC_ok= 158 AGC_ok= 105 possible_files=  35
+  type02_120 range=111-120  HWC_ok= 142 AGC_ok=  82 possible_files=  27
+  type03_130 range=121-130  HWC_ok= 109 AGC_ok=  62 possible_files=  20
+  type04_140 range=131-140  HWC_ok= 115 AGC_ok=  63 possible_files=  21
+  type05_150 range=141-150  HWC_ok=  97 AGC_ok=  58 possible_files=  19
+  type06_160 range=151-160  HWC_ok=  83 AGC_ok=  55 possible_files=  18
+  type07_170 range=161-170  HWC_ok=  81 AGC_ok=  37 possible_files=  12
+  type08_180 range=171-180  HWC_ok=  83 AGC_ok=  25 possible_files=   8
+  type09_190 range=181-190  HWC_ok=  82 AGC_ok=  36 possible_files=  12
+  type10_200 range=191-200  HWC_ok=  66 AGC_ok=  25 possible_files=   8
+
+================================================================================
