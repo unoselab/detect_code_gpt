@@ -35,7 +35,7 @@ def load_base_model_and_tokenizer(args, model_config):
         # 2026-06-05 msong. GPT-OSS models need the native Transformers loader.
         # Do not route openai/gpt-oss-120b through the generic "20b" branch:
         # "120b" contains "20b", and that branch is hardcoded for GPT-NeoX.
-        import os
+        # import os
 
         print(f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}")
         print(f"torch.cuda.device_count()={torch.cuda.device_count()}")
@@ -77,11 +77,81 @@ def load_base_model_and_tokenizer(args, model_config):
         #  on a single 48GB A6000 with room for KV cache and perturbation batches.
         #  bf16 (over fp16) chosen for wider dynamic range — NPR's perturbation
         #  step has occasionally hit fp16 overflow on long sequences.
-        base_model = transformers.AutoModelForCausalLM.from_pretrained(
-            name, **base_model_kwargs, cache_dir=model_config['cache_dir'], 
-            trust_remote_code=True, torch_dtype=torch.bfloat16
-        )
-        base_model.to(args.DEVICE)
+
+        # base_model = transformers.AutoModelForCausalLM.from_pretrained(
+        #     name, **base_model_kwargs, cache_dir=model_config['cache_dir'], 
+        #     trust_remote_code=True, torch_dtype=torch.bfloat16
+        # )
+        # base_model.to(args.DEVICE)
+    
+        print(f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}")
+        print(f"torch.cuda.device_count()={torch.cuda.device_count()}")
+
+        n_gpu = torch.cuda.device_count()
+        if n_gpu == 0:
+            raise RuntimeError("No CUDA GPU visible for StarCoder scoring.")
+
+        gpu_mem_gib = [
+            torch.cuda.get_device_properties(i).total_memory / 1024**3
+            for i in range(n_gpu)
+        ]
+        print(f"Visible GPU memory GiB: {[round(x, 1) for x in gpu_mem_gib]}")
+
+        dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        print(f"Using StarCoder dtype={dtype}")
+
+        is_15b = "15b" in name.lower()
+
+        # Case A: StarCoder2-15B on one large GPU, e.g. RTX 6000 Ada / A6000 48GB.
+        if is_15b and max(gpu_mem_gib) >= 44:
+            print("Using StarCoder single-GPU loader for 15B on large visible GPU.")
+            base_model = transformers.AutoModelForCausalLM.from_pretrained(
+                name,
+                **base_model_kwargs,
+                cache_dir=model_config["cache_dir"],
+                trust_remote_code=True,
+                torch_dtype=dtype,
+            )
+            base_model.to(args.DEVICE)
+
+        # Case B: StarCoder2-15B on two smaller GPUs, e.g. 2x RTX A5000 24GB.
+        elif is_15b and n_gpu >= 2:
+            max_memory = {}
+            for i, mem in enumerate(gpu_mem_gib):
+                # Leave some headroom for activations/KV/cache.
+                if mem >= 23:
+                    max_memory[i] = "21GiB"
+                else:
+                    max_memory[i] = f"{int(max(1, mem - 2))}GiB"
+            max_memory["cpu"] = "48GiB"
+
+            print(
+                f"Using StarCoder multi-GPU loader for 15B; "
+                f"visible GPUs={n_gpu}, max_memory={max_memory}"
+            )
+
+            base_model = transformers.AutoModelForCausalLM.from_pretrained(
+                name,
+                cache_dir=model_config["cache_dir"],
+                trust_remote_code=True,
+                torch_dtype=dtype,
+                device_map="auto",
+                max_memory=max_memory,
+            )
+            # Do NOT call base_model.to(args.DEVICE) after device_map="auto".
+
+        # Case C: StarCoder2-7B or smaller.
+        else:
+            print("Using StarCoder standard single-GPU loader.")
+            base_model = transformers.AutoModelForCausalLM.from_pretrained(
+                name,
+                **base_model_kwargs,
+                cache_dir=model_config["cache_dir"],
+                trust_remote_code=True,
+                torch_dtype=dtype,
+            )
+            base_model.to(args.DEVICE)
+
     else:
         base_model = transformers.AutoModelForCausalLM.from_pretrained(name, **base_model_kwargs, cache_dir=model_config['cache_dir'], trust_remote_code=True)
         base_model.to(args.DEVICE)
