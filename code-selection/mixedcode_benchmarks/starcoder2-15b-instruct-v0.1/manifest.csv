@@ -1,0 +1,11 @@
+benchmark_type,target,token_range,n_hwc_candidates,n_agc_candidates,n_files,out_dir
+type01_110,110,100-110,186,170,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/starcoder2-15b-instruct-v0.1/type01_110
+type02_120,120,111-120,140,107,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/starcoder2-15b-instruct-v0.1/type02_120
+type03_130,130,121-130,115,95,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/starcoder2-15b-instruct-v0.1/type03_130
+type04_140,140,131-140,106,70,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/starcoder2-15b-instruct-v0.1/type04_140
+type05_150,150,141-150,98,61,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/starcoder2-15b-instruct-v0.1/type05_150
+type06_160,160,151-160,86,52,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/starcoder2-15b-instruct-v0.1/type06_160
+type07_170,170,161-170,87,52,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/starcoder2-15b-instruct-v0.1/type07_170
+type08_180,180,171-180,88,33,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/starcoder2-15b-instruct-v0.1/type08_180
+type09_190,190,181-190,79,31,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/starcoder2-15b-instruct-v0.1/type09_190
+type10_200,200,191-200,59,24,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/starcoder2-15b-instruct-v0.1/type10_200
