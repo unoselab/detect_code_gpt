@@ -1,0 +1,11 @@
+benchmark_type,target,token_range,n_hwc_candidates,n_agc_candidates,n_files,out_dir
+type01_110,110,100-110,177,105,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b/type01_110
+type02_120,120,111-120,138,65,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b/type02_120
+type03_130,130,121-130,115,60,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b/type03_130
+type04_140,140,131-140,119,49,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b/type04_140
+type05_150,150,141-150,100,46,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b/type05_150
+type06_160,160,151-160,100,35,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b/type06_160
+type07_170,170,161-170,74,38,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b/type07_170
+type08_180,180,171-180,86,27,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b/type08_180
+type09_190,190,181-190,77,24,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b/type09_190
+type10_200,200,191-200,60,21,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b/type10_200
