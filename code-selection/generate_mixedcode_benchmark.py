@@ -686,6 +686,12 @@ def main() -> None:
                 for c in selected:
                     used_keys.add((c.role, c.source_idx))
 
+        try:
+            home_path = Path.home()
+            generalized_out_dir = "~" / type_dir.relative_to(home_path)
+        except ValueError:
+            generalized_out_dir = type_dir
+
         manifest_rows.append({
             "benchmark_type": type_name,
             "target": target,
@@ -693,8 +699,18 @@ def main() -> None:
             "n_hwc_candidates": len(hwc_pool),
             "n_agc_candidates": len(agc_pool),
             "n_files": written,
-            "out_dir": str(type_dir),
+            "out_dir": str(generalized_out_dir),
         })
+
+        # manifest_rows.append({
+        #     "benchmark_type": type_name,
+        #     "target": target,
+        #     "token_range": token_range,
+        #     "n_hwc_candidates": len(hwc_pool),
+        #     "n_agc_candidates": len(agc_pool),
+        #     "n_files": written,
+        #     "out_dir": str(type_dir.relative_to(out_root.parent)),
+        # })
 
         print(
             f"{type_name}: token_range={token_range}, "
