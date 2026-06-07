@@ -1,4 +1,8 @@
-cd ~/project-workspace/detect_code_gpt/code-selection
+cd ~/project-workspace/detect_code_gpt
 
-find mixedcode_benchmarks/starcoder2-15b-instruct-v0.1 -name "mixed_code_*.py" | wc -l
-find mixedcode_benchmarks/starcoder2-15b-instruct-v0.1 -name "mixed_code_*.json" | wc -l
+find logs -type f \( \
+  -name "npr_scores_main_mixedcode_benchmark_mixedcode_*_50files.csv" -o \
+  -name "npr_scores_main_mixedcode_benchmark_mixedcode_*_50files_bucket_summary.csv" -o \
+  -name "npr_chunks_main_mixedcode_benchmark_mixedcode_*_50files.csv" -o \
+  -name "results_cache_main_mixedcode_benchmark_mixedcode_*_50files.pkl" \
+\) -printf "%TY-%Tm-%Td %TH:%TM  %p\n" | sort

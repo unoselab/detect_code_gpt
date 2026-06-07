@@ -1,0 +1,7 @@
+benchmark_type,file_id,filename,function_id,function_name,role,label,chunk_idx,start_token_body,end_token_body,chunk_n_tokens,low_conf,npr,orig_logrank,mean_p_logrank,body_tokens,source_idx
+"type01_110",1,"mixed_code_001.py",1,"agc_mixed_001_01","AGC",1,0,0,104,104,0,"1.525179","0.388844","0.593056",103,"line7776_lm"
+"type01_110",1,"mixed_code_001.py",2,"hwc_mixed_001_02","HWC",0,0,0,105,105,0,"1.456616","0.352853","0.513972",104,"line1800_human"
+"type01_110",1,"mixed_code_001.py",3,"agc_mixed_001_03","AGC",1,0,0,110,110,0,"1.270584","0.635862","0.807916",109,"line8646_lm"
+"type01_110",1,"mixed_code_001.py",4,"agc_mixed_001_04","AGC",1,0,0,107,107,0,"2.511402","0.154791","0.388742",106,"line4640_lm"
+"type01_110",1,"mixed_code_001.py",5,"hwc_mixed_001_05","HWC",0,0,0,103,103,0,"1.250529","0.599010","0.749079",102,"line2900_human"
+"type01_110",1,"mixed_code_001.py",6,"hwc_mixed_001_06","HWC",0,0,0,106,106,0,"1.259011","0.778551","0.980205",106,"line1949_human"
