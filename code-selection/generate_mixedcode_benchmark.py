@@ -688,7 +688,7 @@ def main() -> None:
 
         try:
             home_path = Path.home()
-            generalized_out_dir = "~" / type_dir.relative_to(home_path)
+            generalized_out_dir = Path("~") / type_dir.relative_to(home_path)
         except ValueError:
             generalized_out_dir = type_dir
 
