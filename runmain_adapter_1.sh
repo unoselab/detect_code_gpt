@@ -37,27 +37,33 @@ export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
 
 ## NPR and AUROC by code length (weighted_mean)
 echo "=== DETECTION ANALYSIS ==="
-echo "StarCoder2-7B"
-echo "===================================="
-echo ""
-python analyze_by_length.py \
-    --cache "${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
-    --aggregate weighted_mean
+# echo "StarCoder2-7B"
+# echo "===================================="
+# echo ""
+# python analyze_by_length.py \
+#     --cache "${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
+#     --aggregate weighted_mean
 
-echo "CodeLlama-7B"
-echo "===================================="
-echo ""
-python analyze_by_length.py \
-    --cache "${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
-    --aggregate weighted_mean
+# echo "CodeLlama-7B"
+# echo "===================================="
+# echo ""
+# python analyze_by_length.py \
+#     --cache "${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
+#     --aggregate weighted_mean
 
-echo "GPT-OSS-120B"
-echo "===================================="
-echo ""
-python analyze_by_length.py \
-    --cache "${LOG_DIR}/results_cache_main_adapter_gpt-oss_4500_refreshed.pkl" \
-    --aggregate weighted_mean
+# echo "GPT-OSS-120B"
+# echo "===================================="
+# echo ""
+# python analyze_by_length.py \
+#     --cache "${LOG_DIR}/results_cache_main_adapter_gpt-oss_4500_refreshed.pkl" \
+#     --aggregate weighted_mean
 
+# echo "StarCoder2-15B"
+# echo "===================================="
+# echo ""
+# python analyze_by_length.py \
+#     --cache "${LOG_DIR}/results_cache_main_adapter_starcoder2-15b-instruct-v0.1_4500_refreshed.pkl" \
+#     --aggregate weighted_mean
 
 # cd "${PROJECT_ROOT}"
 # rm -rf \
@@ -66,33 +72,40 @@ python analyze_by_length.py \
 #   "${ANALYSIS_DIR}"/cl7b-sc7b-mean \
 #   "${ANALYSIS_DIR}"/cl7b-sc7b-go120b-mean
 
+## === ANALYSIS ============================ 
 cd "${ANALYSIS_DIR}"
 
-echo "CodeLlama-7B & StarCoder2-7B & GPT-OSS-120B"
+echo "CodeLlama-7B & StarCoder2-7B & StarCoder2-15B & GPT-OSS-120B"
 echo "===================================="
 echo ""
 
+# python make_paper_artifacts.py \
+#     --cache "CodeLlama-7B=${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
+#     --aggregate weighted_mean \
+#     --out-dir ./cl7b-mean
+
+# python make_paper_artifacts.py \
+#     --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
+#     --aggregate weighted_mean \
+#     --out-dir ./sc7b-mean
+
+# python make_paper_artifacts.py \
+#     --cache "GPT-OSS-120B=${LOG_DIR}/results_cache_main_adapter_gpt-oss_4500_refreshed.pkl" \
+#     --aggregate weighted_mean \
+#     --out-dir ./go120b-mean
+
+python make_paper_artifacts.py \
+    --cache "StarCoder2-15B=${LOG_DIR}/results_cache_main_adapter_starcoder2-15b-instruct-v0.1_4500_refreshed.pkl" \
+    --aggregate weighted_mean \
+    --out-dir ./sc15b-mean
+
 python make_paper_artifacts.py \
     --cache "CodeLlama-7B=${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
-    --aggregate weighted_mean \
-    --out-dir ./cl7b-mean
-
-python make_paper_artifacts.py \
     --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
-    --aggregate weighted_mean \
-    --out-dir ./sc7b-mean
-
-python make_paper_artifacts.py \
+    --cache "StarCoder2-15B=${LOG_DIR}/results_cache_main_adapter_starcoder2-15b-instruct-v0.1_4500_refreshed.pkl" \
     --cache "GPT-OSS-120B=${LOG_DIR}/results_cache_main_adapter_gpt-oss_4500_refreshed.pkl" \
     --aggregate weighted_mean \
-    --out-dir ./go120b-mean
-
-python make_paper_artifacts.py \
-    --cache "CodeLlama-7B=${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
-    --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
-    --cache "GPT-OSS-120B=${LOG_DIR}/results_cache_main_adapter_gpt-oss_4500_refreshed.pkl" \
-    --aggregate weighted_mean \
-    --out-dir ./cl7b-sc7b-go120b-mean
+    --out-dir ./cl7b-sc7b-sc15b-go120b-mean
 
 # check the empty HWC and MGC
 # python main_adapter.py \
