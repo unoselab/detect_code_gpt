@@ -100,10 +100,16 @@ mkdir -p "${LOG_DIR}" "${OUTPUT_ROOT}"
   #   --base_model_name "${BASE_MODEL_NAME}" \
   #   --output_name "mixedcode_${GEN_MODEL}_50files"
 
-  CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}" python main_mixedcode_benchmark.py \
-    --benchmark_root "${BENCHMARK_ROOT}" \
-    --load_cached_results ../logs/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_50files.pkl \
-    --report_group type10_200
+  # CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}" python main_mixedcode_benchmark.py \
+  #   --benchmark_root "${BENCHMARK_ROOT}" \
+  #   --load_cached_results ../logs/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_50files.pkl \
+  #   --report_group type10_200
 
+  CUDA_VISIBLE_DEVICES=0 python main_mixedcode_benchmark.py \
+    --benchmark_root ../code-selection/mixedcode_benchmarks/codellama-7b \
+    --base_model_name codellama/CodeLlama-7b-hf \
+    --only_group type10_200 \
+    --output_name mixedcode_codellama-7b_type10_200_merged \
+    --report_group type10_200
 
 } 2>&1 | tee "${LOG_FILE}"

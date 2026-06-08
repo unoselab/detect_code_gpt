@@ -171,12 +171,29 @@ def load_mixedcode_functions(
     benchmark_root: Path,
     limit_files: Optional[int] = None,
     limit_functions: Optional[int] = None,
+    only_group: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    """Load all function-body examples from type*/mixed_code_*.json sidecars."""
+    """Load all function-body examples from type*/mixed_code_*.json sidecars.
+
+    If ``only_group`` is given (e.g. ``type10_200``), only that type folder is
+    loaded and every loaded example's ``benchmark_type`` is forced to the group
+    name. This lets you score a single merged group from scratch and is robust
+    to sidecars whose stored ``benchmark_type`` differs from the folder they now
+    live in (e.g. files merged in from a ``*_new1`` regeneration).
+    """
     if not benchmark_root.exists():
         raise FileNotFoundError(f"Benchmark root not found: {benchmark_root}")
 
-    json_paths = sorted(benchmark_root.glob("type*/mixed_code_*.json"))
+    if only_group:
+        json_paths = sorted(benchmark_root.glob(f"{only_group}/mixed_code_*.json"))
+        if not json_paths:
+            available = sorted(p.name for p in benchmark_root.glob("type*") if p.is_dir())
+            raise FileNotFoundError(
+                f"No mixed_code_*.json found for group '{only_group}' under "
+                f"{benchmark_root}. Available groups: {available}"
+            )
+    else:
+        json_paths = sorted(benchmark_root.glob("type*/mixed_code_*.json"))
     if limit_files is not None:
         json_paths = json_paths[:limit_files]
 
@@ -194,7 +211,9 @@ def load_mixedcode_functions(
             raise FileNotFoundError(f"Missing .py for {meta_path}: expected {py_path}")
 
         mixed_code = py_path.read_text(encoding="utf-8")
-        benchmark_type = meta.get("benchmark_type", meta_path.parent.name)
+        # When restricting to a single group, label everything by that group so a
+        # merged set (old + new files) aggregates as one bucket.
+        benchmark_type = only_group or meta.get("benchmark_type", meta_path.parent.name)
         file_id = meta.get("file_id", None)
         filename = meta.get("filename", py_path.name)
         target_bucket_upper = meta.get("target_bucket_upper", None)
@@ -516,6 +535,12 @@ def main() -> None:
                         help="Comma-separated benchmark_type bucket(s) to report a "
                              "focused AUROC for, e.g. 'type10_200'. The generator "
                              "model is already fixed by --benchmark_root.")
+    parser.add_argument("--only_group", type=str, default=None,
+                        help="Score only this type folder from scratch, e.g. "
+                             "'type10_200'. Loads just that folder and labels every "
+                             "function with the group name, so a merged old+new set "
+                             "aggregates as one bucket. Overall AUROC then equals "
+                             "that group's AUROC.")
     parser.add_argument("--limit_files", type=int, default=None,
                         help="Debug: only load first N JSON sidecars.")
     parser.add_argument("--limit_functions", type=int, default=None,
@@ -551,6 +576,7 @@ def main() -> None:
         benchmark_root,
         limit_files=cli.limit_files,
         limit_functions=cli.limit_functions,
+        only_group=cli.only_group,
     )
 
     if not examples:

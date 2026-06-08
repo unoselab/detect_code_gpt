@@ -1,0 +1,2 @@
+benchmark_type,target,token_range,n_hwc_candidates,n_agc_candidates,n_files,out_dir
+type10_200_new2,200,190-200,66,21,5,../code-selection/mixedcode_benchmarks/codellama-7b/type10_200_new2

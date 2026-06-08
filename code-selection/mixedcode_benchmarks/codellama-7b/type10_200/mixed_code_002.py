@@ -1,122 +1,167 @@
-def hwc_mixed_002_01(self):
-        """Return a list of attribute names for the mapping.
-
-        :rtype: list
-
+def hwc_mixed_002_01(
+            self,
+            *,
+            text: str,
+    ) -> List[OutputRecord]:
         """
-        return sorted([k for k in dir(self) if
-                       k[0:1] != '_' and k != 'keys' and not k.isupper() and
-                       not inspect.ismethod(getattr(self, k)) and
-                       not (hasattr(self.__class__, k) and
-                            isinstance(getattr(self.__class__, k),
-                                       property)) and
-                       not isinstance(getattr(self, k), property)]) 
+        Send mastodon message.
 
-def hwc_mixed_002_02(self, filepath, fprogress):
-        """Store file at filepath in the database and return the base index entry
-        Needs the git_working_dir decorator active ! This must be assured in the calling code"""
-        st = os.lstat(filepath)     # handles non-symlinks as well
-        if S_ISLNK(st.st_mode):
-            # in PY3, readlink is string, but we need bytes. In PY2, it's just OS encoded bytes, we assume UTF-8
-            open_stream = lambda: BytesIO(force_bytes(os.readlink(filepath), encoding=defenc))
+        :param text: text to send in post.
+        :returns: list of output records,
+            each corresponding to either a single post,
+            or an error.
+        """
+        try:
+            status = self.api.status_post(status=text)
+
+            return [TootRecord(record_data={
+                "toot_id": status["id"],
+                "text": text
+            })]
+
+        except mastodon.MastodonError as e:
+            return [self.handle_error((f"Bot {self.bot_name} encountered an error when "
+                                      f"sending post {text} without media:\n{e}\n"),
+                                     e)] 
+
+def hwc_mixed_002_02(self, start_point, end_point):
+        """Show the rectangle on the canvas.
+
+        :param start_point: QGIS Point object representing the origin (
+            top left).
+        :type start_point: QgsPoint
+
+        :param end_point: QGIS Point object representing the contra-origin (
+            bottom right).
+        :type end_point: QgsPoint
+
+        :return:
+        """
+        self.rubber_band.reset(QgsWkbTypes.PolygonGeometry)
+        if (start_point.x() == end_point.x()
+                or start_point.y() == end_point.y()):
+            return
+
+        point1 = start_point
+        point2 = QgsPointXY(end_point.x(), start_point.y())
+        point3 = end_point
+        point4 = QgsPointXY(start_point.x(), end_point.y())
+
+        update_canvas = False
+        self.rubber_band.addPoint(point1, update_canvas)
+        self.rubber_band.addPoint(point2, update_canvas)
+        self.rubber_band.addPoint(point3, update_canvas)
+        self.rubber_band.addPoint(point4, update_canvas)
+        # noinspection PyArgumentEqualDefault
+        # no False so canvas will update
+        # close the polygon otherwise it shows as a filled rect
+        self.rubber_band.addPoint(point1)
+        self.rubber_band.show() 
+
+def hwc_mixed_002_03(self, t: URIRef) -> Optional[URIRef]:
+        """
+        Return the data type for primitive type t, if any
+        :param t: type
+        :return: corresponding data type
+        """
+        for sco in self._o.objects(t, RDFS.subClassOf):
+            sco_type = self._o.value(sco, RDF.type)
+            sco_prop = self._o.value(sco, OWL.onProperty)
+            if sco_type == OWL.Restriction and sco_prop == FHIR.value:
+                # The older versions of fhir.ttl (incorrectly) referenced the datatype directly
+                restriction_type = self._o.value(sco, OWL.allValuesFrom)
+                if not restriction_type:
+                    restriction_dt_entry = self._o.value(sco, OWL.someValuesFrom)
+                    restriction_type = self._o.value(restriction_dt_entry, OWL.onDatatype)
+                return restriction_type
+        return None 
+
+def agc_mixed_002_04(obj):
+        """
+        Remove all qualifiers from the input objectwhere the object may
+        be an CIMInstance or CIMClass. Removes qualifiers from the object and
+        from properties, methods, and parameters
+
+        This is used to process the IncludeQualifier parameter for classes
+        and instances
+        """
+        if isinstance(obj, CIMInstance):
+            for p in obj.properties:
+                p.qualifiers = []
+        elif isinstance(obj, CIMClass):
+            for p in obj.properties:
+                p.qualifiers = []
+            for m in obj.methods:
+                m.qualifiers = []
+        elif isinstance(obj, CIMParameter):
+            obj.qualifiers = []
+        elif isinstance(obj, CIMMethod):
+            obj.qualifiers = []
         else:
-            open_stream = lambda: open(filepath, 'rb')
-        with open_stream() as stream:
-            fprogress(filepath, False, filepath)
-            istream = self.repo.odb.store(IStream(Blob.type, st.st_size, stream))
-            fprogress(filepath, True, filepath)
-        return BaseIndexEntry((stat_mode_to_index_mode(st.st_mode),
-                               istream.binsha, 0, to_native_path_linux(filepath))) 
+            raise ValueError("Unknown object type") 
 
-def agc_mixed_002_03(self, value):
-        """
-        Returns a UTF-8 string representation of the parameter value,
-        recursing into lists.
-        """
-        # Extract IDs from objects
-        if isinstance(value, list):
-            return '[' + ', '.join(self._process_param_value(v) for v in value) + ']'
-        elif isinstance(value, dict):
-            return '{' + ', '.join('%s: %s' % (k, self._process_param_value(v)) for k, v in value.items()) + '}'
-        elif isinstance(value, bool):
-            return str(value).lower()
-        elif isinstance(value, int):
-            return str(value)
-        elif isinstance(value, float):
-            return str(value)
-        elif isinstance(value, str):
-            return value
-        else:
-            raise TypeError('Parameter value must be str, int, float, bool, list or dict') 
-
-def hwc_mixed_002_04(src_bucket_name, src_bucket_secret_key, src_bucket_access_key,
-                   dst_bucket_name, dst_bucket_secret_key, dst_bucket_access_key):
-    """ Copy S3 bucket directory with CMS data between environments. Operations are done on server. """
-    with cd(env.remote_path):
-        tmp_dir = "s3_tmp"
-        sudo('rm -rf %s' % tmp_dir, warn_only=True, user=env.remote_user)
-        sudo('mkdir %s' % tmp_dir, user=env.remote_user)
-        sudo('s3cmd --recursive get s3://%s/upload/ %s --secret_key=%s --access_key=%s' % (
-            src_bucket_name, tmp_dir, src_bucket_secret_key, src_bucket_access_key),
-            user=env.remote_user)
-        sudo('s3cmd --recursive put %s/ s3://%s/upload/ --secret_key=%s --access_key=%s' % (
-            tmp_dir, dst_bucket_name, dst_bucket_secret_key, dst_bucket_access_key),
-            user=env.remote_user)
-
-        sudo('s3cmd setacl s3://%s/upload --acl-public --recursive --secret_key=%s --access_key=%s' % (
-             dst_bucket_name, dst_bucket_secret_key, dst_bucket_access_key),
-             user=env.remote_user)
-        # cleanup
-        sudo('rm -rf %s' % tmp_dir, warn_only=True, user=env.remote_user) 
-
-async def agc_mixed_002_05(
-    host,
-    port,
-    *,
-    loop=None,
-    secure=True,
-    ssl_context=None,
-    **kwargs,
-):
-    """Open an HTTP/2 connection to the specified host/port.
+def agc_mixed_002_05(kwargs=None, conn=None, call=None):
     """
-    if loop is None:
-        loop = asyncio.get_event_loop()
-    if ssl_context is None:
-        ssl_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-    if secure:
-        ssl_context.set_alpn_protocols(["h2"])
-        ssl_context.set_npn_protocols(["h2"])
-    if ssl_context.check_hostname:
-        ssl_context.verify_mode = ssl.CERT_REQUIRED
-    else:
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-    if ssl_context.ciphers is None:
-        ssl_context.ciphers = "ECDHE+AESGCM"
-    if ssl_context.cert_reqs == ssl.CERT_NONE:
-        ssl_context.load_verify_locations(cafile=None)
-    else:
-        ssl_context.load_default_certs()
-    if ssl_context.certfile is None:
-        ssl_context.load_cert_chain(certfile=None)
-    return await loop.create_connection(
-        lambda: HTTP2Connection(ssl_context=ssl_context, **kwargs),
-        host,
-        port,
-        ssl=ssl_context,
-    ) 
+    .. versionadded:: 2015.8.0
 
-def agc_mixed_002_06(self, domain, record_type, name=None, data=None):
+    Return information about a management_certificate
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt-cloud -f get_management_certificate my-azure name=my_management_certificate \\
+            thumbalgorithm=sha1 thumbprint=0123456789ABCDEF
+    """
+    if call != "function":
+        raise SaltCloudSystemExit(
+            "The get_management_certificate function must be called with -f or --function."
+        )
+
+    if not conn:
+        conn = get_conn(**kwargs)
+
+    thumbalgorithm = kwargs.get("thumbalgorithm", None)
+    thumbprint = kwargs.get("thumbprint", None)
+
+    if not thumbalgorithm or not thumbprint:
+        raise SaltCloudSystemExit(
+            "The thumbalgorithm and thumbprint arguments are required."
+        )
+
+    try:
+        management_certificate = conn.get_management_certificate(
+            thumbalgorithm, thumbprint
+        )
+    except WindowsAzureMissingCertError:
+        return {"Error": "Management certificate not found."}
+    except WindowsAzureError as exc:
+        return {"Error": "Error getting management certificate: {}".format(exc)}
+
+    return management_certificate 
+
+def agc_mixed_002_06(self, current_info: AllBrainInfo, next_info: AllBrainInfo):
         """
-        Returns a list of all records configured for the specified domain that
-        match the supplied search criteria.
+        Checks agent histories for processing condition, and processes them as necessary.
+        Processing involves calculating value and advantage targets for model updating step.
+        :param current_info: Current AllBrainInfo
+        :param next_info: Next AllBrainInfo
         """
-        if not name:
-            name = ''
-        if not data:
-            data = ''
-        return self.connection.request('domains/%s/records' % (domain),
-                                       params={'type': record_type,
-                                               'name': name,
-                                               'data': data}).object
+        if self.replay_buffer.n_entries >= self.learning_starts:
+            # Retrieve experience from the buffer
+            experiences = self.replay_buffer.sample(self.batch_size)
+
+            # Transform experiences
+            states, actions, rewards, dones, last_states = self.process_experiences(experiences)
+
+            # Calculate value targets for updated model
+            next_states_value = self.get_value_targets(next_info)
+
+            # Calculate the advantages
+            self.calculate_advantages(rewards, dones, last_states, next_states_value)
+
+            # Update the replay buffer
+            self.replay_buffer.update_priorities(experiences, self.td_errors_per_sample)
+
+            # Update the model
+            self.update_model()

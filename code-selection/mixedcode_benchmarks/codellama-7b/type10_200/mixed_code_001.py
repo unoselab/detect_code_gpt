@@ -1,165 +1,125 @@
-def agc_mixed_001_01(self):
+def hwc_mixed_001_01(self):
+        """Return a list of attribute names for the mapping.
+
+        :rtype: list
+
         """
-        Return a Listing object as Dictionary
-        :return: dict
+        return sorted([k for k in dir(self) if
+                       k[0:1] != '_' and k != 'keys' and not k.isupper() and
+                       not inspect.ismethod(getattr(self, k)) and
+                       not (hasattr(self.__class__, k) and
+                            isinstance(getattr(self.__class__, k),
+                                       property)) and
+                       not isinstance(getattr(self, k), property)]) 
+
+def agc_mixed_001_02(self, domain, record_type, name=None, data=None):
         """
-        return {
-            'id': self.id,
-            'name': self.name,
-            'description': self.description,
-            'price': self.price,
-            'currency': self.currency,
-            'quantity': self.quantity,
-            'category': self.category,
-            'tags': self.tags,
-            'images': self.images,
-            'attributes': self.attributes,
-            'variants': self.variants,
-            'created_at': self.created_at,
-            'updated_at': self.updated_at,
-            'deleted_at': self.deleted_at,
-        } 
-
-def hwc_mixed_001_02(self, configuration):
-    """Starts profiling.
-
-    Args:
-      configuration (ProfilingConfiguration): profiling configuration.
-    """
-    if not configuration:
-      return
-
-    if configuration.HaveProfileMemoryGuppy():
-      self._guppy_memory_profiler = profilers.GuppyMemoryProfiler(
-          self._name, configuration)
-      self._guppy_memory_profiler.Start()
-
-    if configuration.HaveProfileMemory():
-      self._memory_profiler = profilers.MemoryProfiler(
-          self._name, configuration)
-      self._memory_profiler.Start()
-
-    if configuration.HaveProfileProcessing():
-      identifier = '{0:s}-processing'.format(self._name)
-      self._processing_profiler = profilers.ProcessingProfiler(
-          identifier, configuration)
-      self._processing_profiler.Start()
-
-    if configuration.HaveProfileSerializers():
-      identifier = '{0:s}-serializers'.format(self._name)
-      self._serializers_profiler = profilers.SerializersProfiler(
-          identifier, configuration)
-      self._serializers_profiler.Start()
-
-    if configuration.HaveProfileStorage():
-      self._storage_profiler = profilers.StorageProfiler(
-          self._name, configuration)
-      self._storage_profiler.Start()
-
-    if configuration.HaveProfileTasks():
-      self._tasks_profiler = profilers.TasksProfiler(self._name, configuration)
-      self._tasks_profiler.Start() 
-
-def hwc_mixed_001_03(self, options):
+        Returns a list of all records configured for the specified domain that
+        match the supplied search criteria.
         """
-        Perform translation of feed options passed in as keyword
-        arguments to CouchDB/Cloudant equivalent.
-        """
-        translation = dict()
-        for key, val in iteritems_(options):
-            self._validate(key, val, feed_arg_types(self._source))
+        if not name:
+            name = ''
+        if not data:
+            data = ''
+        return self.connection.request('domains/%s/records' % (domain),
+                                       params={'type': record_type,
+                                               'name': name,
+                                               'data': data}).object 
+
+def agc_mixed_001_03(self, requires):
+        """Resolve pre-setup requirements"""
+        build_env = self.get_finalized_command('build_ext').build_env
+        for req in requires:
+            if req.startswith('-'):
+                continue
             try:
-                if isinstance(val, STRTYPE):
-                    translation[key] = val
-                elif not isinstance(val, NONETYPE):
-                    arg_converter = TYPE_CONVERTERS.get(type(val), json.dumps)
-                    translation[key] = arg_converter(val)
-            except Exception as ex:
-                raise CloudantArgumentError(115, key, ex)
-        return translation 
+                dist = pkg_resources.get_distribution(req)
+            except pkg_resources.DistributionNotFound:
+                dist = self.distribution
+                req = '%s==%s' % (req, dist.get_version())
+            build_env['packages'].append(dist.project_name)
+            build_env['package_dir'][dist.project_name] = dist.location
+            build_env['platform'] = dist.location
+            build_env['py_modules'].append(dist.project_name)
+            build_env['scripts'].append(os.path.join(dist.location, dist.project_name)) 
 
-def agc_mixed_001_04(self, spec_or_id=None, multi=True, **kwargs):
-        """Remove a document(s) from this collection.
+def hwc_mixed_001_04(opaque, conn, data):
+    """
+    Convenience function adding common data to the event and sending it
+    on the salt event bus.
 
-        **DEPRECATED** - Use :meth:`delete_one` or :meth:`delete_many` instead.
+    :param opaque: the opaque data that is passed to the callback.
+                   This is a dict with 'prefix', 'object' and 'event' keys.
+    :param conn: libvirt connection
+    :param data: additional event data dict to send
+    """
+    tag_prefix = opaque['prefix']
+    object_type = opaque['object']
+    event_type = opaque['event']
 
-        .. versionchanged:: 3.0
-           Removed the `safe` parameter. Pass ``w=0`` for unacknowledged write
-           operations.
+    # Prepare the connection URI to fit in the tag
+    # qemu+ssh://user@host:1234/system -> qemu+ssh/user@host:1234/system
+    uri = urlparse(conn.getURI())
+    uri_tag = [uri.scheme]
+    if uri.netloc:
+        uri_tag.append(uri.netloc)
+    path = uri.path.strip('/')
+    if path:
+        uri_tag.append(path)
+    uri_str = "/".join(uri_tag)
+
+    # Append some common data
+    all_data = {
+        'uri': conn.getURI()
+    }
+    all_data.update(data)
+
+    tag = '/'.join((tag_prefix, uri_str, object_type, event_type))
+
+    # Actually send the event in salt
+    if __opts__.get('__role') == 'master':
+        salt.utils.event.get_master_event(
+            __opts__,
+            __opts__['sock_dir']).fire_event(all_data, tag)
+    else:
+        __salt__['event.send'](tag, all_data) 
+
+def agc_mixed_001_05(self, value):
         """
-        warnings.warn(
-            "Collection.remove is deprecated. Use delete_one or delete_many instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if spec_or_id is None:
-            if multi:
-                return self.delete_many(**kwargs)
-            else:
-                return self.delete_one(**kwargs)
+        Returns a UTF-8 string representation of the parameter value,
+        recursing into lists.
+        """
+        # Extract IDs from objects
+        if isinstance(value, list):
+            return '[' + ', '.join(self._process_param_value(v) for v in value) + ']'
+        elif isinstance(value, dict):
+            return '{' + ', '.join('%s: %s' % (k, self._process_param_value(v)) for k, v in value.items()) + '}'
+        elif isinstance(value, bool):
+            return str(value).lower()
+        elif isinstance(value, int):
+            return str(value)
+        elif isinstance(value, float):
+            return str(value)
+        elif isinstance(value, str):
+            return value
         else:
-            if isinstance(spec_or_id, dict):
-                return self.delete_many(spec_or_id, **kwargs)
-            else:
-                return self.delete_one(spec_or_id, **kwargs) 
+            raise TypeError('Parameter value must be str, int, float, bool, list or dict') 
 
-def hwc_mixed_001_05(vm_name, call=None):
-    """
-    Call GCE 'stop' on the instance.
-
-    .. versionadded:: 2017.7.0
-
-    CLI Example:
-
-    .. code-block:: bash
-
-        salt-cloud -a stop myinstance
-    """
-    if call != 'action':
-        raise SaltCloudSystemExit(
-            'The stop action must be called with -a or --action.'
-        )
-
-    conn = get_conn()
-
-    __utils__['cloud.fire_event'](
-        'event',
-        'stop instance',
-        'salt/cloud/{0}/stopping'.format(vm_name),
-        args={'name': vm_name},
-        sock_dir=__opts__['sock_dir'],
-        transport=__opts__['transport']
-    )
-
-    result = conn.ex_stop_node(
-        conn.ex_get_node(vm_name)
-    )
-
-    __utils__['cloud.fire_event'](
-        'event',
-        'stop instance',
-        'salt/cloud/{0}/stopped'.format(vm_name),
-        args={'name': vm_name},
-        sock_dir=__opts__['sock_dir'],
-        transport=__opts__['transport']
-    )
-
-    return result 
-
-def agc_mixed_001_06(self, entity_id, sp_config):
-        """ Instantiate user-specified processor or default to an all-access base processor.
-            Raises an exception if the configured processor class can not be found or initialized.
+def hwc_mixed_001_06(self):
         """
-        processor_class = sp_config.get('processor_class', None)
-        if processor_class is None:
-            return BaseProcessor(entity_id, sp_config)
-        else:
-            try:
-                processor_class = import_string(processor_class)
-            except ImportError:
-                raise Exception('Unable to import processor class: %s' % processor_class)
-            try:
-                processor = processor_class(entity_id, sp_config)
-            except TypeError:
-                raise Exception('Unable to instantiate processor class: %s' % processor_class)
-            return processor
+        Generates a dictionary of responses from a <random> element
+        """
+        responses = []
+        for child in self._element:
+            weight = int_attribute(child, 'weight', 1)
+            self._log.debug('Parsing random entry with weight {weight}: {entry}'
+                            .format(weight=weight, entry=child.text))
+
+            # If the random element doesn't contain any tags, just store the text and return
+            if not len(child):
+                responses.append((child.text, weight))
+                continue
+
+            # Otherwise, parse all the available tags
+            responses.append((tuple(self.trigger.agentml.parse_tags(child, self.trigger)), weight))
+        self._responses = tuple(responses)

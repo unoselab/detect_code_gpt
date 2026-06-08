@@ -562,6 +562,30 @@ def parse_targets(s: str) -> List[int]:
     return xs
 
 
+def parse_width_overrides(s: str) -> Dict[int, int]:
+    """Parse ``TARGET:WIDTH`` pairs, e.g. '200:11' or '190:10,200:11'."""
+    out: Dict[int, int] = {}
+    for part in s.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if ":" not in part:
+            raise argparse.ArgumentTypeError(
+                f"Bad --bucket_width_overrides entry {part!r}; expected TARGET:WIDTH"
+            )
+        t_str, w_str = part.split(":", 1)
+        try:
+            target, width = int(t_str), int(w_str)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(
+                f"Bad --bucket_width_overrides entry {part!r}: {exc}"
+            )
+        if width <= 0:
+            raise argparse.ArgumentTypeError(f"Override width must be positive: {part!r}")
+        out[target] = width
+    return out
+
+
 def collect_used_source_keys(
     scan_root: Path,
     roles: Sequence[str],
@@ -620,6 +644,15 @@ def main() -> None:
         help="Comma-separated bucket upper bounds. Default: 110,120,...,200",
     )
     parser.add_argument("--bucket_width", type=int, default=10, help="Token bucket width. Default: 10")
+    parser.add_argument(
+        "--bucket_width_overrides",
+        type=parse_width_overrides,
+        default={},
+        help="Per-target bucket-width overrides as TARGET:WIDTH pairs, e.g. "
+             "'200:11'. Only the listed targets use the override; all others "
+             "keep --bucket_width. Useful to widen one sparse group without "
+             "changing the rest.",
+    )
     parser.add_argument(
         "--files_per_type",
         type=int,
@@ -696,6 +729,8 @@ def main() -> None:
     print(f"out_dir        : {out_root}")
     print(f"targets        : {args.targets}")
     print(f"bucket_width   : {args.bucket_width}")
+    if args.bucket_width_overrides:
+        print(f"width_overrides: {args.bucket_width_overrides}")
     print(f"files_per_type : {args.files_per_type if args.files_per_type > 0 else 'max'}")
     print(f"seed           : {args.seed}")
     print("=" * 80)
@@ -746,7 +781,8 @@ def main() -> None:
         if args.type_suffix:
             sfx = args.type_suffix if args.type_suffix.startswith("_") else "_" + args.type_suffix
             type_name = f"{type_name}{sfx}"
-        lower = target - args.bucket_width
+        width = args.bucket_width_overrides.get(target, args.bucket_width)
+        lower = target - width
         token_range = f"{lower}-{target}" if type_idx == 1 else f"{lower + 1}-{target}"
         type_dir = out_root / type_name
         type_dir.mkdir(parents=True, exist_ok=True)
@@ -758,7 +794,7 @@ def main() -> None:
             key = (c.role, c.source_idx)
             if not args.allow_reuse_across_types and key in used_keys:
                 continue
-            ok = in_bucket(c.body_tokens, target, args.bucket_width, first_bucket_inclusive=(type_idx == 1))
+            ok = in_bucket(c.body_tokens, target, width, first_bucket_inclusive=(type_idx == 1))
             if not ok:
                 continue
             if c.role == "HWC":
@@ -779,7 +815,7 @@ def main() -> None:
                 mixed_code, meta = build_mixed_file_record(
                     selected=selected,
                     target=target,
-                    bucket_width=args.bucket_width,
+                    bucket_width=width,
                     type_name=type_name,
                     file_id=file_id,
                 )

@@ -1,0 +1,2 @@
+benchmark_type,n_hwc,n_agc,auc,hwc_mean,agc_mean
+type10_200,15,15,0.711111,1.278772,1.431400

@@ -1,4 +1,48 @@
-def hwc_mixed_003_01(batch_id, vrn_files, config_file, base_dir, ref_file, data):
+def agc_mixed_005_01(self):
+        """Check if the RPM Python binding has a depndency to popt-devel.
+
+        Search include header files in the source code to check it.
+        """
+        if self.rpm_py_has_popt_devel_dep is not None:
+            return self.rpm_py_has_popt_devel_dep
+
+        self.rpm_py_has_popt_devel_dep = False
+        for f in self.rpm_py_files:
+            if f.endswith('.h'):
+                with open(f, 'r') as fd:
+                    for line in fd:
+                        if 'popt.h' in line:
+                            self.rpm_py_has_popt_devel_dep = True
+                            break
+        return self.rpm_py_has_popt_devel_dep 
+
+def hwc_mixed_005_02(self, variable):
+        """Method to parse an input or output variable.
+
+        **Example Variable**::
+
+        #App:1234:output!String
+
+        Args:
+            variable (string): The variable name to parse.
+
+        Returns:
+            (dictionary): Result of parsed string.
+        """
+        data = None
+        if variable is not None:
+            variable = variable.strip()
+            if re.match(self._variable_match, variable):
+                var = re.search(self._variable_parse, variable)
+                data = {
+                    'root': var.group(0),
+                    'job_id': var.group(2),
+                    'name': var.group(3),
+                    'type': var.group(4),
+                }
+        return data 
+
+def hwc_mixed_005_03(batch_id, vrn_files, config_file, base_dir, ref_file, data):
     """Run an ensemble call using merging and SVM-based approach in bcbio.variation
     """
     out_vcf_file = os.path.join(base_dir, "{0}-ensemble.vcf".format(batch_id))
@@ -18,51 +62,7 @@ def hwc_mixed_003_01(batch_id, vrn_files, config_file, base_dir, ref_file, data)
             "vrn_file": out_vcf_file,
             "bed_file": out_bed_file if os.path.exists(out_bed_file) else None} 
 
-def agc_mixed_003_02(kind, device, channels, dtype, latency, samplerate):
-    """Generate PaStreamParameters struct."""
-    if kind == "input":
-        stream_parameters = pa.StreamParameters(
-            device=device,
-            channel_count=channels,
-            sample_format=dtype,
-            suggested_latency=latency,
-            host_api_specific_stream_info=None,
-        )
-    elif kind == "output":
-        stream_parameters = pa.StreamParameters(
-            device=device,
-            channel_count=channels,
-            sample_format=dtype,
-            suggested_latency=latency,
-            host_api_specific_stream_info=None,
-        )
-    else:
-        raise ValueError("kind must be 'input' or 'output'")
-    return stream_parameters 
-
-def hwc_mixed_003_03(self, row):
-        """Get the key that should be used as the first interpolation value"""
-        # Don't bother with empty tracks
-        if len(self.keys) == 0:
-            return -1
-
-        # No track values are defined yet
-        if row < self.keys[0].row:
-            return -1
-
-        # Get the insertion index
-        index = bisect.bisect_left(self.keys, row)
-        # Index is within the array size?
-        if index < len(self.keys):
-            # Are we inside an interval?
-            if row < self.keys[index].row:
-                return index - 1
-            return index
-
-        # Return the last index
-        return len(self.keys) - 1 
-
-def agc_mixed_003_04(self, model_item, data):
+def agc_mixed_005_04(self, model_item, data):
         """
             Merge a model with a python data structure
             This is useful to turn PUT method into a PATCH also
@@ -87,34 +87,50 @@ def agc_mixed_003_04(self, model_item, data):
 
         return model_item 
 
-def hwc_mixed_003_05(self, sites, rup, dists, imt, stddev_types):
-        """
-        See :meth:`superclass method
-        <.base.GroundShakingIntensityModel.get_mean_and_stddevs>`
-        for spec of input and result values.
-        """
-        # extracting dictionary of coefficients specific to required
-        # intensity measure type.
+def hwc_mixed_005_05(vm_name, call=None):
+    """
+    Call GCE 'stop' on the instance.
 
-        C = self.COEFFS[imt]
+    .. versionadded:: 2017.7.0
 
-        mean = (self._get_magnitude_term(C, rup.mag) +
-                self._get_distance_term(C, dists.rjb, rup.mag) +
-                self._get_site_term(C, sites.vs30))
+    CLI Example:
 
-        # Units of GMPE are in terms of m/s (corrected in an Erratum)
-        # Convert to g
-        if imt.name in "SA PGA":
-            mean = np.log(np.exp(mean) / g)
-        else:
-            # For PGV convert from m/s to cm/s/s
-            mean = np.log(np.exp(mean) * 100.)
+    .. code-block:: bash
 
-        # Get standard deviations
-        stddevs = self._get_stddevs(C, stddev_types, dists.rjb.shape)
-        return mean, stddevs 
+        salt-cloud -a stop myinstance
+    """
+    if call != 'action':
+        raise SaltCloudSystemExit(
+            'The stop action must be called with -a or --action.'
+        )
 
-def agc_mixed_003_06(
+    conn = get_conn()
+
+    __utils__['cloud.fire_event'](
+        'event',
+        'stop instance',
+        'salt/cloud/{0}/stopping'.format(vm_name),
+        args={'name': vm_name},
+        sock_dir=__opts__['sock_dir'],
+        transport=__opts__['transport']
+    )
+
+    result = conn.ex_stop_node(
+        conn.ex_get_node(vm_name)
+    )
+
+    __utils__['cloud.fire_event'](
+        'event',
+        'stop instance',
+        'salt/cloud/{0}/stopped'.format(vm_name),
+        args={'name': vm_name},
+        sock_dir=__opts__['sock_dir'],
+        transport=__opts__['transport']
+    )
+
+    return result 
+
+def agc_mixed_005_06(
             self,
             *,
             text: str,
