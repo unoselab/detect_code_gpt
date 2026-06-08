@@ -87,17 +87,23 @@ mkdir -p "${LOG_DIR}" "${OUTPUT_ROOT}"
   #   --preview
 
   ## FULL RUN
-  echo ""
-  echo "=== FULL RUN ==="
-  echo "[RUN] CUDA_VISIBLE_DEVICES=${CUDA_DEVICE} python main_mixedcode_benchmark.py \\"
-  echo "        --benchmark_root \"${BENCHMARK_ROOT}\" \\"
-  echo "        --base_model_name \"${BASE_MODEL_NAME}\" \\"
-  echo "        --output_name mixedcode_${GEN_MODEL}_50files"
-  echo ""
+  # echo ""
+  # echo "=== FULL RUN ==="
+  # echo "[RUN] CUDA_VISIBLE_DEVICES=${CUDA_DEVICE} python main_mixedcode_benchmark.py \\"
+  # echo "        --benchmark_root \"${BENCHMARK_ROOT}\" \\"
+  # echo "        --base_model_name \"${BASE_MODEL_NAME}\" \\"
+  # echo "        --output_name mixedcode_${GEN_MODEL}_50files"
+  # echo ""
   
+  # CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}" python main_mixedcode_benchmark.py \
+  #   --benchmark_root "${BENCHMARK_ROOT}" \
+  #   --base_model_name "${BASE_MODEL_NAME}" \
+  #   --output_name "mixedcode_${GEN_MODEL}_50files"
+
   CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}" python main_mixedcode_benchmark.py \
     --benchmark_root "${BENCHMARK_ROOT}" \
-    --base_model_name "${BASE_MODEL_NAME}" \
-    --output_name "mixedcode_${GEN_MODEL}_50files"
+    --load_cached_results ../logs/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_50files.pkl \
+    --report_group type10_200
+
 
 } 2>&1 | tee "${LOG_FILE}"

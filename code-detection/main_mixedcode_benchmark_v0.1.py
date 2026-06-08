@@ -316,49 +316,6 @@ def compute_youden(y_true: List[int], y_score: List[float]) -> Tuple[float, floa
     return float(thresholds[best_idx]), float(tpr[best_idx]), float(fpr[best_idx]), float(j_stat[best_idx])
 
 
-def report_group_auc(
-    results: List[Dict[str, Any]],
-    groups: Iterable[str],
-    group_field: str = "benchmark_type",
-) -> Dict[str, float]:
-    """Print and return AUROC for one or more specific groups (buckets).
-
-    ``results`` must already have an aggregated ``npr`` per function body
-    (i.e. call this after summarize_and_save, which sets r["npr"]). The
-    generator model is fixed per run via --benchmark_root, so a "group" here
-    is a benchmark_type bucket such as ``type10_200``.
-    """
-    out: Dict[str, float] = {}
-    print("\n" + "=" * 80)
-    print(f"Per-group AUROC (group_field={group_field})")
-    print("=" * 80)
-    for group in groups:
-        group = str(group).strip()
-        if not group:
-            continue
-        sub = [
-            r for r in results
-            if str(r.get(group_field)) == group and not math.isnan(float(r.get("npr", float("nan"))))
-        ]
-        if not sub:
-            print(f"  {group:14s} : no valid scored rows (group not found?)")
-            out[group] = float("nan")
-            continue
-
-        y_true = [int(r["label"]) for r in sub]
-        y_score = [float(r["npr"]) for r in sub]
-        n_hwc = sum(1 for t in y_true if t == 0)
-        n_agc = sum(1 for t in y_true if t == 1)
-        auc = compute_auc(y_true, y_score)
-        out[group] = auc
-        print(
-            f"  {group:14s} : AUROC={auc:.4f}  (n_hwc={n_hwc}, n_agc={n_agc}, "
-            f"n_total={len(sub)})"
-        )
-    print("=" * 80)
-    return out
-
-
 def summarize_and_save(
     results: List[Dict[str, Any]],
     output_csv: Path,
@@ -512,10 +469,6 @@ def main() -> None:
     parser.add_argument("--results_cache", type=str, default=None)
     parser.add_argument("--load_cached_results", type=str, default=None,
                         help="Skip scoring and load cached per-function chunk results.")
-    parser.add_argument("--report_group", type=str, default=None,
-                        help="Comma-separated benchmark_type bucket(s) to report a "
-                             "focused AUROC for, e.g. 'type10_200'. The generator "
-                             "model is already fixed by --benchmark_root.")
     parser.add_argument("--limit_files", type=int, default=None,
                         help="Debug: only load first N JSON sidecars.")
     parser.add_argument("--limit_functions", type=int, default=None,
@@ -543,8 +496,6 @@ def main() -> None:
         with load_cache.open("rb") as f:
             results = pickle.load(f)
         summarize_and_save(results, output_csv, chunk_csv, cli.aggregate)
-        if cli.report_group:
-            report_group_auc(results, cli.report_group.split(","))
         return
 
     examples = load_mixedcode_functions(
@@ -621,8 +572,6 @@ def main() -> None:
 
     torch.cuda.empty_cache()
     summarize_and_save(results, output_csv, chunk_csv, cli.aggregate)
-    if cli.report_group:
-        report_group_auc(results, cli.report_group.split(","))
 
 
 if __name__ == "__main__":
