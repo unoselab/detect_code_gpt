@@ -62,66 +62,6 @@ def load_base_model_and_tokenizer(args, model_config):
         )
         # NOTE: do not call base_model.to(args.DEVICE) after device_map="auto".
 
-    elif 'gemma' in name.lower():
-        # 2026-06-08 msong: Gemma 4 31B does not fit on one 48GB A6000.
-        # The generic loader below loads on CPU and then calls .to(cuda), which
-        # attempts to move the entire model to CUDA device 0 and OOMs. Mirror the
-        # GPT-OSS/StarCoder large-model pattern: use Accelerate device_map="auto"
-        # with explicit per-GPU memory caps, and DO NOT call base_model.to(...)
-        # after from_pretrained(..., device_map="auto").
-        print(f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}")
-        print(f"torch.cuda.device_count()={torch.cuda.device_count()}")
-
-        n_gpu = torch.cuda.device_count()
-        if n_gpu == 0:
-            raise RuntimeError(
-                "No CUDA GPU visible for Gemma scoring. "
-                f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}"
-            )
-
-        gpu_mem_gib = [
-            torch.cuda.get_device_properties(i).total_memory / 1024**3
-            for i in range(n_gpu)
-        ]
-        print(f"Visible GPU memory GiB: {[round(x, 1) for x in gpu_mem_gib]}")
-
-        is_large_gemma = any(tag in name.lower() for tag in ("31b", "27b", "gemma-4"))
-        if is_large_gemma and n_gpu < 3:
-            raise RuntimeError(
-                "Large Gemma scoring should use the 3 visible A6000 GPUs for "
-                "weights plus activation/KV-cache headroom. "
-                f"Got torch.cuda.device_count()={n_gpu}, "
-                f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}"
-            )
-
-        dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-        # Leave room for activations, perturbation batches, and allocator overhead.
-        max_memory = {}
-        for i, mem in enumerate(gpu_mem_gib):
-            if mem >= 47:
-                max_memory[i] = "42GiB"
-            elif mem >= 23:
-                max_memory[i] = "20GiB"
-            else:
-                max_memory[i] = f"{int(max(1, mem - 4))}GiB"
-        max_memory["cpu"] = os.environ.get("GEMMA_CPU_MAX_MEMORY", "128GiB")
-
-        print(
-            f"Using Gemma multi-GPU loader; visible GPUs={n_gpu}, "
-            f"dtype={dtype}, max_memory={max_memory}"
-        )
-
-        base_model = transformers.AutoModelForCausalLM.from_pretrained(
-            name,
-            cache_dir=model_config["cache_dir"],
-            trust_remote_code=True,
-            torch_dtype=dtype,
-            device_map="auto",
-            max_memory=max_memory,
-            low_cpu_mem_usage=True,
-        )
-        # NOTE: do not call base_model.to(args.DEVICE) after device_map="auto".
-
     elif '20b' in name:
         config = transformers.AutoConfig.from_pretrained("EleutherAI/gpt-neox-20b")
         with init_empty_weights():
