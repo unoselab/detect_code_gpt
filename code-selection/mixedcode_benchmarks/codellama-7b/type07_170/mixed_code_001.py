@@ -1,131 +1,146 @@
-def agc_mixed_001_01(self, bucket_name, bucket_region, storage_type, statistic, days):
-        """ Returns datapoints from cloudwatch for bucket statistics.
+def hwc_mixed_001_01(sub_parser: ArgumentParser) -> ArgumentParser:
+    """Populates the sub parser with the shell arguments"""
 
-        Args:
-            bucket_name `(str)`: The name of the bucket
-            statistic `(str)`: The statistic you want to fetch from
-            days `(int)`: Sample period for the statistic
+    sub_parser.add_argument(
+        '-p', '--project',
+        dest='project_directory',
+        type=str,
+        default=None
+    )
 
+    sub_parser.add_argument(
+        '-l', '--log',
+        dest='logging_path',
+        type=str,
+        default=None
+    )
+
+    sub_parser.add_argument(
+        '-o', '--output',
+        dest='output_directory',
+        type=str,
+        default=None
+    )
+
+    sub_parser.add_argument(
+        '-s', '--shared',
+        dest='shared_data_path',
+        type=str,
+        default=None
+    )
+
+    return sub_parser 
+
+def agc_mixed_001_02(self, lat, lon):
+        """Get the altitude of a lat lon pair, using the four neighbouring
+            pixels for interpolation.
         """
+        # print "-----\nFromLatLon", lon, lat
+        lat_min = lat - self.lat_step
+        lat_max = lat + self.lat_step
+        lon_min = lon - self.lon_step
+        lon_max = lon + self.lon_step
+        # get the four neighbouring altitudes
+        alt_min = self.getAltitude(lat_min, lon_min)
+        alt_max = self.getAltitude(lat_max, lon_max)
+        alt_min_2 = self.getAltitude(lat_min, lon)
+        alt_max_2 = self.getAltitude(lat_max, lon)
+        # interpolate the altitude
+        alt = alt_min + (alt_max - alt_min) * (lat - lat_min) / (lat_max - lat_min)
+        alt = alt + (alt_max_2 - alt) * (lon - lon_min) / (lon_max - lon_min)
+        return alt 
 
-        try:
-            # Get the bucket region
-            region = self.get_bucket_region(bucket_name)
-            # Get the bucket statistics
-            statistics = self.get_bucket_statistics(bucket_name, bucket_region, storage_type, statistic, days)
-            # Return the statistics
-            return statistics
-        except Exception as e:
-            # Log the exception
-            self.logger.exception(e)
-            # Raise the exception
-            raise 
+def hwc_mixed_001_03(self, plaintext):
+        """Return ciphertext for given plaintext."""
 
-def hwc_mixed_001_02(self, path):
-        """
-        Load cookies from the file.
+        # String to bytes.
+        plainbytes = plaintext.encode('utf8')
 
-        Content of file should be a JSON-serialized list of dicts.
-        """
+        # Compress plaintext bytes.
+        compressed = zlib.compress(plainbytes)
 
-        with open(path) as inf:
-            data = inf.read()
-            if data:
-                items = json.loads(data)
-            else:
-                items = {}
-        for item in items:
-            extra = dict((x, y) for x, y in item.items()
-                         if x not in ['name', 'value', 'domain'])
-            self.set(item['name'], item['value'], item['domain'], **extra) 
+        # Construct AES-GCM cipher, with 96-bit nonce.
+        cipher = AES.new(self.cipher_key, AES.MODE_GCM, nonce=random_bytes(12))
 
-def agc_mixed_001_03(self, val):
-        """Helper function to format a value."""
-        if isinstance(val, str):
-            return val
-        elif isinstance(val, bool):
-            return 'true' if val else 'false'
-        elif isinstance(val, int):
-            return str(val)
-        elif isinstance(val, float):
-            return str(val)
-        elif isinstance(val, list):
-            return ','.join(val)
-        elif isinstance(val, dict):
-            return ','.join(val.keys())
-        else:
-            raise ValueError('Invalid value type: {}'.format(type(val))) 
+        # Encrypt and digest.
+        encrypted, tag = cipher.encrypt_and_digest(compressed)
 
-def agc_mixed_001_04(self, tops):
-        """
-        The default merging strategy. The base env is authoritative, so it is
-        checked first, followed by the remaining environments. In top files
-        from environments other than "base", only the section matching the
-        environment from the top file will be considered, and it too will be
-        ignored if that environment was defined in the "base" top file.
-        """
-        merged = {}
-        for top in tops:
-            for section, items in top.items():
-                if section == "base":
-                    merged.update(items)
-                elif section in merged:
-                    merged[section].update(items)
-                else:
-                    merged[section] = items
-        return merged 
+        # Combine with nonce.
+        combined = cipher.nonce + tag + encrypted
 
-def hwc_mixed_001_05(p):
-    """ function_body : program_co END FUNCTION
-                      | program_co END SUB
-                      | statements_co END FUNCTION
-                      | statements_co END SUB
-                      | co_statements_co END FUNCTION
-                      | co_statements_co END SUB
-                      | END FUNCTION
-                      | END SUB
+        # Encode as Base64.
+        cipherbytes = base64.b64encode(combined)
+
+        # Bytes to string.
+        ciphertext = cipherbytes.decode('utf8')
+
+        # Return ciphertext.
+        return ciphertext 
+
+def agc_mixed_001_04():
     """
-    if not FUNCTION_LEVEL:
-        syntax_error(p.lineno(3), "Unexpected token 'END %s'. No Function or Sub has been defined." % p[2])
-        p[0] = None
-        return
+    Build an argument parser using optparse. Use it when python version is 2.5 or 2.6.
 
-    a = FUNCTION_LEVEL[-1].kind
-    if a not in (KIND.sub, KIND.function):  # This function/sub was not correctly declared, so exit now
-        p[0] = None
-        return
-
-    i = 2 if p[1] == 'END' else 3
-    b = p[i].lower()
-
-    if a != b:
-        syntax_error(p.lineno(i), "Unexpected token 'END %s'. Should be 'END %s'" % (b.upper(), a.upper()))
-        p[0] = None
-    else:
-        p[0] = None if p[1] == 'END' else p[1] 
-
-def hwc_mixed_001_06(keyword, feature, parent):
-    """Given a keyword, it will return the value of the keyword
-    from the hazard layer's extra keywords.
-
-    For instance:
-    *   hazard_extra_keyword( 'depth' ) -> will return the value of 'depth'
-        in current hazard layer's extra keywords.
     """
-    _ = feature, parent  # NOQA
-    hazard_layer_path = QgsExpressionContextUtils. \
-        projectScope(QgsProject.instance()).variable(
-          'hazard_layer')
-    hazard_layer = load_layer(hazard_layer_path)[0]
-    keywords = KeywordIO.read_keywords(hazard_layer)
-    extra_keywords = keywords.get('extra_keywords')
-    if extra_keywords:
-        value = extra_keywords.get(keyword)
-        if value:
-            value_definition = definition(value)
-            if value_definition:
-                return value_definition['name']
-            return value
+    parser = optparse.OptionParser(usage="usage: %prog [options]")
+    parser.add_option("-i", "--input", dest="input",
+                      help="Input file")
+    parser.add_option("-o", "--output", dest="output",
+                      help="Output file")
+    parser.add_option("-t", "--type", dest="type",
+                      help="Type of the input file")
+    parser.add_option("-f", "--format", dest="format",
+                      help="Format of the output file")
+    parser.add_option("-d", "--debug", dest="debug",
+                      help="Debug mode", action="store_true")
+    return parser 
+
+def hwc_mixed_001_05(deps, tree_base, saltenv='base'):
+    """
+    Get include string for list of dependent rpms to build package
+    """
+    deps_list = ''
+    if deps is None:
+        return deps_list
+    if not isinstance(deps, list):
+        raise SaltInvocationError(
+            '\'deps\' must be a Python list or comma-separated string'
+        )
+    for deprpm in deps:
+        parsed = _urlparse(deprpm)
+        depbase = os.path.basename(deprpm)
+        dest = os.path.join(tree_base, depbase)
+        if parsed.scheme:
+            __salt__['cp.get_url'](deprpm, dest, saltenv=saltenv)
         else:
-            return tr('Keyword %s is not found' % keyword)
-    return tr('No extra keywords found')
+            shutil.copy(deprpm, dest)
+
+        deps_list += ' {0}'.format(dest)
+
+    return deps_list 
+
+def agc_mixed_001_06 (self, current_password, new_password):
+        """
+            Change the password for the current user
+
+            @param current_password (string) - md5 hash of the current password of the user
+            @param new_password (string) - md5 hash of the new password of the user (make sure to doublecheck!)
+
+            @return (bool) - Boolean indicating whether ChangePassword was successful.
+        """
+        if self.UsersCheckPassword (current_password) == True:
+
+            # Check if the new password is valid
+            if self.UsersCheckPassword (new_password) == True:
+
+                # Change the password
+                self.Users.password = new_password
+
+                # Return True
+                return True
+
+            # Return False
+            return False
+
+        # Return False
+        return False

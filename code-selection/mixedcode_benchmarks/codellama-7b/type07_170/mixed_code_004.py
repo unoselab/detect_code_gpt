@@ -1,123 +1,134 @@
-def hwc_mixed_004_01(variant_dict=None, variant_line=None):
-    """Build a variant id
-
-        The variant id is a string made of CHROM_POS_REF_ALT
-
-        Args:
-            variant_dict (dict): A variant dictionary
-
-        Returns:
-            variant_id (str)
-    """
-
-    if variant_dict:
-        chrom = variant_dict['CHROM']
-        position = variant_dict['POS']
-        ref = variant_dict['REF']
-        alt = variant_dict['ALT']
-    elif variant_line:
-        splitted_line = variant_line.rstrip().split('\t')
-        chrom = splitted_line[0]
-        position = splitted_line[1]
-        ref = splitted_line[3]
-        alt = splitted_line[4]
-    else:
-        raise Exception("Have to provide variant dict or variant line")
-
-    return '_'.join([
-        chrom,
-        position,
-        ref,
-        alt,
-    ]) 
-
-def agc_mixed_004_02(self,
-             regexp, negate_regexp=False,
-             class_pattern=None,
-             find_fnc=re.search,
-             refresh_cache=False):
-        """
-        yield the full path of the matching regular expression and the
-        match itself
-        """
-        if refresh_cache:
-            self.refresh_cache()
-        for path in self.cache:
-            if class_pattern:
-                if not class_pattern.match(path):
-                    continue
-            match = find_fnc(regexp, path)
-            if match:
-                yield path, match
-            elif negate_regexp:
-                yield path, match 
-
-def agc_mixed_004_03(self, block_1st2nd, block_1st, block_2nd, block_3rd):
-        """Takes into account whether we need to output all codon positions."""
-        if self.codon_positions:
-            block_1st2nd = block_1st2nd.replace(' ', '')
-            block_1st = block_1st.replace(' ', '')
-            block_2nd = block_2nd.replace(' ', '')
-            block_3rd = block_3rd.replace(' ', '')
+def agc_mixed_004_01(self, use_dict=None, as_class=dict):
+        """Return the contents of an object as a dict."""
+        if use_dict is None:
+            use_dict = {}
+        if self.is_empty():
+            return use_dict
+        if self.is_list():
+            for item in self:
+                item.bvlpdu_contents(use_dict, as_class)
         else:
-            block_1st2nd = block_1st2nd.replace(' ', '').replace('-', '')
-            block_1st = block_1st.replace(' ', '').replace('-', '')
-            block_2nd = block_2nd.replace(' ', '').replace('-', '')
-            block_3rd = block_3rd.replace(' ', '').replace('-', '')
-        return block_1st2nd, block_1st, block_2nd, block_3rd 
+            if self.is_container():
+                use_dict[self.name] = as_class()
+            for key, value in self.items():
+                value.bvlpdu_contents(use_dict[self.name], as_class)
+        return use_dict 
 
-def hwc_mixed_004_04(deps, tree_base, saltenv='base'):
-    """
-    Get include string for list of dependent rpms to build package
-    """
-    deps_list = ''
-    if deps is None:
-        return deps_list
-    if not isinstance(deps, list):
-        raise SaltInvocationError(
-            '\'deps\' must be a Python list or comma-separated string'
-        )
-    for deprpm in deps:
-        parsed = _urlparse(deprpm)
-        depbase = os.path.basename(deprpm)
-        dest = os.path.join(tree_base, depbase)
-        if parsed.scheme:
-            __salt__['cp.get_url'](deprpm, dest, saltenv=saltenv)
-        else:
-            shutil.copy(deprpm, dest)
+def hwc_mixed_004_02(self, session_cookies):
+        """Loads session cookies
 
-        deps_list += ' {0}'.format(dest)
-
-    return deps_list 
-
-def hwc_mixed_004_05(self):
-        """On Windows we use a pipe to emulate a Linux style character
-        buffer."""
-        if self._evdev:
-            return None
-
-        if not self.__pipe:
-            target_function = self._get_target_function()
-            if not target_function:
-                return None
-
-            self.__pipe, child_conn = Pipe(duplex=False)
-            self._listener = Process(target=target_function,
-                                     args=(child_conn,), daemon=True)
-            self._listener.start()
-        return self.__pipe 
-
-def agc_mixed_004_06(self, pool):
-        """AddAgentPool.
-        [Preview API] Create an agent pool.
-        :param :class:`<TaskAgentPool> <azure.devops.v5_1.task_agent.models.TaskAgentPool>` pool: Details about the new agent pool
-        :rtype: :class:`<TaskAgentPool> <azure.devops.v5_1.task-agent.models.TaskAgentPool>`
+        :param session_cookies: A dictionay containing session cookies
+        :type session_cookies: dict
+        :return: False if `session_cookies` does not contain proper cookies
+        :rtype: bool
         """
-        route_values = {}
-        content = self._serialize.body(pool, 'TaskAgentPool')
-        response = self._send(http_method='POST',
-                              location_id='0cd358e1-9217-4d94-8265-8694e4e40690',
-                              version='5.1-preview.1',
-                              route_values=route_values,
-                              content=content)
-        return self._deserialize('TaskAgentPool', response)
+        # Quick check to see if session_cookies is formatted properly
+        if not session_cookies or "c_user" not in session_cookies:
+            return False
+
+        try:
+            # Load cookies into current session
+            self._session.cookies = requests.cookies.merge_cookies(
+                self._session.cookies, session_cookies
+            )
+            self._postLogin()
+        except Exception as e:
+            log.exception("Failed loading session")
+            self._resetValues()
+            return False
+        return True 
+
+def hwc_mixed_004_03(self, val_list):
+        """Formats value list from Munin Graph and returns multi-line value
+        entries for the plugin fetch cycle.
+
+        @param val_list: List of name-value pairs. 
+        @return:         Multi-line text.
+
+        """
+        vals = []
+        for (name, val) in val_list:
+            if val is not None:
+                if isinstance(val, float):
+                    vals.append("%s.value %f" % (name, val))
+                else:
+                    vals.append("%s.value %s" % (name, val))
+            else:
+                vals.append("%s.value U" % (name,))
+        return "\n".join(vals) 
+
+def hwc_mixed_004_04(json_data):
+    """
+    return a list of GradDegree objects.
+    """
+    requests = []
+    for item in json_data:
+        degree = GradDegree()
+        degree.degree_title = item["degreeTitle"]
+        degree.exam_place = item["examPlace"]
+        degree.exam_date = parse_datetime(item.get("examDate"))
+        degree.req_type = item["requestType"]
+        degree.major_full_name = item["majorFullName"]
+        degree.submit_date = parse_datetime(item.get("requestSubmitDate"))
+        degree.decision_date = parse_datetime(item.get('decisionDate'))
+        degree.status = item["status"]
+        degree.target_award_year = item["targetAwardYear"]
+        if item.get("targetAwardQuarter")and\
+           len(item.get("targetAwardQuarter")):
+            degree.target_award_quarter = item["targetAwardQuarter"].lower()
+
+        requests.append(degree)
+    return requests 
+
+def agc_mixed_004_05(self, job_id, timeout=None):
+        """
+        Wait for the job given by job_id to change to COMPLETED or CANCELED. Raises a
+        iceqube.exceptions.TimeoutError if timeout is exceeded before each job change.
+
+        :param job_id: the id of the job to wait for.
+        :param timeout: how long to wait for a job state change before timing out.
+        """
+        if timeout is None:
+            timeout = self.timeout
+
+        start_time = time.time()
+        while True:
+            job = self.get_job(job_id)
+            if job.state == 'COMPLETED' or job.state == 'CANCELED':
+                return job
+            elif time.time() - start_time > timeout:
+                raise TimeoutError('Timeout exceeded while waiting for job to complete')
+            else:
+                time.sleep(1) 
+
+def agc_mixed_004_06(access_token, ams_account, key_delivery_url):
+    """Create Media Service Asset Delivery Policy.
+
+    Args:
+        access_token (str): A valid Azure authentication token.
+        ams_account (str): Media Service Account.
+
+    Returns:
+        HTTP response. JSON body.
+    """
+    headers = {
+        "Authorization": "Bearer " + access_token,
+        "Content-Type": "application/json"
+    }
+
+    body = {
+        "policyId": "AssetDeliveryPolicy",
+        "assetDeliveryProtocol": "SmoothStreaming",
+        "assetDeliveryPolicyType": "AssetDeliveryPolicy",
+        "assetDeliveryConfiguration": {
+            "keyDeliveryConfiguration": {
+                "keyDeliveryType": "PlayReadyLicense",
+                "playReadyLicenseAcquisitionUrl": key_delivery_url
+            }
+        }
+    }
+
+    url = "https://" + ams_account + ".restv2.westcentralus.media.azure.net/api/Assets('nb:cid:UUID:2d0d78a2-685a-4b14-9cf0-9afb0bb5dbfc')/DeliveryPolicies"
+
+    response = requests.post(url, headers=headers, json=body)
+    return response.json()

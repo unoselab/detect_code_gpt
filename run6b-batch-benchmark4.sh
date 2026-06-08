@@ -115,15 +115,17 @@ mkdir -p "${LOG_DIR}" "${OUTPUT_ROOT}"
   # CUDA_VISIBLE_DEVICES=0 python main_mixedcode_benchmark.py \
   #   --benchmark_root ../code-selection/mixedcode_benchmarks/codellama-7b \
   #   --base_model_name codellama/CodeLlama-7b-hf \
-  #   --only_group type06_160 \
-  #   --output_name mixedcode_codellama-7b_type10_200_merged \
-  #   --report_group type06_160
+  #   --only_group type07_170 \
+  #   --output_name mixedcode_codellama-7b_type07_170_merged \
+  #   --report_group type07_170
 
   # To update the group `type10_200` in place inside the 50files cache:
+  # --only_group type06_160 \
+  # --only_group type10_200 \
   CUDA_VISIBLE_DEVICES=0 python main_mixedcode_benchmark.py \
     --benchmark_root "${BENCHMARK_ROOT}" \
     --base_model_name "${BASE_MODEL_NAME}" \
-    --only_group type10_200 \
+    --only_group type07_170 \
     --update_cache ../logs/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_50files.pkl \
     --output_name "mixedcode_${GEN_MODEL}_50files"
 

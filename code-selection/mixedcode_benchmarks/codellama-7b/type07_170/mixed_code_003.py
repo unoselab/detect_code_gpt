@@ -1,168 +1,124 @@
-def agc_mixed_003_01(certificate):
+def agc_mixed_003_01(input, format=None):
+    """ Returns a case object from the given input file object. The data
+    format may be optionally specified.
     """
-    Returns a dict containing details of a certificate. Input can be a PEM
-    string or file path.
+    # Map of data file types to readers.
+    if format is None:
+        format = input.readline().strip()
+    if format == 'json':
+        return read_json(input)
+    elif format == 'yaml':
+        return read_yaml(input)
+    elif format == 'xml':
+        return read_xml(input)
+    elif format == 'csv':
+        return read_csv(input)
+    elif format == 'tsv':
+        return read_tsv(input)
+    elif format == 'xlsx':
+        return read_xlsx(input)
+    elif format == 'xls':
+        return read_xls(input)
+    elif format == 'txt':
+        return read_txt(input)
+    else:
+        raise ValueError('Unknown format: %s' % format) 
 
-    certificate:
-        The certificate to be read. Can be a path to a certificate file, or
-        a string containing the PEM formatted text of the certificate.
-
-    CLI Example:
-
-    .. code-block:: bash
-
-        salt '*' x509.read_certificate /etc/pki/mycert.crt
-    """
-    if os.path.isfile(certificate):
-        with salt.utils.files.fopen(certificate, "r") as _certificate:
-            certificate = _certificate.read()
-    try:
-        cert = M2Crypto.X509.load_cert_string(certificate)
-    except M2Crypto.X509.X509Error as err:
-        raise CommandExecutionError(err)
-    return {
-        "subject": cert.get_subject().as_text(),
-        "issuer": cert.get_issuer().as_text(),
-        "not_before": cert.get_not_before().as_tuple(),
-        "not_after": cert.get_not_after().as_tuple(),
-        "serial_number": cert.get_serial_number(),
-        "version": cert.get_version(),
-        "signature_algorithm": cert.get_signature_algorithm(),
-        "signature": cert.get_signature(),
-        "public_key": cert.get_pubkey().as_text(),
-        "extensions": cert.get_extensions(),
-    } 
-
-def hwc_mixed_003_02(self, block, file_info):
-        """
-        new content from file_info can be added into block iff
-        - file count limit hasn't been reached for the block
-        - there is enough space to completely fit the info into the block
-        - OR the info can be split and some info can fit into the block
-        """
-        return ((self._max_files_per_container == 0 or self._max_files_per_container > len(block.content_file_infos))
-                and (self.does_content_fit(file_info, block)
-                     or
-                     # check if we can fit some content by splitting the file
-                     # Note: if max size was unlimited, does_content_fit would have been True
-                     (block.content_size < self._max_container_content_size_in_bytes
-                      and (self._should_split_small_files or not self._is_small_file(file_info))))) 
-
-def hwc_mixed_003_03(self, attr_name, prefix=None):
-        """Write attribute's value to a file.
-
-        :param str attr_name:
-            Attribute's name to be logged
-
-        :param str prefix:
-            Optional. Attribute's name that is prefixed to logging message,
-            defaults to ``None``.
-
-        :returns: message written to file
-        :rtype: str
-        """
-        if self._folder is None:
-            return
-
-        separator = "\t"
-        attr = getattr(self.obj, attr_name)
-        if hasattr(attr, '__iter__'):
-            msg = separator.join([str(e) for e in attr])
+def hwc_mixed_003_02(self, value, store_type):
+        """Save the key value base on it's storage type."""
+        self._store_type = store_type
+        if store_type == PUBLIC_KEY_STORE_TYPE_HEX:
+            self._value = value.hex()
+        elif store_type == PUBLIC_KEY_STORE_TYPE_BASE64:
+            self._value = b64encode(value).decode()
+        elif store_type == PUBLIC_KEY_STORE_TYPE_BASE85:
+            self._value = b85encode(value).decode()
+        elif store_type == PUBLIC_KEY_STORE_TYPE_JWK:
+            # TODO: need to decide on which jwk library to import?
+            raise NotImplementedError
         else:
-            msg = str(attr)
+            self._value = value
+        return value 
 
-        if prefix is not None:
-            msg = "{}\t{}".format(getattr(self.obj, prefix), msg)
+def agc_mixed_003_03(self, data):
+        """ Processes a received STATUS message and notifies listeners. """
+        if data.get('status') == 'OK':
+            self._status = 'OK'
+        elif data.get('status') == 'ERROR':
+            self._status = 'ERROR'
+        elif data.get('status') == 'WARNING':
+            self._status = 'WARNING'
+        elif data.get('status') == 'UNKNOWN':
+            self._status = 'UNKNOWN'
+        else:
+            self._status = 'UNKNOWN'
 
-        path = self.get_file(attr_name)
-        with open(path, 'a') as f:
-            f.write("{}\n".format(msg))
+        self._status_message = data.get('message')
+        self._status_code = data.get('code')
+        self._status_data = data.get('data')
 
-        return msg 
+        self._notify_status_listeners() 
 
-def agc_mixed_003_04(name, value, persist=False):
-    """
-    Set up an SELinux boolean
+def agc_mixed_003_04(self, release):
+        """Copy the workfile of the given release to the releasefile location
 
-    name
-        The name of the boolean to set
+        This is inteded to be used in a action unit.
 
-    value
-        The value to set on the boolean
-
-    persist
-        Defaults to False, set persist to true to make the boolean apply on a
-        reboot
-    """
-    ret = {"name": name, "result": True, "comment": "", "changes": {}}
-
-    if __salt__["selinux.getboolean"](name) == value:
-        ret["comment"] = "SELinux boolean {} already set to {}".format(name, value)
-        return ret
-
-    if __opts__["test"]:
-        ret["comment"] = "SELinux boolean {} will be set to {}".format(name, value)
-        ret["result"] = None
-        return ret
-
-    if __salt__["selinux.setboolean"](name, value, persist):
-        ret["comment"] = "SELinux boolean {} set to {}".format(name, value)
-        ret["changes"] = {"old": __salt__["selinux.getboolean"](name), "new": value}
-    else:
-        ret["comment"] = "Failed to set SELinux boolean {} to {}".format(name, value)
-        ret["result"] = False
-
-    return ret 
-
-def hwc_mixed_003_05(self):
-    """
-    Export a DataFrame from the front-end visualization. For instance, a user
-    can filter to show only a single cluster using the dendrogram and then
-    get a dataframe of this cluster using the widget_df method.
-    """
-
-    if hasattr(self, 'widget_instance') == True:
-
-      if self.widget_instance.mat_string != '':
-
-        tmp_net = deepcopy(Network())
-
-        df_string = self.widget_instance.mat_string
-
-        tmp_net.load_file_as_string(df_string)
-
-        df = tmp_net.export_df()
-
-        return df
-
-      else:
-        return self.export_df()
-
-    else:
-      if hasattr(self, 'widget_class') == True:
-        print('Please make the widget before exporting the widget DataFrame.')
-        print('Do this using the widget method: net.widget()')
-
-      else:
-        print('Can not make widget because Network has no attribute widget_class')
-        print('Please instantiate Network with clustergrammer_widget using: Network(clustergrammer_widget)') 
-
-def agc_mixed_003_06(self, conn):
+        :param release: the release with the release and workfile
+        :type release: :class:`Release`
+        :returns: an action status
+        :rtype: :class:`ActionStatus`
+        :raises: None
         """
-        Create the version table into an already populated database
-        and insert the base script.
+        if release.workfile is None:
+            return ActionStatus.failure("No workfile for release")
 
-        :param conn: a DB API 2 connection
-        """
-        conn.execute("""
-            CREATE TABLE version (
-                id INTEGER PRIMARY KEY,
-                version TEXT NOT NULL,
-                script TEXT NOT NULL,
-                UNIQUE (version)
-            );
-        """)
-        conn.execute("""
-            INSERT INTO version (version, script)
-            VALUES (?, ?);
-        """, ("0.0.0", "base"))
+        if release.releasefile is not None:
+            return ActionStatus.failure("Releasefile already exists")
+
+        if release.workfile.path is None:
+            return ActionStatus.failure("No path for workfile")
+
+        if not os.path.exists(release.workfile.path):
+            return ActionStatus.failure("Workfile does not exist")
+
+        try:
+            shutil.copy(release.workfile.path, release.releasefile.path)
+        except Exception as e:
+            return ActionStatus.failure(str(e))
+
+        return ActionStatus.success() 
+
+def hwc_mixed_003_05(fin_src, fout):
+    """Download a file from an ftp server"""
+    assert fin_src[:6] == 'ftp://', fin_src
+    dir_full, fin_ftp = os.path.split(fin_src[6:])
+    pt0 = dir_full.find('/')
+    assert pt0 != -1, pt0
+    ftphost = dir_full[:pt0]
+    chg_dir = dir_full[pt0+1:]
+    print('FTP RETR {HOST} {DIR} {SRC} -> {DST}'.format(
+        HOST=ftphost, DIR=chg_dir, SRC=fin_ftp, DST=fout))
+    ftp = FTP(ftphost)  # connect to host, default port      ftp.ncbi.nlm.nih.gov
+    ftp.login()         # user anonymous, passwd anonymous@
+    ftp.cwd(chg_dir)    # change into "debian" directory     gene/DATA
+    cmd = 'RETR {F}'.format(F=fin_ftp)   #                   gene2go.gz
+    ftp.retrbinary(cmd, open(fout, 'wb').write)  #           /usr/home/gene2go.gz
+    ftp.quit() 
+
+def hwc_mixed_003_06(self):
+        """Returns tuple key rect of above left cell"""
+
+        key_above_left = self.row - 1, self.col - 1, self.tab
+
+        border_width_right = \
+            float(self.cell_attributes[key_above_left]["borderwidth_right"]) \
+            / 2.0
+        border_width_bottom = \
+            float(self.cell_attributes[key_above_left]["borderwidth_bottom"]) \
+            / 2.0
+
+        rect_above_left = (self.x-border_width_right,
+                           self.y-border_width_bottom,
+                           border_width_right, border_width_bottom)
+        return key_above_left, rect_above_left

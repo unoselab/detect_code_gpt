@@ -88,7 +88,7 @@ mkdir -p "${LOG_DIR}"
   python generate_mixedcode_benchmark.py \
     --input_csv "$INPUT_CSV" \
     --out_dir ../code-selection/mixedcode_benchmarks/codellama-7b \
-    --only_targets 160 \
+    --only_targets 170 \
     --bucket_width_overrides 160:11 \
     --exclude_used_dir ../code-selection/mixedcode_benchmarks/codellama-7b \
     --exclude_roles AGC \
