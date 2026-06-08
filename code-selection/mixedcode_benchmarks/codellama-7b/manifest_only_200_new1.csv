@@ -1,0 +1,2 @@
+benchmark_type,target,token_range,n_hwc_candidates,n_agc_candidates,n_files,out_dir
+type10_200_new1,200,191-200,60,6,2,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b/type10_200_new1

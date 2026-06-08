@@ -562,6 +562,51 @@ def parse_targets(s: str) -> List[int]:
     return xs
 
 
+def collect_used_source_keys(
+    scan_root: Path,
+    roles: Sequence[str],
+) -> set:
+    """Scan an existing benchmark tree for (role, source_idx) pairs in use.
+
+    Reads every ``type*/mixed_code_*.json`` sidecar under ``scan_root`` and
+    returns the set of ``(role, source_idx)`` keys whose role is listed in
+    ``roles``. Seeding the generator's ``used_keys`` with this set makes a
+    regeneration pick different source functions than the ones already on disk.
+    """
+    roles_up = {r.strip().upper() for r in roles if r.strip()}
+    used: set = set()
+    if not scan_root.exists():
+        print(f"[WARN] --exclude_used_dir not found, nothing excluded: {scan_root}")
+        return used
+
+    for json_path in sorted(scan_root.glob("type*/mixed_code_*.json")):
+        try:
+            with json_path.open("r", encoding="utf-8") as f:
+                meta = json.load(f)
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"[WARN] could not read {json_path}: {exc}")
+            continue
+        for fmeta in meta.get("functions", []):
+            source_idx = fmeta.get("source_idx")
+            if source_idx is None:
+                continue
+            role = str(fmeta.get("role", "")).upper()
+            if role in roles_up:
+                used.add((role, str(source_idx)))
+    return used
+
+
+def next_file_id(type_dir: Path) -> int:
+    """Return ``1 + highest existing mixed_code_NNN id`` in ``type_dir``."""
+    max_id = 0
+    if type_dir.exists():
+        for p in type_dir.glob("mixed_code_*.py"):
+            m = re.search(r"mixed_code_(\d+)\.py$", p.name)
+            if m:
+                max_id = max(max_id, int(m.group(1)))
+    return max_id + 1
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate 6-function mixed-code benchmark .py files with JSON ground truth."
@@ -592,6 +637,46 @@ def main() -> None:
         "--keep_lm_prompt",
         action="store_true",
         help="Use the LM row's own prompt instead of replacing it with the human prompt. Default uses human prompt for AGC body.",
+    )
+    parser.add_argument(
+        "--only_targets",
+        type=parse_targets,
+        default=None,
+        help="Regenerate only these bucket upper bounds (must be a subset of "
+             "--targets). Type index and bucket boundaries stay identical to a "
+             "full run, e.g. --only_targets 200 regenerates type10_200.",
+    )
+    parser.add_argument(
+        "--exclude_used_dir",
+        type=str,
+        default=None,
+        help="Scan this existing benchmark tree (type*/mixed_code_*.json) and "
+             "avoid re-selecting the same source functions, so regenerated files "
+             "get fresh code. Usually the same path as --out_dir.",
+    )
+    parser.add_argument(
+        "--exclude_roles",
+        type=str,
+        default="AGC",
+        help="Comma-separated roles to treat as already-used when "
+             "--exclude_used_dir is set. Default: AGC (only avoid reusing AGC "
+             "functions). Pass 'AGC,HWC' to make every function fresh.",
+    )
+    parser.add_argument(
+        "--append",
+        action="store_true",
+        help="Preserve existing mixed_code_*.py files and continue numbering "
+             "after the highest existing id per type dir, instead of starting at "
+             "001 (which would overwrite existing files).",
+    )
+    parser.add_argument(
+        "--type_suffix",
+        type=str,
+        default="",
+        help="Append a suffix to the type folder name so regenerated files go "
+             "into a fresh directory instead of an existing one, e.g. "
+             "--type_suffix new1 writes type10_200_new1/. Numbering starts at "
+             "001 in the new folder and benchmark_type is labeled accordingly.",
     )
     args = parser.parse_args()
 
@@ -631,11 +716,36 @@ def main() -> None:
     if not args.no_shuffle_candidates:
         rng.shuffle(candidates)
 
+    only_set: Optional[set] = None
+    if args.only_targets:
+        only_set = set(args.only_targets)
+        unknown = only_set - set(args.targets)
+        if unknown:
+            raise ValueError(
+                f"--only_targets values {sorted(unknown)} are not in --targets "
+                f"{args.targets}; cannot infer their type index. Add them to "
+                f"--targets or correct the values."
+            )
+
     used_keys = set()
+    if args.exclude_used_dir:
+        exclude_root = Path(args.exclude_used_dir).expanduser()
+        exclude_roles = [r for r in args.exclude_roles.split(",") if r.strip()]
+        seeded = collect_used_source_keys(exclude_root, exclude_roles)
+        used_keys |= seeded
+        print(
+            f"Excluding {len(seeded)} already-used source function(s) "
+            f"(roles={exclude_roles}) found under {exclude_root}"
+        )
     manifest_rows: List[Dict[str, Any]] = []
 
     for type_idx, target in enumerate(args.targets, start=1):
+        if only_set is not None and target not in only_set:
+            continue
         type_name = f"type{type_idx:02d}_{target}"
+        if args.type_suffix:
+            sfx = args.type_suffix if args.type_suffix.startswith("_") else "_" + args.type_suffix
+            type_name = f"{type_name}{sfx}"
         lower = target - args.bucket_width
         token_range = f"{lower}-{target}" if type_idx == 1 else f"{lower + 1}-{target}"
         type_dir = out_root / type_name
@@ -662,8 +772,9 @@ def main() -> None:
 
         file_groups = chunk_into_files(hwc_pool, agc_pool, args.files_per_type, rng)
 
+        start_file_id = next_file_id(type_dir) if args.append else 1
         written = 0
-        for file_id, selected in enumerate(file_groups, start=1):
+        for file_id, selected in enumerate(file_groups, start=start_file_id):
             try:
                 mixed_code, meta = build_mixed_file_record(
                     selected=selected,
@@ -718,7 +829,14 @@ def main() -> None:
             f"files={written}, out={type_dir}"
         )
 
-    manifest_path = out_root / "manifest.csv"
+    if args.only_targets:
+        tag = "_".join(str(t) for t in args.only_targets)
+        if args.type_suffix:
+            sfx = args.type_suffix if args.type_suffix.startswith("_") else "_" + args.type_suffix
+            tag = f"{tag}{sfx}"
+        manifest_path = out_root / f"manifest_only_{tag}.csv"
+    else:
+        manifest_path = out_root / "manifest.csv"
     write_manifest(manifest_path, manifest_rows)
     print(f"Manifest       : {manifest_path}")
     print("=" * 80)
