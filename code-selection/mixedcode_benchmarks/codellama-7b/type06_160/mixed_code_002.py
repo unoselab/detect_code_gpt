@@ -1,206 +1,134 @@
-def hwc_mixed_002_01(self, lang, field):
-        """
-        Return the translation string of an specific field in a Translatable
-        istance
-
-        @type lang: string
-        @param lang: a string with the name of the language
-
-        @type field: string
-        @param field: a string with the name that we try to get
-
-        @rtype: string
-        @return: Returns a translation string
-        """
-        # Read from cache
-        key = self._get_translation_cache_key(lang, field)
-        trans = cache.get(key, '')
-
-        if not trans:
-            trans_obj = self.get_translation_obj(lang, field)
-            trans = getattr(trans_obj, 'translation', '')
-            # if there's no translation text fall back to the model field
-            if not trans:
-                trans = getattr(self, field, '')
-            # update cache
-            cache.set(key, trans)
-        return trans 
-
-def agc_mixed_002_02(name, value, check_keys, opts):
-    """Encode a mapping type."""
-    items = []
-    for item_key, item_value in value.items():
-        if check_keys and item_key.startswith('_'):
-            raise TypeError(
-                "Detected private key '{0}' in mapping. "
-                'Remove the underscore prefix to use it.'.format(item_key))
-        if isinstance(item_value, Mapping):
-            item_value = _encode_mapping(item_key, item_value, check_keys, opts)
-        elif isinstance(item_value, Sequence):
-            item_value = _encode_sequence(item_key, item_value, check_keys, opts)
-        items.append((item_key, item_value))
-    return {name: items} 
-
-def hwc_mixed_002_03(name):
+def agc_mixed_002_01(source=None, source_hash=None,
+                              sources=None, source_hashes=None):
     """
-    Return information about a group
-
-    Args:
-
-        name (str):
-            The name of the group for which to get information
-
-    Returns:
-        dict: A dictionary of information about the group
-
-    CLI Example:
-
-    .. code-block:: bash
-
-        salt '*' group.info foo
+    Silly little function to give us a standard tuple list for sources and
+    source_hashes
     """
-    try:
-        groupObj = _get_group_object(name)
-        gr_name = groupObj.Name
-        gr_mem = [_get_username(x) for x in groupObj.members()]
-    except pywintypes.com_error as exc:
-        msg = 'Failed to access group {0}. {1}'.format(
-            name, win32api.FormatMessage(exc.excepinfo[5]))
-        log.debug(msg)
-        return False
+    if source and sources:
+        raise CommandExecutionError(
+            "Only one of source or sources should be specified."
+        )
+    if source_hash and source_hashes:
+        raise CommandExecutionError(
+            "Only one of source_hash or source_hashes should be specified."
+        )
+    if source:
+        sources = [source]
+        source_hashes = [source_hash]
+    if source_hashes is None:
+        source_hashes = []
+    if sources is None:
+        sources = []
+    return sources, source_hashes 
 
-    if not gr_name:
-        return False
-
-    return {'name': gr_name,
-            'passwd': None,
-            'gid': None,
-            'members': gr_mem} 
-
-def agc_mixed_002_04(self, argv):
+def hwc_mixed_002_02(self):
+        # type: () -> bytes
         """
-        Set up any environment changes requested (e.g., Python path
-        and Django settings), then run this command. If the
-        command raises a ``CommandError``, intercept it and print it sensibly
-        to stderr.
+        A method to generate a string representing this El Torito Entry.
+
+        Parameters:
+         None.
+        Returns:
+         String representing this El Torito Entry.
         """
-        if self.use_unicode_console_output():
-            encoding.set_console_output_encoding()
+        if not self._initialized:
+            raise pycdlibexception.PyCdlibInternalError('El Torito Entry not yet initialized')
 
-        # Set up the Python path.
-        self.setup_paths(self.app)
+        return struct.pack(self.FMT, self.boot_indicator, self.boot_media_type,
+                           self.load_segment, self.system_type, 0,
+                           self.sector_count, self.load_rba,
+                           self.selection_criteria_type,
+                           self.selection_criteria) 
 
-        # Set up the Django settings.
-        self.setup_environ(self.app)
+def agc_mixed_002_03(self, segment, overwrite=False):
+        """Add segments by ascending address.
 
-        # Command-specific setup.
-        self.handle_default_options()
+        """
 
-        # Run the command.
-        try:
-            self.execute(*self.parse_args(argv))
-        except CommandError as e:
-            self.stderr.write('%s: %s' % (e.__class__.__name__, e))
-            sys.exit(1) 
+        if not isinstance(segment, Segment):
+            raise TypeError("segment must be a Segment")
 
-def agc_mixed_002_05(self, context):
+        if segment.start in self:
+            if not overwrite:
+                raise ValueError("segment already exists")
+            self.remove(segment.start)
 
-		"""
-		Applies database changes.
+        if segment.start in self:
+            raise ValueError("segment already exists")
 
-		:param resort.engine.execution.Context context:
-		   Current execution context.
-		"""
+        if segment.end in self:
+            raise ValueError("segment already exists")
 
-		db = context.db
+        self._segments.append(segment)
+        self._segments.sort(key=lambda x: x.start) 
 
-		# Get the database cursor.
-		cursor = db.cursor()
+def hwc_mixed_002_04(self,
+                       user,
+                       currentPassword,
+                       newPassword):
+        """Change the password of a user."""
+        return self.__post('/api/updatePassword',
+                           data={
+                               'user': user,
+                               'currentPassword': currentPassword,
+                               'newPassword': newPassword
+                           }) 
 
-		# Get the database schema.
-		schema = context.schema
+def agc_mixed_002_05(self, httptype=None,
+                             channel=None, path_file=None):
+        """
+        Params:
 
-		# Get the database schema.
-		schema = context.schema
+            path_file - path to output file
+            channel: - integer
+            httptype - type string (singlepart or multipart)
 
-		# Get the database schema.
-		schema = context.schema
+                singlepart: HTTP content is a continuos flow of audio packets
+                multipart: HTTP content type is multipart/x-mixed-replace, and
+                           each audio packet ends with a boundary string
 
-		# Get the database schema.
-		schema = context.schema
+        """
+        if not path_file:
+            raise ValueError("path_file is required")
 
-		# Get the database schema.
-		schema = context.schema
+        if not channel:
+            raise ValueError("channel is required")
 
-		# Get the database schema.
-		schema = context.schema
+        if not httptype:
+            raise ValueError("httptype is required")
 
-		# Get the database schema.
-		schema = context.schema
+        if httptype == "singlepart":
+            self.stream_capture_singlepart(path_file, channel)
+        elif httptype == "multipart":
+            self.stream_capture_multipart(path_file, channel)
+        else:
+            raise ValueError("httptype must be singlepart or multipart") 
 
-		# Get the database schema.
-		schema = context.schema
+def hwc_mixed_002_06(self, reference: Optional[Path], repo: str) -> Optional[Path]:
+        """
+        Returns a repository to use in clone command, if there is one to be referenced.
+        Either provided by the user of generated from already cloned branches (master is preferred).
 
-		# Get the database schema.
-		schema = context.schema
+        :param reference: Path to a local repository provided by the user or None.
+        :param repo: Reference for which remote repository.
+        """
+        if reference is not None:
+            return reference.absolute()
 
-		# Get the database schema.
-		schema = context.schema
+        repo_path = self.get_path_to_repo(repo)
 
-		# Get the database schema.
-		schema = context.schema
+        if not repo_path.exists():
+            return None
 
-		# Get the database schema.
-		schema = context.schema
+        master = repo_path / "master"
 
-		# Get the database schema.
-		schema = context.schema
+        if master.exists() and master.is_dir():
+            return master
 
-		# Get the database schema.
-		schema = context.schema
+        for existing_branch in repo_path.iterdir():
+            if not existing_branch.is_dir():
+                continue
 
-		# Get the database schema.
-		schema = context.schema
+            return existing_branch.resolve()
 
-		# Get the database schema.
-		schema = context.schema
-
-		# Get the database schema.
-		schema = context.schema
-
-		# Get the database schema.
-		schema = context.schema
-
-		# Get the database schema.
-		schema = context.schema
-
-		# Get the database schema.
-		schema = context.schema
-
-		# Get the database schema.
-		schema = context.schema
-
-		# Get the database schema.
-		schema = context.schema
-
-		# Get the database schema.
-		schema = context.schema
-
-		# Get the database schema 
-
-def hwc_mixed_002_06(self, scale, f, loop=3):
-        """Get the running parameters (e.g. quark masses and the strong
-        coupling at a given scale."""
-        p = {}
-        p['alpha_s'] = qcd.alpha_s(scale, self.f, self.parameters['alpha_s'], loop=loop)
-        p['m_b'] = qcd.m_b(self.parameters['m_b'], scale, self.f, self.parameters['alpha_s'], loop=loop)
-        p['m_c'] = qcd.m_c(self.parameters['m_c'], scale, self.f, self.parameters['alpha_s'], loop=loop)
-        p['m_s'] = qcd.m_s(self.parameters['m_s'], scale, self.f, self.parameters['alpha_s'], loop=loop)
-        p['m_u'] = qcd.m_s(self.parameters['m_u'], scale, self.f, self.parameters['alpha_s'], loop=loop)
-        p['m_d'] = qcd.m_s(self.parameters['m_d'], scale, self.f, self.parameters['alpha_s'], loop=loop)
-        # running ignored for alpha_e and lepton mass
-        p['alpha_e'] = self.parameters['alpha_e']
-        p['m_e'] = self.parameters['m_e']
-        p['m_mu'] = self.parameters['m_mu']
-        p['m_tau'] = self.parameters['m_tau']
-        return p
+        return None

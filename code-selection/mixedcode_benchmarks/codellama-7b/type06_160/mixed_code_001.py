@@ -1,133 +1,138 @@
-def agc_mixed_001_01(self):
-        r"""Return a :math:`N \rightarrow 2^N` decoder.
-
-        Example Truth Table for a 2:4 decoder:
-
-        .. csv-table::
-           :header: :math:`A_1`, :math:`A_0`, \
-                    :math:`D_3`, :math:`D_2`, :math:`D_1`, :math:`D_0`
-           :stub-columns: 2
-
-           0, 0, 0, 0, 0, 1
-           0, 1, 0, 0, 1, 0
-           1, 0, 0, 1, 0, 0
-           1, 1, 1, 0, 0, 0
+def hwc_mixed_001_01(self, expr):
         """
-        r"""Return a :math:`N \rightarrow 2^N` decoder.
-
-        Example Truth Table for a 2:4 decoder:
-
-        .. csv-table::
-           :header: :math:`A_1`, :math:`A_0`, \
-                    :math:`D_3`, :math:`D_2`, :math:`D_1`, :math:`D_0`
-           :stub-columns: 2
-
-           0, 0, 0, 0, 0, 1
-           0, 1, 0, 0, 1, 0
-           1, 0, 0, 1, 0, 0
-           1, 1, 1, 0, 0, 0
-        """, 
-
-def hwc_mixed_001_02(self, property_name):
-        """Returns the value associated to the passed property
-
-        This public method is passed a specific property as a string
-        and returns the value of that property. If the property is not
-        found, None will be returned.
-
-        :param property_name (str) The name of the property
-        :return: (str) value for the passed property, or None.
+        Matrix multiplication printer. The sympy one turns everything into a
+        dot product without type-checking.
         """
-        log = logging.getLogger(self.cls_logger + '.get_value')
-        if not isinstance(property_name, basestring):
-            log.error('property_name arg is not a string, found type: {t}'.format(t=property_name.__class__.__name__))
-            return None
-        # Ensure a property with that name exists
-        prop = self.get_property(property_name)
-        if not prop:
-            log.debug('Property name not found matching: {n}'.format(n=property_name))
-            return None
-        value = self.properties[prop]
-        log.debug('Found value for property {n}: {v}'.format(n=property_name, v=value))
-        return value 
-
-def hwc_mixed_001_03(self):
-    """Cleans up old hunt data from aff4."""
-
-    hunts_ttl = config.CONFIG["DataRetention.hunts_ttl"]
-    if not hunts_ttl:
-      self.Log("TTL not set - nothing to do...")
-      return
-
-    exception_label = config.CONFIG["DataRetention.hunts_ttl_exception_label"]
-
-    hunts_root = aff4.FACTORY.Open("aff4:/hunts", token=self.token)
-    hunts_urns = list(hunts_root.ListChildren())
-
-    deadline = rdfvalue.RDFDatetime.Now() - hunts_ttl
-
-    hunts_deleted = 0
-
-    hunts = aff4.FACTORY.MultiOpen(
-        hunts_urns, aff4_type=implementation.GRRHunt, token=self.token)
-    for hunt in hunts:
-      if exception_label in hunt.GetLabelsNames():
-        continue
-
-      runner = hunt.GetRunner()
-      if runner.context.create_time + runner.context.duration < deadline:
-        aff4.FACTORY.Delete(hunt.urn, token=self.token)
-        hunts_deleted += 1
-        self.HeartBeat()
-    self.Log("Deleted %d hunts." % hunts_deleted) 
-
-def agc_mixed_001_04(self, data):
-        """ this functions extracts the code, reason from the close body
-        if they exists, and if the self.on_close except three arguments """
-        # if the on_close callback is "old", just return empty list
-        if data is None:
-            return None, None
-        if not isinstance(data, dict):
-            return None, None
-        if 'code' in data:
-            code = data['code']
-        else:
-            code = None
-        if 'reason' in data:
-            reason = data['reason']
-        else:
-            reason = None
-        return code, reason 
-
-def agc_mixed_001_05(self, todays_facts):
-        """check if we need to notify user perhaps"""
-        if self.user.last_fact_sent is None:
-            self.user.last_fact_sent = todays_facts[0]
-            self.user.save()
-            return True
-        else:
-            if self.user.last_fact_sent != todays_facts[0]:
-                self.user.last_fact_sent = todays_facts[0]
-                self.user.save()
-                return True
+        from sympy import MatrixExpr
+        links = []
+        for i, j in zip(expr.args[1:], expr.args[:-1]):
+            if isinstance(i, MatrixExpr) and isinstance(j, MatrixExpr):
+                links.append(').dot(')
             else:
-                return False 
+                links.append('*')
+        printouts = [self._print(i) for i in expr.args]
+        result = [printouts[0]]
+        for link, printout in zip(links, printouts[1:]):
+            result.extend([link, printout])
+        return '({0})'.format(''.join(result)) 
 
-def hwc_mixed_001_06(self):
-        # type: () -> bytes
+def hwc_mixed_001_02(page, output = "text"):
+    """ Extract a document page's text.
+
+    Args:
+        output: (str) text, html, dict, json, rawdict, xhtml or xml.
+
+    Returns:
+        the output of TextPage methods extractText, extractHTML, extractDICT, extractJSON, extractRAWDICT, extractXHTML or etractXML respectively. Default and misspelling choice is "text".
+    """
+    CheckParent(page)
+    dl = page.getDisplayList()
+    # available output types
+    formats = ("text", "html", "json", "xml", "xhtml", "dict", "rawdict")
+    # choose which of them also include images in the TextPage
+    images = (0, 1, 1, 0, 1, 1, 1)      # controls image inclusion in text page
+    try:
+        f = formats.index(output.lower())
+    except:
+        f = 0
+    flags = TEXT_PRESERVE_LIGATURES | TEXT_PRESERVE_WHITESPACE
+    if images[f] :
+        flags |= TEXT_PRESERVE_IMAGES
+    tp = dl.getTextPage(flags)     # TextPage with / without images
+    t = tp._extractText(f)
+    del dl
+    del tp
+    return t 
+
+def agc_mixed_001_03(f, id2f):
+    """
+    split fasta file into separate fasta files based on list of scaffolds
+    that belong to each separate file
+    """
+    with open(f, 'r') as fh:
+        for line in fh:
+            if line.startswith('>'):
+                id = line.strip()[1:]
+                if id not in id2f:
+                    id2f[id] = open(id, 'w')
+                id2f[id].write(line)
+            else:
+                id2f[id].write(line)
+    for id, fh in id2f.items():
+        fh.close() 
+
+def agc_mixed_001_04(self, course, filter_type, selected_tasks, users, aggregations, stype):
         """
-        A method to generate a string representing this El Torito Entry.
-
-        Parameters:
-         None.
-        Returns:
-         String representing this El Torito Entry.
+        Returns the submissions that have been selected by the admin
+        :param course: course
+        :param filter_type: users or aggregations
+        :param selected_tasks: selected tasks id
+        :param users: selected usernames
+        :param aggregations: selected aggregations
+        :param stype: single or all submissions
+        :return:
         """
-        if not self._initialized:
-            raise pycdlibexception.PyCdlibInternalError('El Torito Entry not yet initialized')
+        if filter_type == 'users':
+            submissions = Submission.objects.filter(task__in=selected_tasks, user__in=users)
+        elif filter_type == 'aggregations':
+            submissions = Submission.objects.filter(task__in=selected_tasks, aggregation__in=aggregations)
+        elif filter_type == 'all':
+            submissions = Submission.objects.filter(task__in=selected_tasks)
+        else:
+            submissions = Submission.objects.none()
 
-        return struct.pack(self.FMT, self.boot_indicator, self.boot_media_type,
-                           self.load_segment, self.system_type, 0,
-                           self.sector_count, self.load_rba,
-                           self.selection_criteria_type,
-                           self.selection_criteria)
+        if stype == 'single':
+            submissions = submissions.filter(single=True)
+        elif stype == 'all':
+            submissions = submissions.filter(single=False)
+
+        return submissions 
+
+def agc_mixed_001_05():
+    """
+    Get the grains from the proxied device
+    """
+    grains = salt.salt.proxy.grains(
+        __opts__,
+        __grains__,
+        __pillar__,
+        __salt__,
+        __context__,
+        __proxy__,
+        __file_client__,
+        __env__,
+        __ext_pillar__,
+        __sls__,
+        __top__,
+        __opts__.get("id"),
+        __jid__,
+        __user__,
+        __grains__.get("ipv6", False),
+        __utils__,
+        __salt_error_prefix__,
+    )
+    return grains 
+
+async def hwc_mixed_001_06(self) -> None:
+        """
+        Explicit exit. If so configured, populate cache to prove all creds in
+        wallet offline if need be, archive cache, and purge prior cache archives.
+
+        :return: current object
+        """
+
+        LOGGER.debug('HolderProver.close >>>')
+
+        if self.config.get('archive-holder-prover-caches-on-close', False):
+            await self.load_cache_for_proof(True)
+            ArchivableCaches.purge_archives(self.dir_cache, True)
+
+        await BaseAnchor.close(self)
+        for path_rr_id in Tails.links(self._dir_tails):
+            rr_id = basename(path_rr_id)
+            try:
+                await self._sync_revoc_for_proof(rr_id)
+            except ClosedPool:
+                LOGGER.warning('HolderProver sync-revoc on close required ledger for %s but pool was closed', rr_id)
+
+        LOGGER.debug('HolderProver.close <<<')

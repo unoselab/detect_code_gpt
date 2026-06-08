@@ -74,14 +74,25 @@ mkdir -p "${LOG_DIR}"
   #   --files_per_type 5 \
   #   --seed 1
 
+  # python generate_mixedcode_benchmark.py \
+  #   --input_csv "$INPUT_CSV" \
+  #   --out_dir ../code-selection/mixedcode_benchmarks/codellama-7b \
+  #   --only_targets 200 \
+  #   --bucket_width_overrides 200:11 \
+  #   --exclude_used_dir ../code-selection/mixedcode_benchmarks/codellama-7b \
+  #   --exclude_roles AGC \
+  #   --type_suffix new2 \
+  #   --files_per_type 5 \
+  #   --seed 2
+
   python generate_mixedcode_benchmark.py \
     --input_csv "$INPUT_CSV" \
     --out_dir ../code-selection/mixedcode_benchmarks/codellama-7b \
-    --only_targets 200 \
-    --bucket_width_overrides 200:11 \
+    --only_targets 160 \
+    --bucket_width_overrides 160:11 \
     --exclude_used_dir ../code-selection/mixedcode_benchmarks/codellama-7b \
     --exclude_roles AGC \
-    --type_suffix new2 \
+    --type_suffix new1 \
     --files_per_type 5 \
     --seed 2
 

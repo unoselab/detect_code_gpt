@@ -1,113 +1,124 @@
-def agc_mixed_003_01(self, **kwargs):
-        """
-        Given a set of keyword arguments, splits it into those relevant to SPI
-        implementations and all the rest. SPI arguments are augmented with
-        defaults and converted into the pin format (from the port/device
-        format) if necessary.
+def agc_mixed_003_01(item, vendored_libs):
+    """Rewrite 'import xxx' and 'from xxx import' for vendored_libs"""
+    if item.startswith('import '):
+        for lib in vendored_libs:
+            if item.startswith('import ' + lib):
+                item = 'import ' + vendored_libs[lib]
+                break
+    elif item.startswith('from '):
+        for lib in vendored_libs:
+            if item.startswith('from ' + lib + ' import'):
+                item = 'from ' + vendored_libs[lib] + ' import'
+                break
+    return item 
 
-        Returns a tuple of ``(spi_args, other_args)``.
-        """
-        spi_args = {}
-        other_args = {}
-        for key, value in kwargs.items():
-            if key in self.spi_args:
-                spi_args[key] = value
-            else:
-                other_args[key] = value
-        for key in self.spi_args:
-            if key not in spi_args:
-                spi_args[key] = self.spi_args[key]
-        return spi_args, other_args 
-
-def hwc_mixed_003_02(self, prob):
-        """Remove the problem from our problems list
-        and check if we are still 'impacted'
-
-        :param prob: problem to remove
-        :type prob: alignak.objects.schedulingitem.SchedulingItem
-        :return: None
-        """
-        self.source_problems.remove(prob.uuid)
-
-        # For know if we are still an impact, maybe our dependencies
-        # are not aware of the remove of the impact state because it's not ordered
-        # so we can just look at if we still have some problem in our list
-        if not self.source_problems:
-            self.is_impact = False
-            # No more an impact, we can unset the impact state
-            self.unset_impact_state()
-
-        # And we register a new broks for update status
-        self.broks.append(self.get_update_status_brok()) 
-
-def hwc_mixed_003_03(job, job_vars):
-    """
-    Upload bam to S3. Requires S3AM and a ~/.boto config file.
-    """
-    input_args, ids = job_vars
-    work_dir = job.fileStore.getLocalTempDir()
-    uuid = input_args['uuid']
-    # I/O
-    job.fileStore.readGlobalFile(ids['alignments.bam'], os.path.join(work_dir, 'alignments.bam'))
-    bam_path = os.path.join(work_dir, 'alignments.bam')
-    sample_name = uuid + '.bam'
-    # Parse s3_dir to get bucket and s3 path
-    s3_dir = input_args['s3_dir']
-    bucket_name = s3_dir.split('/')[0]
-    bucket_dir = os.path.join('/'.join(s3_dir.split('/')[1:]), 'bam_files')
-    # Upload to S3 via S3AM
-    s3am_command = ['s3am',
-                    'upload',
-                    'file://{}'.format(bam_path),
-                    os.path.join('s3://', bucket_name, bucket_dir, sample_name)]
-    subprocess.check_call(s3am_command) 
-
-def agc_mixed_003_04(self, indices, element):
-        r"""
-        This is a generalized version of tomask that accepts a string of
-        'pore' or 'throat' for programmatic access.
-        """
-        if indices is None:
-            return self._tomask(self.Ps, element)
-        elif isinstance(indices, str):
-            if indices == 'pore':
-                return self._tomask(self.Ps, element)
-            elif indices == 'throat':
-                return self._tomask(self.Ts, element)
-            else:
-                raise Exception('Invalid string')
+def agc_mixed_003_02(self, value, store_type):
+        """Save the key value base on it's storage type."""
+        if store_type == 'string':
+            self.encode_key_value = value
+        elif store_type == 'bytes':
+            self.encode_key_value = bytes(value, 'utf-8')
+        elif store_type == 'int':
+            self.encode_key_value = int(value)
+        elif store_type == 'float':
+            self.encode_key_value = float(value)
+        elif store_type == 'bool':
+            self.encode_key_value = bool(value)
         else:
-            return self._tomask(indices, element) 
+            raise ValueError('Unknown store type: {}'.format(store_type)) 
 
-def agc_mixed_003_05(self, **kws_usr):
-        """Plot one GO header group in Grouper."""
-        if not self.is_grouper:
-            raise ValueError("Not a Grouper.")
-        if self.is_plotted:
-            raise ValueError("Already plotted.")
-        self.is_plotted = True
-        if self.is_plt_usr:
-            if self.is_plt_usr_dotstr:
-                raise ValueError("Already plotted.")
-            self.is_plt_usr_dotstr = True
-            return self.plt_usr_dotstr
-        self.is_plt_usr = True
-        self.plt_usr_dotstr = self.get_pltdotstr_grouper(**kws_usr)
-        return self.plt_usr_dotstr 
+def agc_mixed_003_03(recfile):
+    """read the phi components from a record file by iteration
 
-def hwc_mixed_003_06(self, x, sampled_values, label):
-        """Forward computation."""
-        sampled_candidates, _, _ = sampled_values
-        # (batch_size,)
-        label = label.reshape(shape=(-1,))
-        # (num_sampled+batch_size,)
-        ids = nd.concat(sampled_candidates, label, dim=0)
-        # lookup weights and biases
-        weight = self.weight.row_sparse_data(ids)
-        bias = self.bias.data(ids.context)
-        # (num_sampled+batch_size, dim)
-        w_all = nd.Embedding(data=ids, weight=weight, **self._kwargs)
-        # (num_sampled+batch_size,)
-        b_all = nd.take(bias, indices=ids)
-        out, new_targets = self._dense(x, sampled_values, label, w_all, b_all)
-        return out, new_targets
+    Parameters
+    ----------
+    recfile : str
+        pest record file name
+
+    Returns
+    -------
+    iters : dict
+        nested dictionary of iteration number, {group,contribution}
+
+    """
+    iters = {}
+    with open(recfile, 'r') as f:
+        for line in f:
+            if line.startswith('ITER'):
+                iters[int(line.split()[1])] = {}
+            elif line.startswith('GROUP'):
+                iters[int(line.split()[1])][line.split()[2]] = {}
+            elif line.startswith('CONTRIBUTION'):
+                iters[int(line.split()[1])][line.split()[2]][line.split()[3]] = {}
+            elif line.startswith('PARAMETER'):
+                iters[int(line.split()[1])][line.split()[2]][line.split()[3]][line.split()[4]] = float(line.split()[5])
+
+    return iters 
+
+def hwc_mixed_003_04(addr):
+    """
+    parse host address to get domain name or ipv4/v6 address,
+    cidr prefix and net mask code string if given a subnet address
+
+    :param addr:
+    :type addr: str
+    :return: parsed domain name/ipv4 address/ipv6 address,
+             cidr prefix if there is,
+             net mask code string if there is
+    :rtype: (string, int, string)
+    """
+
+    if addr.startswith('[') and addr.endswith(']'):
+        addr = addr[1:-1]
+
+    parts = addr.split('/')
+    if len(parts) == 1:
+        return parts[0], None, None
+    if len(parts) > 2:
+        raise ValueError("Illegal host address")
+    else:
+        domain_or_ip, prefix = parts
+        prefix = int(prefix)
+        if re.match(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$", domain_or_ip):
+            return domain_or_ip, prefix, ipv4_prefix_to_mask(prefix)
+        elif ':' in domain_or_ip:
+            return domain_or_ip, prefix, ipv6_prefix_to_mask(prefix)
+        else:
+            return domain_or_ip, None, None 
+
+def hwc_mixed_003_05(self, oprnd1, oprnd2, oprnd3):
+        """Return a formula representation of an ADD instruction.
+        """
+        assert oprnd1.size and oprnd2.size and oprnd3.size
+        assert oprnd1.size == oprnd2.size
+
+        op1_var = self._translate_src_oprnd(oprnd1)
+        op2_var = self._translate_src_oprnd(oprnd2)
+        op3_var, op3_var_constrs = self._translate_dst_oprnd(oprnd3)
+
+        if oprnd3.size > oprnd1.size:
+            result = smtfunction.zero_extend(op1_var, oprnd3.size) + smtfunction.zero_extend(op2_var, oprnd3.size)
+        elif oprnd3.size < oprnd1.size:
+            result = smtfunction.extract(op1_var + op2_var, 0, oprnd3.size)
+        else:
+            result = op1_var + op2_var
+
+        return [op3_var == result] + op3_var_constrs 
+
+def hwc_mixed_003_06(self, password):
+        """Attempts to log in as the current user with given password"""
+
+        if self.logged_in:
+            raise RuntimeError("User already logged in!")
+
+        params = {"name": self.nick, "password": password}
+        resp = self.conn.make_api_call("login", params)
+        if "error" in resp:
+            raise RuntimeError(
+                f"Login failed: {resp['error'].get('message') or resp['error']}"
+            )
+        self.session = resp["session"]
+        self.conn.make_call("useSession", self.session)
+        self.conn.cookies.update({"session": self.session})
+        self.logged_in = True
+        return True

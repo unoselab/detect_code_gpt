@@ -105,11 +105,18 @@ mkdir -p "${LOG_DIR}" "${OUTPUT_ROOT}"
   #   --load_cached_results ../logs/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_50files.pkl \
   #   --report_group type10_200
 
+  # CUDA_VISIBLE_DEVICES=0 python main_mixedcode_benchmark.py \
+  #   --benchmark_root ../code-selection/mixedcode_benchmarks/codellama-7b \
+  #   --base_model_name codellama/CodeLlama-7b-hf \
+  #   --only_group type10_200 \
+  #   --output_name mixedcode_codellama-7b_type10_200_merged \
+  #   --report_group type10_200
+
   CUDA_VISIBLE_DEVICES=0 python main_mixedcode_benchmark.py \
     --benchmark_root ../code-selection/mixedcode_benchmarks/codellama-7b \
     --base_model_name codellama/CodeLlama-7b-hf \
-    --only_group type10_200 \
+    --only_group type06_160 \
     --output_name mixedcode_codellama-7b_type10_200_merged \
-    --report_group type10_200
+    --report_group type06_160
 
 } 2>&1 | tee "${LOG_FILE}"

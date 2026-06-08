@@ -1,141 +1,195 @@
-def hwc_mixed_005_01(host):
-    """ Put your host information in the prefix object. """
-    p = new_prefix()
-    p.prefix = str(host['ipaddr'])
-    p.type = "host"
-    p.description = host['description']
-    p.node = host['fqdn']
-    p.avps = {}
-
-    # Use remaining data from ipplan to populate comment field.
-    if 'additional' in host:
-        p.comment = host['additional']
-
-    # Use specific info to create extra attributes.
-    if len(host['location']) > 0:
-        p.avps['location'] = host['location']
-
-    if len(host['mac']) > 0:
-        p.avps['mac'] = host['mac']
-
-    if len(host['phone']) > 0:
-        p.avps['phone'] = host['phone']
-
-    if len(host['user']) > 0:
-        p.avps['user'] = host['user']
-
-    return p 
-
-def hwc_mixed_005_02(self, value):
+def hwc_mixed_005_01(self):
         """
-        Handles the following cases:
-        1. If the value is already the proper type (a regex), return it.
-        2. If the value is a string, compile and return the regex.
+        Restores the stored session.
 
-        Raises: A ValidationError if the regex cannot be compiled.
+        :return: Method success.
+        :rtype: bool
         """
-        if isinstance(value, type(re.compile(''))):
-            return value
-        else:
-            if value is None and self.null:
-                return None
+
+        session = [foundations.strings.to_string(path)
+                   for path in self.__settings.get_key(self.__settings_section, "session").toStringList()
+                   if foundations.common.path_exists(path)]
+
+        LOGGER.debug("> Restoring session :'{0}'.".format(session))
+        success = True
+        for path in session:
+            if os.path.isfile(path):
+                success *= self.load_file(path)
             else:
-                try:
-                    return self.get_compiled_regex(value)
-                except:
-                    raise ValidationError('Invalid regex {0}'.format(value)) 
+                success *= self.add_project(path)
+        return success 
 
-def agc_mixed_005_03(self, nameformat=None, capitalize=None, formatters=None, **kwargs):
-        """Pick a random name form a specified list of name parts"""
+def hwc_mixed_005_02(dataset_date, date_format):
+        # type: (str, Optional[str]) -> datetime
+        """Parse dataset date from string using specified format. If no format is supplied, the function will guess.
+        For unambiguous formats, this should be fine.
 
-        if nameformat is None:
-            nameformat = self.nameformat
-        if capitalize is None:
-            capitalize = self.capitalize
-        if formatters is None:
-            formatters = self.formatters
+        Args:
+            dataset_date (str): Dataset date string
+            date_format (Optional[str]): Date format. If None is given, will attempt to guess. Defaults to None.
 
-        if nameformat not in self.nameformats:
-            raise ValueError("Unknown name format: %s" % nameformat)
-
-        parts = self.nameformats[nameformat]
-        if capitalize:
-            parts = [part.capitalize() for part in parts]
-
-        return " ".join([formatters[part](**kwargs) for part in parts]) 
-
-def agc_mixed_005_04(self, requested_device, map_device):
-        """Compare the requested device with the map device and
-        return the map device if it differs from the requested device
-        along with a warning.
+        Returns:
+            datetime.datetime
         """
-        if requested_device != map_device:
-            warnings.warn(
-                "The requested device '{}' is different from the "
-                "mapped device '{}'. The mapped device will be used "
-                "instead.".format(requested_device, map_device),
-                RuntimeWarning,
-            )
-            return map_device
+        if date_format is None:
+            try:
+                return parser.parse(dataset_date)
+            except (ValueError, OverflowError) as e:
+                raisefrom(HDXError, 'Invalid dataset date!', e)
         else:
-            return requested_device 
+            try:
+                return datetime.strptime(dataset_date, date_format)
+            except ValueError as e:
+                raisefrom(HDXError, 'Invalid dataset date!', e) 
 
-def hwc_mixed_005_05():
-    """Constructs a version string of the form:
+def agc_mixed_005_03(dam_name, config):
+        """ create DAM """
+        dam_path = config['DAM_PATH']
+        dam_path = dam_path.replace('<DAM_NAME>', dam_name)
+        dam_path = dam_path.replace('<DAM_NAME_LOWER>', dam_name.lower())
+        dam_path = dam_path.replace('<DAM_NAME_UPPER>', dam_name.upper())
+        dam_path = dam_path.replace('<DAM_NAME_CAPITALIZED>', dam_name.capitalize())
+        dam_path = dam_path.replace('<DAM_NAME_CAPITALIZED_FIRST>', dam_name.capitalize()[0])
+        dam_path = dam_path.replace('<DAM_NAME_CAPITALIZED_REST>', dam_name.capitalize()[1:])
+        dam_path = dam_path.replace('<DAM_NAME_CAPITALIZED_FIRST_LOWER>', dam_name.capitalize()[0].lower())
+        dam_path = dam_path.replace('<DAM_NAME_CAPITALIZED_REST_LOWER>', dam_name.capitalize()[1:].lower())
+        dam_path = dam_path.replace('<DAM_NAME_CAPITALIZED_FIRST_UPPER>', dam_name.capitalize()[0].upper())
+        dam_path = dam_path.replace('<DAM_NAME_CAPITALIZED_REST_UPPER>', dam_name.capitalize()[1:].upper())
+        dam_path = dam_path.replace('<DAM_NAME_CAPITALIZED_FIRST_CAPITALIZED>', dam_name.capitalize()[0].capitalize())
+        dam_path = dam_path.replace('<DAM_NAME_CAPITALIZED_REST_CAPITALIZED>', dam_name.capitalize()[1:].capitalize())
+        dam 
 
-           <tag>[.<distance-from-tag>[+<branch-name-if-not-master>]]
+def hwc_mixed_005_04(collection_name, spec, safe,
+           last_error_args, opts, flags=0):
+    """Get a **delete** message.
 
-       Master is understood to be always buildable and thus untagged
-       versions are treated as patch levels. Branches not master are treated
-       as PEP-440 "local version identifiers".
+    `opts` is a CodecOptions. `flags` is a bit vector that may contain
+    the SingleRemove flag or not:
+
+    http://docs.mongodb.org/meta-driver/latest/legacy/mongodb-wire-protocol/#op-delete
     """
-    tag = cmd('git', 'describe').strip()
-    pieces = s(tag).split('-')
-    dotted = pieces[0]
-    if len(pieces) < 2:
-        distance = None
+    data = _ZERO_32
+    data += bson._make_c_string(collection_name)
+    data += struct.pack("<I", flags)
+    encoded = bson.BSON.encode(spec, False, opts)
+    data += encoded
+    if safe:
+        (_, remove_message) = __pack_message(2006, data)
+        (request_id, error_message, _) = __last_error(collection_name,
+                                                      last_error_args)
+        return (request_id, remove_message + error_message, len(encoded))
     else:
-        # Distance from the latest tag is treated as a patch level.
-        distance = pieces[1]
-        dotted += '.' + s(distance)
-    # Branches that are not master are treated as local:
-    #   https://www.python.org/dev/peps/pep-0440/#local-version-identifiers
-    if distance is not None:
-        branch = get_git_branch()
-        if branch != 'master':
-            dotted += '+' + s(branch)
-    return dotted 
+        (request_id, remove_message) = __pack_message(2006, data)
+        return (request_id, remove_message, len(encoded)) 
 
-def agc_mixed_005_06(self, path_spec):
-    """Opens the file-like object defined by path specification.
+def agc_mixed_005_05(self, context):
 
-    Args:
-      path_spec (PathSpec): path specification.
+		"""
+		Create resource.
 
-    Returns:
-      pyvhdi.file: a file-like object.
+		:param resort.engine.execution.Context context:
+		   Current execution context.
+		"""
 
-    Raises:
-      PathSpecError: if the path specification is incorrect.
+		resource = context.resource
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current request.
+		request = context.request
+
+		# Get the current response.
+		response = context.response
+
+		# Get the current session.
+		session = context.session
+
+		# Get the current settings.
+		settings = context.settings
+
+		# Get the current site.
+		site = context.site
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user.
+		user = context.user
+
+		# Get the current user. 
+
+def agc_mixed_005_06(config):
+    """Returns the password for a remote server
+
+    It tries to fetch the password from the following
+    locations in this order:
+
+     1. config file [remote] section, password option
+     2. GNOME keyring
+     3. interactively, from the user
     """
-    if not path_spec.HasParent():
-      raise errors.PathSpecError(
-          u'Missing parent in path specification: {0:s}.'.format(
-              path_spec.comparable))
-
-    parent_path_spec = path_spec.parent
-    location = getattr(parent_path_spec, u'location', None)
-    if location is None:
-      raise errors.PathSpecError(
-          u'Parent path specification missing location: {0:s}.'.format(
-              parent_path_spec.comparable))
-
-    if not path_spec.Has(u'name'):
-      raise errors.PathSpecError(
-          u'Path specification missing name: {0:s}.'.format(
-              path_spec.comparable))
-
-    name = path_spec.name
-
-    file_object = self._file_system.OpenFileObject(location, name)
-    return file_object
+    password = None
+    if config.has_option('remote', 'password'):
+        password = config.get('remote', 'password')
+    else:
+        try:
+            password = keyring.get_password('git-remote-codecommit', 'password')
+        except:
+            pass
+    if password is None:
+        password = getpass.getpass('Password for remote server: ')
+        if config.has_option('remote', 'password'):
+            config.set('remote', 'password', password)
+        else:
+            config.add_section('remote')
+            config.set('remote', 'password', password)
+    return password

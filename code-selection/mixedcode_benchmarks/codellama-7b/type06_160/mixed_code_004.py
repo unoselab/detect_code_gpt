@@ -1,145 +1,152 @@
-def agc_mixed_004_01(seq_path,
-                             failures,
-                             output_fasta_fp):
-    """ Parses seq IDs from failures list, writes to output_fasta_fp
+def hwc_mixed_004_01(self, spec_or_id=None, multi=True, **kwargs):
+        """Remove a document(s) from this collection.
 
-    seq_path: filepath of original input fasta file.
-    failures: list/set of failure seq IDs
-    output_fasta_fp: path to write parsed sequences
-    """
+        **DEPRECATED** - Use :meth:`delete_one` or :meth:`delete_many` instead.
 
-    seq_ids = set()
-    with open(seq_path, 'r') as f:
-        for line in f:
-            if line[0] == '>':
-                seq_id = line.strip().split()[0][1:]
-                seq_ids.add(seq_id)
-    with open(output_fasta_fp, 'w') as f:
-        for seq_id in seq_ids:
-            if seq_id in failures:
-                continue
-            f.write('>' + seq_id + '\n')
-            f.write(seq_id + '\n') 
-
-def agc_mixed_004_02(name, value):
-    """
-    Only succeed if the value in the given register location is less than
-    the given value
-
-    USAGE:
-
-    .. code-block:: yaml
-
-        foo:
-          check.lt:
-            - value: 42
-
-        run_remote_ex:
-          local.cmd:
-            - tgt: '*'
-            - func: test.ping
-            - require:
-              - check: foo
-    """
-    ret = {"name": name, "changes": {}, "result": False, "comment": ""}
-    if not isinstance(value, int):
-        ret["comment"] = "Value must be an integer"
-        return ret
-    if not isinstance(name, str):
-        ret["comment"] = "Name must be a string"
-        return ret
-    if not isinstance(name, str):
-        ret["comment"] = "Name must be a string"
-        return ret
-    if __salt__["reg.read_value"](name)["vdata"] < value:
-        ret["result"] = True
-        ret["comment"] = "Value is less than {}".format(value)
-    else:
-        ret["comment"] = "Value is not less than {}".format(value)
-    return ret 
-
-def hwc_mixed_004_03(self, data):
-        """ Processes a received STATUS message and notifies listeners. """
-        status = self._parse_status(data, self.cast_type)
-        is_new_app = self.app_id != status.app_id and self.app_to_launch
-        self.status = status
-
-        self.logger.debug("Received status: %s", self.status)
-        self._report_status()
-
-        if is_new_app and self.app_to_launch == self.app_id:
-            self.app_to_launch = None
-            self.app_launch_event.set()
-            if self.app_launch_event_function:
-                self.logger.debug("Start app_launch_event_function...")
-                self.app_launch_event_function()
-                self.app_launch_event_function = None 
-
-def hwc_mixed_004_04(cls, sock):
-    """Parse the request (the pre-execution) section of the nailgun protocol from the given socket.
-
-    Handles reading of the Argument, Environment, Working Directory and Command chunks from the
-    client which represents the "request" phase of the exchange. Working Directory and Command are
-    required and must be sent as the last two chunks in this phase. Argument and Environment chunks
-    are optional and can be sent more than once (thus we aggregate them).
-    """
-
-    command = None
-    working_dir = None
-    arguments = []
-    environment = {}
-
-    while not all((working_dir, command)):
-      chunk_type, payload = cls.read_chunk(sock)
-
-      if chunk_type == ChunkType.ARGUMENT:
-        arguments.append(payload)
-      elif chunk_type == ChunkType.ENVIRONMENT:
-        key, val = payload.split(cls.ENVIRON_SEP, 1)
-        environment[key] = val
-      elif chunk_type == ChunkType.WORKING_DIR:
-        working_dir = payload
-      elif chunk_type == ChunkType.COMMAND:
-        command = payload
-      else:
-        raise cls.ProtocolError('received non-request chunk before header was fully received!')
-
-    return working_dir, command, arguments, environment 
-
-def hwc_mixed_004_05(self, s):
+        .. versionchanged:: 3.0
+           Removed the `safe` parameter. Pass ``w=0`` for unacknowledged write
+           operations.
         """
-        Commit the pending r/w state if it has been triggered (e.g. by an
-        underlying TLSChangeCipherSpec or a SSLv2ClientMasterKey). We update
-        nothing if the prcs was not set, as this probably means that we're
-        working out-of-context (and we need to keep the default rcs).
-        """
-        if self.tls_session.triggered_prcs_commit:
-            if self.tls_session.prcs is not None:
-                self.tls_session.rcs = self.tls_session.prcs
-                self.tls_session.prcs = None
-            self.tls_session.triggered_prcs_commit = False
-        if self.tls_session.triggered_pwcs_commit:
-            if self.tls_session.pwcs is not None:
-                self.tls_session.wcs = self.tls_session.pwcs
-                self.tls_session.pwcs = None
-            self.tls_session.triggered_pwcs_commit = False
-        return s 
+        warnings.warn("remove is deprecated. Use delete_one or delete_many "
+                      "instead.", DeprecationWarning, stacklevel=2)
+        if spec_or_id is None:
+            spec_or_id = {}
+        if not isinstance(spec_or_id, abc.Mapping):
+            spec_or_id = {"_id": spec_or_id}
+        write_concern = None
+        collation = validate_collation_or_none(kwargs.pop('collation', None))
+        if kwargs:
+            write_concern = WriteConcern(**kwargs)
+        return self._delete_retryable(
+            spec_or_id, multi, write_concern, collation=collation) 
 
-def agc_mixed_004_06(self):
-        """Gets the firmware update service uri.
-
-        :returns: firmware update service uri
-        :raises: IloError, on an error from iLO.
-        :raises: IloConnectionError, if not able to reach iLO.
-        :raises: IloCommandNotSupportedError, for not finding the uri
+def agc_mixed_004_02(self, message):
         """
+        A helper method that does the actual sending
+
+        :param SmsMessage message: SmsMessage class instance.
+        :returns: True if message is sent else False
+        :rtype: bool
+        """
+
+        if not isinstance(message, SmsMessage):
+            raise TypeError("message must be a SmsMessage instance")
+
+        if not message.validate():
+            raise ValueError("message is not valid")
+
+        if self.debug:
+            print("Sending message: %s" % message)
+
         try:
-            return self._client.get_uri(
-                '/redfish/v1/Managers/iLOService/FirmwareInventory')
-        except (exception.IloConnectionError,
-                exception.IloCommandNotSupportedError) as e:
-            raise e
-        except exception.IloError as e:
-            LOG.error(_LE("Failed to get firmware update service resource "
-                          "from iLO. Error: %s"), e)
-            raise exception.IloError(e)
+            response = self._send_request(message)
+        except Exception as e:
+            raise SmsException(e)
+
+        if not response.ok:
+            raise SmsException(response.text)
+
+        return True 
+
+def hwc_mixed_004_03(canvas, fn, delay=1./24, *args, **kwargs):
+    """Animation automation function
+
+    :param canvas: :class:`Canvas` object
+    :param fn: Callable. Frame coord generator
+    :param delay: Float. Delay between frames.
+    :param *args, **kwargs: optional fn parameters
+    """
+
+    # python2 unicode curses fix
+    if not IS_PY3:
+        import locale
+        locale.setlocale(locale.LC_ALL, "")
+
+    def animation(stdscr):
+
+        for frame in fn(*args, **kwargs):
+            for x,y in frame:
+                canvas.set(x,y)
+
+            f = canvas.frame()
+            stdscr.addstr(0, 0, '{0}\n'.format(f))
+            stdscr.refresh()
+            if delay:
+                sleep(delay)
+            canvas.clear()
+
+    curses.wrapper(animation) 
+
+def agc_mixed_004_04(self, definitions, field, value):
+        """ {'type': 'list', 'logical': 'allof'} """
+        if not isinstance(value, list):
+            raise ValidationError(
+                "Value must be a list",
+                field,
+                value,
+                definitions,
+                self.name,
+            )
+        for item in value:
+            self._validate_type(definitions, field, item)
+        return value 
+
+def hwc_mixed_004_05(self):
+        """
+        Return cached repo metadata
+        """
+        cache = salt.cache.Cache(self.opts, self.opts['spm_cache_dir'])
+        metadata = {}
+
+        def _read_metadata(repo, repo_info):
+            if cache.updated('.', repo) is None:
+                log.warning('Updating repo metadata')
+                self._download_repo_metadata({})
+
+            metadata[repo] = {
+                'info': repo_info,
+                'packages': cache.fetch('.', repo),
+            }
+
+        self._traverse_repos(_read_metadata)
+        return metadata 
+
+def agc_mixed_004_06(sender, receivers, subject, text=None, html=None, charset='utf-8', config=Injected):
+    """Sends an email.
+
+    :param sender: Sender as string or None for default got from config.
+    :param receivers: String or array of recipients.
+    :param subject: Subject.
+    :param text: Plain text message.
+    :param html: Html message.
+    :param charset: Charset.
+    :param config: Current configuration
+    """
+    if not isinstance(receivers, list):
+        receivers = [receivers]
+
+    if not sender:
+        sender = config.email_sender
+
+    if not text:
+        text = ''
+
+    if not html:
+        html = ''
+
+    if not isinstance(sender, list):
+        sender = [sender]
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = sender[0]
+    msg['To'] = ', '.join(receivers)
+    msg.attach(MIMEText(text, 'plain', charset))
+    msg.attach(MIMEText(html, 'html', charset))
+
+    smtp = smtplib.SMTP(config.email_host, config.email_port)
+    smtp.ehlo()
+    smtp.starttls()
+    smtp.login(config.email_user, config.email_password)
+    smtp.sendmail(sender[0], receivers, msg.as_string())
+    smtp.close()
