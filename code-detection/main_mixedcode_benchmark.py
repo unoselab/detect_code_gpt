@@ -503,6 +503,72 @@ def summarize_and_save(
 # CLI
 # ---------------------------------------------------------------------------
 
+def score_examples(
+    examples: List[Dict[str, Any]],
+    cli: argparse.Namespace,
+) -> List[Dict[str, Any]]:
+    """Load the base model and score every example body into per-chunk results.
+
+    Shared by the full run and the partial cache-update path so both score
+    identically. Returns a list of result dicts (without ``body_text``).
+    """
+    args = build_full_args(cli)
+    logger.info(
+        f"Before model load: CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}, "
+        f"args.DEVICE={args.DEVICE}"
+    )
+
+    cache_dir, _, _ = preprocess_and_save(args)
+    model_config: Dict[str, Any] = {"cache_dir": cache_dir}
+
+    logger.info("Loading base scoring model...")
+    model_config = load_base_model_and_tokenizer(args, model_config)
+
+    results: List[Dict[str, Any]] = []
+    for ex in tqdm(examples, desc="Scoring function bodies"):
+        chunks = score_body(
+            ex["body_text"],
+            args=args,
+            model_config=model_config,
+            k=cli.n_perturbation,
+            chunk_len=cli.chunk_len,
+            min_chunk_tokens=cli.min_chunk_tokens,
+        )
+        r = dict(ex)
+        # Do not keep body_text in cache/CSV unless needed; reduces pickle size a bit.
+        r.pop("body_text", None)
+        r["chunks"] = chunks
+        results.append(r)
+
+    torch.cuda.empty_cache()
+    return results
+
+
+def replace_group_in_cache(
+    old_results: List[Dict[str, Any]],
+    group: str,
+    new_results: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], int]:
+    """Return (merged, n_removed): drop ``group`` rows from the old cache and
+    append the freshly scored ``new_results`` for that group.
+
+    The merged list is sorted by (benchmark_type, file_id, function_id) so the
+    derived CSVs stay stable regardless of which group was updated.
+    """
+    group = str(group)
+    kept = [r for r in old_results if str(r.get("benchmark_type")) != group]
+    removed = len(old_results) - len(kept)
+    merged = kept + list(new_results)
+    merged.sort(
+        key=lambda r: (
+            str(r.get("benchmark_type")),
+            r.get("file_id") if r.get("file_id") is not None else 0,
+            r.get("function_id") if r.get("function_id") is not None else 0,
+        )
+    )
+    return merged, removed
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Evaluate DetectCodeGPT NPR on generated mixed-code benchmark files."
@@ -541,6 +607,14 @@ def main() -> None:
                              "function with the group name, so a merged old+new set "
                              "aggregates as one bucket. Overall AUROC then equals "
                              "that group's AUROC.")
+    parser.add_argument("--update_cache", type=str, default=None,
+                        help="Partial update: re-score only --only_group from "
+                             "--benchmark_root and splice the fresh results into "
+                             "this existing full cache .pkl, leaving all other "
+                             "groups untouched. The merged cache is written to "
+                             "--results_cache (or the path derived from "
+                             "--output_name); set --output_name to the original "
+                             "run to overwrite it in place. Requires --only_group.")
     parser.add_argument("--limit_files", type=int, default=None,
                         help="Debug: only load first N JSON sidecars.")
     parser.add_argument("--limit_functions", type=int, default=None,
@@ -570,6 +644,73 @@ def main() -> None:
         summarize_and_save(results, output_csv, chunk_csv, cli.aggregate)
         if cli.report_group:
             report_group_auc(results, cli.report_group.split(","))
+        return
+
+    if cli.update_cache is not None:
+        if cli.load_cached_results is not None:
+            raise ValueError("--update_cache and --load_cached_results are mutually exclusive.")
+        if not cli.only_group:
+            raise ValueError(
+                "--update_cache requires --only_group so it knows which group to "
+                "re-score and replace."
+            )
+        old_cache = Path(os.path.expanduser(cli.update_cache))
+        if not old_cache.exists():
+            raise FileNotFoundError(f"--update_cache file not found: {old_cache}")
+
+        logger.info(
+            f"Partial cache update: re-scoring group '{cli.only_group}' and "
+            f"splicing into {old_cache}"
+        )
+        with old_cache.open("rb") as f:
+            old_results = pickle.load(f)
+
+        examples = load_mixedcode_functions(
+            benchmark_root,
+            limit_files=cli.limit_files,
+            limit_functions=cli.limit_functions,
+            only_group=cli.only_group,
+        )
+        if not examples:
+            raise RuntimeError(
+                f"No function bodies for group '{cli.only_group}' under {benchmark_root}"
+            )
+
+        print("=" * 80)
+        print("main_mixedcode_benchmark.py  [PARTIAL CACHE UPDATE]")
+        print("=" * 80)
+        print(f"benchmark_root       : {benchmark_root}")
+        print(f"updating group       : {cli.only_group}")
+        print(f"function bodies      : {len(examples)} (group only)")
+        print(f"old cache            : {old_cache} ({len(old_results)} rows)")
+        print(f"writing merged cache : {cache_path}")
+        print("=" * 80)
+
+        if cli.preview:
+            preview_examples(examples, n=min(5, len(examples)))
+
+        new_results = score_examples(examples, cli)
+
+        merged, removed = replace_group_in_cache(old_results, cli.only_group, new_results)
+        if removed == 0:
+            logger.warning(
+                f"No existing rows matched group '{cli.only_group}' in the old cache; "
+                f"appending {len(new_results)} rows as a new group (check the name?)."
+            )
+        logger.info(
+            f"Replaced {removed} old '{cli.only_group}' row(s) with "
+            f"{len(new_results)} freshly scored row(s); cache size "
+            f"{len(old_results)} -> {len(merged)}"
+        )
+
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with cache_path.open("wb") as f:
+            pickle.dump(merged, f)
+        logger.info(f"Wrote updated full cache to: {cache_path}")
+
+        summarize_and_save(merged, output_csv, chunk_csv, cli.aggregate)
+        groups_to_report = cli.report_group.split(",") if cli.report_group else [cli.only_group]
+        report_group_auc(merged, groups_to_report)
         return
 
     examples = load_mixedcode_functions(
@@ -614,30 +755,7 @@ def main() -> None:
         return
 
     # Build args required by the imported main.py / baseline helpers.
-    args = build_full_args(cli)
-    logger.info(f"Before model load: CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}, args.DEVICE={args.DEVICE}")
-
-    cache_dir, _, _ = preprocess_and_save(args)
-    model_config: Dict[str, Any] = {"cache_dir": cache_dir}
-
-    logger.info("Loading base scoring model...")
-    model_config = load_base_model_and_tokenizer(args, model_config)
-
-    results: List[Dict[str, Any]] = []
-    for ex in tqdm(examples, desc="Scoring function bodies"):
-        chunks = score_body(
-            ex["body_text"],
-            args=args,
-            model_config=model_config,
-            k=cli.n_perturbation,
-            chunk_len=cli.chunk_len,
-            min_chunk_tokens=cli.min_chunk_tokens,
-        )
-        r = dict(ex)
-        # Do not keep body_text in cache/CSV unless needed; reduces pickle size a bit.
-        r.pop("body_text", None)
-        r["chunks"] = chunks
-        results.append(r)
+    results = score_examples(examples, cli)
 
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with cache_path.open("wb") as f:
@@ -645,7 +763,6 @@ def main() -> None:
     logger.info(f"Cached per-function chunk results to: {cache_path}")
     logger.info(f"To re-aggregate without rescoring: --load_cached_results {cache_path}")
 
-    torch.cuda.empty_cache()
     summarize_and_save(results, output_csv, chunk_csv, cli.aggregate)
     if cli.report_group:
         report_group_auc(results, cli.report_group.split(","))
