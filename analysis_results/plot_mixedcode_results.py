@@ -131,7 +131,10 @@ def load_bucket_summary(path: Path) -> pd.DataFrame:
         df, ["AGC_mean", "MGC_mean", "agc_mean", "mgc_mean", "lm_mean"], required=False
     )
 
-    out = pd.DataFrame()
+    # Anchor to df.index so scalar metadata broadcasts across every row.
+    # Building on an empty frame would assign 0-length scalar columns that
+    # silently backfill to NaN once a real Series column is added.
+    out = pd.DataFrame(index=df.index)
     out["model_key"] = model_key
     out["model"] = model
     out["model_long"] = model_long
@@ -177,7 +180,9 @@ def load_score_csv(path: Path) -> pd.DataFrame:
     score_col = find_column(df, ["npr", "NPR"], required=True)
     bucket_col = find_column(df, ["benchmark_type", "bucket", "type"], required=False)
 
-    out = pd.DataFrame()
+    # Anchor to df.index (see load_bucket_summary) so the scalar model
+    # metadata is present on every row instead of backfilling to NaN.
+    out = pd.DataFrame(index=df.index)
     out["model_key"] = model_key
     out["model"] = model
     out["model_long"] = model_long
@@ -284,6 +289,12 @@ def compute_overall(score_df: pd.DataFrame) -> pd.DataFrame:
         )
 
     out = pd.DataFrame(rows)
+    if out.empty:
+        raise ValueError(
+            "compute_overall() produced no per-model rows. This usually means "
+            "the 'model' column is empty/NaN, so groupby('model') dropped every "
+            f"row. Distinct model values seen: {score_df['model'].unique().tolist()}"
+        )
     out["model_order"] = out["model"].map(
         lambda m: MODEL_ORDER.index(m) if m in MODEL_ORDER else 999
     )
