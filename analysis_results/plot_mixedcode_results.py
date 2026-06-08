@@ -383,7 +383,7 @@ def plot_auc_by_bucket(bucket_df: pd.DataFrame, out_dir: Path) -> None:
     plt.text(9.0, 0.515, "random", ha="right", va="bottom", fontsize=9)
     plt.xlabel("Implementation-body length bucket (whitespace tokens)")
     plt.ylabel("Detection AUROC")
-    plt.ylim(0.60, 1.01)
+    plt.ylim(0.0, 1.01)
     plt.xticks(rotation=35, ha="right")
     plt.legend(
         ncol=4, frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.18)
