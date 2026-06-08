@@ -58,6 +58,13 @@ BUCKET_LABELS = {
     "type10_200": "191--200",
 }
 
+MODEL_STYLES = {
+    "CL7B":   {"linestyle": "-",  "marker": "o"},
+    "SC7B":   {"linestyle": "--", "marker": "s"},
+    "SC15B":  {"linestyle": "-.", "marker": "^"},
+    "GO120B": {"linestyle": ":",  "marker": "D"},
+}
+
 BUCKET_ORDER = list(BUCKET_LABELS.keys())
 
 
@@ -370,33 +377,117 @@ def save_table_bucket_auc(bucket_df: pd.DataFrame, out_path: Path) -> None:
 # --------------------------------------------------------------------------- #
 
 def plot_auc_by_bucket(bucket_df: pd.DataFrame, out_dir: Path) -> None:
-    """Line plot of detection AUROC across body-length buckets, per model."""
-    plt.figure(figsize=(8.8, 4.2))
+    """
+    Plot mixed-code AUROC by implementation-body length bucket
+    using black-only line styles and a broken y-axis.
+    Expected columns in bucket_df:
+        - model
+        - bucket
+        - auc
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    for model in MODEL_ORDER:
-        g = bucket_df[bucket_df["model"] == model].sort_values("bucket_order")
-        if g.empty:
-            continue
-        plt.plot(g["bucket_label"], g["auc"], marker="o", linewidth=2, label=model)
+    df = bucket_df.copy()
 
-    plt.axhline(0.5, linestyle="--", linewidth=1.2, color="black")
-    plt.text(9.0, 0.515, "random", ha="right", va="bottom", fontsize=9)
-    plt.xlabel("Implementation-body length bucket (whitespace tokens)")
-    plt.ylabel("Detection AUROC")
-    plt.ylim(0.0, 1.01)
-    plt.xticks(rotation=35, ha="right")
-    plt.legend(
-        ncol=4, frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.18)
+    # normalize / guard
+    if "benchmark_type" in df.columns and "bucket" not in df.columns:
+        df["bucket"] = df["benchmark_type"]
+
+    if "model" not in df.columns:
+        raise ValueError("plot_auc_by_bucket() expected a 'model' column")
+
+    if "auc" not in df.columns:
+        raise ValueError("plot_auc_by_bucket() expected an 'auc' column")
+
+    df = df[df["bucket"].isin(BUCKET_ORDER)].copy()
+    df["bucket_order"] = df["bucket"].map({b: i for i, b in enumerate(BUCKET_ORDER)})
+    df["model_order"] = df["model"].map({m: i for i, m in enumerate(MODEL_ORDER)})
+    df = df.sort_values(["model_order", "bucket_order"])
+
+    x = np.arange(len(BUCKET_ORDER))
+    xlabels = [BUCKET_LABELS[b] for b in BUCKET_ORDER]
+
+    fig, (ax_top, ax_bot) = plt.subplots(
+        2,
+        1,
+        sharex=True,
+        figsize=(12.5, 5.4),
+        gridspec_kw={"height_ratios": [4, 1], "hspace": 0.05},
     )
-    plt.tight_layout()
 
-    for ext in ["png", "pdf"]:
-        plt.savefig(
-            out_dir / f"fig_mixedcode_auc_by_bucket.{ext}",
-            dpi=300,
-            bbox_inches="tight",
+    # black-only academic style
+    for model in MODEL_ORDER:
+        sub = df[df["model"] == model].copy()
+        if sub.empty:
+            continue
+
+        sub = sub.set_index("bucket").reindex(BUCKET_ORDER).reset_index()
+        y = sub["auc"].to_numpy()
+
+        style = MODEL_STYLES.get(model, {"linestyle": "-", "marker": "o"})
+
+        ax_top.plot(
+            x, y,
+            color="black",
+            linestyle=style["linestyle"],
+            marker=style["marker"],
+            linewidth=1.8,
+            markersize=5.5,
+            label=model,
         )
-    plt.close()
+        ax_bot.plot(
+            x, y,
+            color="black",
+            linestyle=style["linestyle"],
+            marker=style["marker"],
+            linewidth=1.8,
+            markersize=5.5,
+        )
+
+    # broken y-axis ranges
+    ax_top.set_ylim(0.45, 1.005)
+    ax_bot.set_ylim(0.00, 0.1)
+
+    # random baseline
+    ax_bot.axhline(0.7, color="black", linestyle="--", linewidth=1.2)
+    ax_bot.text(len(BUCKET_ORDER) - 1.65, 0.17, "random", fontsize=11)
+
+    # styling
+    ax_top.spines["bottom"].set_visible(False)
+    ax_bot.spines["top"].set_visible(False)
+    ax_top.tick_params(labeltop=False)
+    ax_bot.xaxis.tick_bottom()
+
+    # zigzag / break marks 
+    d = 0.008
+    kwargs = dict(color="black", clip_on=False, linewidth=1.2)
+
+    ax_top.plot((-d, +d), (-d, +d), transform=ax_top.transAxes, **kwargs)
+    ax_top.plot((1 - d, 1 + d), (-d, +d), transform=ax_top.transAxes, **kwargs)
+
+    ax_bot.plot((-d, +d), (1 - d, 1 + d), transform=ax_bot.transAxes, **kwargs)
+    ax_bot.plot((1 - d, 1 + d), (1 - d, 1 + d), transform=ax_bot.transAxes, **kwargs)
+
+    ax_top.set_ylabel("Detection AUROC")
+    ax_bot.set_xlabel("Implementation-body length bucket (whitespace tokens)")
+    ax_bot.set_xticks(x)
+    ax_bot.set_xticklabels(xlabels, rotation=35, ha="right")
+
+    ax_top.legend(
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.18),
+        ncol=4,
+        frameon=False,
+    )
+
+    fig.tight_layout()
+
+    png_path = out_dir / "fig_mixedcode_auc_by_bucket.png"
+    pdf_path = out_dir / "fig_mixedcode_auc_by_bucket.pdf"
+
+    fig.savefig(png_path, dpi=300, bbox_inches="tight")
+    fig.savefig(pdf_path, bbox_inches="tight")
+    plt.close(fig)
 
 
 def plot_overall_auc(overall: pd.DataFrame, out_dir: Path) -> None:
