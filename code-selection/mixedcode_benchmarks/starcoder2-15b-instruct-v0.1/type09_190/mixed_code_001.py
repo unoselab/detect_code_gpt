@@ -1,150 +1,124 @@
-def hwc_mixed_001_01(self, collection, query):
+def agc_mixed_001_01(self, seqprop, structprop, chain_id,
+                                      seq_ident_cutoff=0.5, allow_missing_on_termini=0.2,
+                                      allow_mutants=True, allow_deletions=False,
+                                      allow_insertions=False, allow_unresolved=True):
+        """Report if a structure's chain meets the defined cutoffs for sequence quality."""
+        seq_ident = seqprop.get_sequence_identity(structprop, chain_id)
+        if seq_ident < seq_ident_cutoff:
+            return False
+        missing_residues = seqprop.get_missing_residues(structprop, chain_id)
+        if missing_residues > allow_missing_on_termini:
+            return False
+        if not allow_mutants and seqprop.has_mutants(structprop, chain_id):
+            return False
+        if not allow_deletions and seqprop.has_deletions(structprop, chain_id):
+            return False
+        if not allow_insertions and seqprop.has_insertions(structprop, chain_id):
+            return False
+        if not allow_unresolved and seqprop.has_unresolved(structprop, chain_id):
+            return False
+        return True 
+
+def agc_mixed_001_02(
+        self, table_data, primary_key=None, add_primary_key_column=False, index_attrs=None
+    ):
         """
-        :param str collection: The name of the collection for the request.
-        :param dict query: Dictionary of solr args.
+        Create a table from :py:class:`tabledata.TableData`.
 
-        Will page through the result set in increments using cursorMark until it has all items. Sort is required for cursorMark \
-        queries, if you don't specify it, the default is 'id desc'.
+        :param tabledata.TableData table_data: Table data to create.
+        :param str primary_key: |primary_key|
+        :param tuple index_attrs: |index_attrs|
 
-        Returns an iterator of SolrResponse objects. For Example::
-
-            >>> for res in solr.cursor_query('SolrClient_unittest',{'q':'*:*'}):
-                    print(res)
-        """
-        cursor = '*'
-        if 'sort' not in query:
-            query['sort'] = 'id desc'
-        while True:
-            query['cursorMark'] = cursor
-            # Get data with starting cursorMark
-            results = self.query(collection, query)
-            if results.get_results_count():
-                cursor = results.get_cursor()
-                yield results
-            else:
-                self.logger.debug("Got zero Results with cursor: {}".format(cursor))
-                break 
-
-def hwc_mixed_001_02():
-    """
-    Read all the template's files
-    """
-
-    files_root = path.join(path.dirname(__file__), 'files')
-
-    for root, dirs, files in walk(files_root):
-        rel_root = path.relpath(root, files_root)
-
-        for file_name in files:
-            try:
-                f = open(path.join(root, file_name), 'r', encoding='utf-8')
-                with f:
-                    yield rel_root, file_name, f.read(), True
-            except UnicodeError:
-                f = open(path.join(root, file_name), 'rb')
-                with f:
-                    yield rel_root, file_name, f.read(), False 
-
-def agc_mixed_001_03(shape, inds=None, return_directions=True):
-    """
-    Get list of grid edges
-    :param shape:
-    :param inds:
-    :param return_directions:
-    :return:
-    """
-    if inds is None:
-        inds = np.arange(np.prod(shape)).reshape(shape)
-    edges = []
-    directions = []
-    for i in range(shape[0]):
-        for j in range(shape[1]):
-            if i < shape[0] - 1:
-                edges.append([inds[i, j], inds[i + 1, j]])
-                directions.append([0, 1])
-            if j < shape[1] - 1:
-                edges.append([inds[i, j], inds[i, j + 1]])
-                directions.append([1, 0])
-    if return_directions:
-        return edges, directions
-    else:
-        return edges 
-
-def agc_mixed_001_04(self):
-        """
-        Get past PythonKC meetup events.
-
-        Returns
-        -------
-        List of ``pythonkc_meetups.types.MeetupEvent``, ordered by event time,
-        descending.
-
-        Exceptions
-        ----------
-        * PythonKCMeetupsBadJson
-        * PythonKCMeetupsBadResponse
-        * PythonKCMeetupsMeetupDown
-        * PythonKCMeetupsNotJson
-        * PythonKCMeetupsRateLimitExceeded
-
+        .. seealso::
+            :py:meth:`.create_table_from_data_matrix`
         """
 
-        response = self.client.get_events()
-        if response.status_code!= 200:
-            raise PythonKCMeetupsBadResponse(response.status_code)
-        try:
-            json_response = response.json()
-        except ValueError:
-            raise PythonKCMeetupsNotJson(response.text)
-        if 'errors' in json_response:
-            raise PythonKCMeetupsBadJson(json_response['errors'])
-        if 'rate_limit_exceeded' in json_response:
-            raise PythonKCMeetupsRateLimitExceeded(json_response['rate_limit_exceeded'])
-        if 'problem' in json_response:
-            raise PythonKCMeetupsMeetupDown(json_response['problem'])
-        events = [MeetupEvent(event) for event in json_response]
-        events.sort(key=lambda event: event.time, reverse=True)
+        if not isinstance(table_data, TableData):
+            raise ValueError("table_data must be an instance of TableData")
+        if primary_key and primary_key not in table_data.headers:
+            raise ValueError(f"primary_key {primary_key} not found in table_data headers")
+        if index_attrs:
+            for index_attr in index_attrs:
+                if index_attr not in table_data.headers:
+                    raise ValueError(f"index_attr {index_attr} not found in table_data headers")
+        data_matrix = table_data.to_data_matrix()
+        table = self.create_table_from_data_matrix(
+            data_matrix, primary_key=primary_key, add_primary_key_column=add_primary_key_column, index_attrs=index_attrs
+        )
 
-        return events 
+        return table 
 
-def hwc_mixed_001_05(self):
+def hwc_mixed_001_03(self, time):
         """
-        Chooses next available server to connect.
+        Set point in time used to check validity of certificates for
+        Time can be either python datetime object or number of seconds
+        sinse epoch
         """
-        if self.options["dont_randomize"]:
-            server = self._server_pool.pop(0)
-            self._server_pool.append(server)
+        if isinstance(time, datetime) or isinstance(time,
+                                                             datetime.date):
+            seconds = int(time.strftime("%s"))
+        elif isinstance(time, int):
+            seconds = time
         else:
-            shuffle(self._server_pool)
+            raise TypeError("datetime.date, datetime.datetime or integer " +
+                            "is required as time argument")
+        raise NotImplementedError 
 
-        s = None
-        for server in self._server_pool:
-            if self.options["max_reconnect_attempts"] > 0 and (
-                    server.reconnects >
-                    self.options["max_reconnect_attempts"]):
-                continue
-            else:
-                s = server
-        return s 
+def hwc_mixed_001_04(self):
+        """Build a key from the "important" parts of a selector: elements,
+        classes, ids.
+        """
+        parts = set()
+        for node in self.simple_selectors:
+            for token in node.tokens:
+                if token[0] not in ':[':
+                    parts.add(token)
 
-def agc_mixed_001_06(organization, github_url, github_token, clone_dir,
-                 verbose, filter, exclude):
-    """Checkout repositories from a GitHub organization."""
-    if not os.path.exists(clone_dir):
-        os.makedirs(clone_dir)
-    cmd = f'gh repo list {organization} --json name --jq ".[] |.name"'
-    if filter:
-        cmd += f' | grep "{filter}"'
-    if exclude:
-        cmd += f' | grep -v "{exclude}"'
-    repos = subprocess.check_output(cmd, shell=True).decode().splitlines()
-    for repo in repos:
-        repo_dir = os.path.join(clone_dir, repo)
-        if os.path.exists(repo_dir):
-            shutil.rmtree(repo_dir)
-        cmd = f'gh repo clone {organization}/{repo} {repo_dir}'
-        if github_token:
-            cmd += f' -t {github_token}'
-        if verbose:
-            cmd +='--verbose'
-        subprocess.run(cmd, shell=True)
+        if not parts:
+            # Should always have at least ONE key; selectors with no elements,
+            # no classes, and no ids can be indexed as None to avoid a scan of
+            # every selector in the entire document
+            parts.add(None)
+
+        return frozenset(parts) 
+
+def hwc_mixed_001_05(self, urns, aff4_type=None, mode="r"):
+    """Opens many urns efficiently, returning cached objects when possible."""
+    not_opened_urns = []
+    _ValidateAFF4Type(aff4_type)
+
+    for urn in urns:
+      key = self._ObjectKey(urn, mode)
+      try:
+        result = self._objects_cache[key]
+        if aff4_type is not None and not isinstance(result, aff4_type):
+          continue
+        yield result
+
+      except KeyError:
+        not_opened_urns.append(urn)
+
+    if not_opened_urns:
+      for obj in FACTORY.MultiOpen(
+          not_opened_urns, follow_symlinks=False, mode=mode, token=self._token):
+        key = self._ObjectKey(obj.urn, mode)
+        self._objects_cache[key] = obj
+
+        if aff4_type is not None and not isinstance(obj, aff4_type):
+          continue
+
+        yield obj 
+
+def agc_mixed_001_06(self, archive_paths, objects_getter, bboxes_getter,
+                         prefixes=None):
+    """Yields examples."""
+    for archive_path in archive_paths:
+        with tf.io.gfile.GFile(archive_path, "rb") as f:
+            archive = zipfile.ZipFile(f)
+            for name in archive.namelist():
+                if prefixes and not any(name.startswith(p) for p in prefixes):
+                    continue
+                with archive.open(name) as file:
+                    obj = objects_getter(file)
+                    bboxes = bboxes_getter(obj)
+                    yield name, obj, bboxes

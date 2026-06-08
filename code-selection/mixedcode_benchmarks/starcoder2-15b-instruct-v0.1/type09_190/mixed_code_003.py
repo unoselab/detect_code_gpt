@@ -1,129 +1,147 @@
-def agc_mixed_003_01(self) -> List['DAGCircuit']:
-        """Split DAGCircuit into independent components"""
-        components = []
-        visited = set()
+def hwc_mixed_003_01(self):
+        """Convert to the internal representation of (angstroms, photlam).
+        This is for internal use only.
 
-        def dfs(node):
-            if node not in visited:
-                visited.add(node)
-                for neighbor in node.neighbors:
-                    dfs(neighbor)
-
-        for node in self.nodes:
-            if node not in visited:
-                component = DAGCircuit()
-                dfs(node)
-                components.append(component)
-
-        return components 
-
-def hwc_mixed_003_02(self):
-        """Raise ACTIVE CHECK RESULT entry
-        Example : "ACTIVE HOST CHECK: server;DOWN;HARD;1;I don't know what to say..."
-
-        :return: None
         """
-        if not self.__class__.log_active_checks:
-            return
+        self.validate_units()
 
-        log_level = 'info'
-        if self.state == 'DOWN':
-            log_level = 'error'
-        elif self.state == 'UNREACHABLE':
-            log_level = 'warning'
-        brok = make_monitoring_log(
-            log_level, 'ACTIVE HOST CHECK: %s;%s;%d;%s' % (self.get_name(), self.state,
-                                                           self.attempt, self.output)
-        )
-        self.broks.append(brok) 
+        savewunits = self.waveunits
+        savefunits = self.fluxunits
 
-def hwc_mixed_003_03(length=12,
-                      allowed_chars='abcdefghijklmnopqrstuvwxyz'
-                                    'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'):
+        if hasattr(self, 'primary_area'):
+            area = self.primary_area
+        else:
+            area = None
+
+        angwave = self.waveunits.Convert(self.GetWaveSet(), 'angstrom')
+        phoflux = self.fluxunits.Convert(angwave, self._fluxtable, 'photlam',
+                                         area=area)
+
+        self._wavetable = angwave.copy()
+        self._fluxtable = phoflux.copy()
+
+        self.waveunits = savewunits
+        self.fluxunits = savefunits 
+
+def agc_mixed_003_02(self):
+        """
+        Returns errors on:
+        Certificate, PrivateKey or Chain not being properly formatted
+        Arn not existing if its provided
+        PrivateKey size > 2048
+        Certificate expired or is not yet in effect
+
+        Does not return errors on:
+        Checking Certificate is legit, or a selfsigned chain is provided
+
+        :return: str(JSON) for response
+        """
+        errors = []
+        if not self.certificate:
+            errors.append("Certificate not properly formatted")
+        if not self.private_key:
+            errors.append("PrivateKey not properly formatted")
+        if not self.chain:
+            errors.append("Chain not properly formatted")
+        if self.arn and not self.certificate_manager.get_certificate(self.arn):
+            errors.append("Arn not existing")
+        if len(self.private_key) > 2048:
+            errors.append("PrivateKey size > 2048")
+        if self.certificate.not_valid_before > datetime.now() or self.certificate.not_valid_after < datetime.now():
+            errors.append("Certificate expired or is not yet in effect")
+        return json.dumps(errors) 
+
+def hwc_mixed_003_03(ret, ruby, user=None):
     """
-    Return a securely generated random string.
-    The default length of 12 with the a-z, A-Z, 0-9 character set returns
-    a 71-bit value. log_2((26+26+10)^12) =~ 71 bits
+    Verify that ruby is uninstalled
     """
-    if not using_sysrandom:
-        # This is ugly, and a hack, but it makes things better than
-        # the alternative of predictability. This re-seeds the PRNG
-        # using a value that is hard for an attacker to predict, every
-        # time a random string is required. This may change the
-        # properties of the chosen random sequence slightly, but this
-        # is better than absolute predictability.
-        random.seed(
-            hashlib.sha256(
-                ('%s%s%s' % (random.getstate(), time.time(), settings.SECRET_KEY)).encode()
-            ).digest()
-        )
-        return ''.join(random.choice(allowed_chars) for i in range(length)) 
+    ret = _ruby_installed(ret, ruby, user=user)
+    if ret['result']:
+        if ret['default']:
+            __salt__['rbenv.default']('system', runas=user)
 
-def agc_mixed_003_04(self, ds):
-        """
-        Check the axis attribute of coordinate variables
-
-        CF §4 The attribute axis may be attached to a coordinate variable and
-        given one of the values X, Y, Z or T which stand for a longitude,
-        latitude, vertical, or time axis respectively. Alternatively the
-        standard_name attribute may be used for direct identification.
-
-        :param netCDF4.Dataset ds: An open netCDF dataset
-        :rtype: list
-        :return: List of results
-        """
-        results = []
-        for var_name, var in ds.variables.items():
-            if 'axis' in var.ncattrs():
-                axis = var.getncattr('axis')
-                if axis in ['X', 'Y', 'Z', 'T']:
-                    results.append((var_name, axis))
-            elif'standard_name' in var.ncattrs():
-                standard_name = var.getncattr('standard_name')
-                if standard_name in ['longitude', 'latitude', 'height', 'time']:
-                    results.append((var_name, standard_name))
-
-        return results 
-
-def agc_mixed_003_05(self, path=None, fatal=True, logger=None):
-        """
-        :param str|None path: Load this object from file with 'path' (default: self._path)
-        :param bool|None fatal: Abort execution on failure if True
-        :param callable|None logger: Logger to use
-        """
-        if path is None:
-            path = self._path
-        if logger is None:
-            logger = self._logger
-        try:
-            with open(path, 'r') as f:
-                data = f.read()
-                self._data = data
-        except Exception as e:
-            if fatal:
-                raise e
-            else:
-                logger.error(f'Failed to load data from {path}: {e}') 
-
-def hwc_mixed_003_06(df, other):
-    """
-    Helper function to ensure that DataFrames are valid for set operations.
-    Columns must be the same name in the same order, and indices must be of the
-    same dimension with the same names.
-    """
-
-    if df.columns.values.tolist() != other.columns.values.tolist():
-        not_in_df = [col for col in other.columns if col not in df.columns]
-        not_in_other = [col for col in df.columns if col not in other.columns]
-        error_string = 'Error: not compatible.'
-        if len(not_in_df):
-            error_string += ' Cols in y but not x: ' + str(not_in_df) + '.'
-        if len(not_in_other):
-            error_string += ' Cols in x but not y: ' + str(not_in_other) + '.'
-        raise ValueError(error_string)
-    if len(df.index.names) != len(other.index.names):
-        raise ValueError('Index dimension mismatch')
-    if df.index.names != other.index.names:
-        raise ValueError('Index mismatch')
+        if __salt__['rbenv.uninstall_ruby'](ruby, runas=user):
+            ret['result'] = True
+            ret['changes'][ruby] = 'Uninstalled'
+            ret['comment'] = 'Successfully removed ruby'
+            return ret
+        else:
+            ret['result'] = False
+            ret['comment'] = 'Failed to uninstall ruby'
+            return ret
     else:
-        return
+        ret['result'] = True
+        ret['comment'] = 'Ruby {0} is already absent'.format(ruby)
+
+    return ret 
+
+def agc_mixed_003_04(ins):
+    """ Defines a memory space with a default set of bytes/words in hexadecimal
+    (starting with a number) or literals (starting with #).
+    Numeric values with more than 2 digits represents a WORD (2 bytes) value.
+    E.g. '01' => 0, '001' => 1, 0 bytes
+    Literal values starts with # (1 byte) or ## (2 bytes)
+    E.g. '#label + 1' => (label + 1) & 0xFF
+         '##(label + 1)' => (label + 1) & 0xFFFF
+    """
+    if ins.startswith('0x'):
+        value = int(ins[2:], 16)
+        if len(ins) == 4:
+            return value & 0xFF
+        elif len(ins) == 6:
+            return value & 0xFFFF
+        else:
+            raise ValueError("Invalid hexadecimal value")
+    elif ins.startswith('#'):
+        if len(ins) == 2:
+            return eval(ins[1:]) & 0xFF
+        elif len(ins) == 3:
+            return eval(ins[1:]) & 0xFFFF
+        else:
+            raise ValueError("Invalid literal value")
+    else:
+        raise ValueError("Invalid input") 
+
+def hwc_mixed_003_05(cls, action_map=None, **initkwargs):
+        """
+        Allows custom request to method routing based on given ``action_map`` kwarg.
+        """
+
+        # Needs to re-implement the method but contains all the things the parent does.
+        if not action_map:  # actions must not be empty
+            raise TypeError("action_map is a required argument.")
+
+        def view(request):
+            self = cls(**initkwargs)
+            self.request = request
+            self.lookup_url_kwargs = self.request.matchdict
+            self.action_map = action_map
+            self.action = self.action_map.get(self.request.method.lower())
+
+            for method, action in action_map.items():
+                handler = getattr(self, action)
+                setattr(self, method, handler)
+
+            return self.dispatch(self.request, **self.request.matchdict)
+
+        return view 
+
+def agc_mixed_003_06(self):
+        """
+        Return the unicode XML snippet for the ``<c:val>`` element describing
+        this series, containing the series values and their spreadsheet range
+        reference.
+        """
+        values = self._values
+        if values is None:
+            values = self._values = self._series_values()
+        value_xml = []
+        for value in values:
+            value_xml.append(
+                '<c:ptCount val="{count}"/><c:numCache>{values}</c:numCache>'
+               .format(
+                    count=len(value),
+                    values="".join(value)
+                )
+            )
+        return "".join(value_xml)

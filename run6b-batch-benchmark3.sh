@@ -87,17 +87,28 @@ mkdir -p "${LOG_DIR}" "${OUTPUT_ROOT}"
   #   --preview
 
   ## FULL RUN
-  echo ""
-  echo "=== FULL RUN ==="
-  echo "[RUN] CUDA_VISIBLE_DEVICES=${CUDA_DEVICE} python main_mixedcode_benchmark.py \\"
-  echo "        --benchmark_root \"${BENCHMARK_ROOT}\" \\"
-  echo "        --base_model_name \"${BASE_MODEL_NAME}\" \\"
-  echo "        --output_name mixedcode_${GEN_MODEL}_50files"
-  echo ""
+  # echo ""
+  # echo "=== FULL RUN ==="
+  # echo "[RUN] CUDA_VISIBLE_DEVICES=${CUDA_DEVICE} python main_mixedcode_benchmark.py \\"
+  # echo "        --benchmark_root \"${BENCHMARK_ROOT}\" \\"
+  # echo "        --base_model_name \"${BASE_MODEL_NAME}\" \\"
+  # echo "        --output_name mixedcode_${GEN_MODEL}_50files"
+  # echo ""
   
-  CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}" python main_mixedcode_benchmark.py \
+  # CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}" python main_mixedcode_benchmark.py \
+  #   --benchmark_root "${BENCHMARK_ROOT}" \
+  #   --base_model_name "${BASE_MODEL_NAME}" \
+  #   --output_name "mixedcode_${GEN_MODEL}_50files"
+
+  # To update the group `type10_200` in place inside the 50files cache:
+  # --update_cache ../logs/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_50files.pkl \
+  CUDA_VISIBLE_DEVICES=0 python main_mixedcode_benchmark.py \
     --benchmark_root "${BENCHMARK_ROOT}" \
     --base_model_name "${BASE_MODEL_NAME}" \
-    --output_name "mixedcode_${GEN_MODEL}_50files"
+    --only_group type09_190 \
+    --update_cache ../logs/results_cache_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files.pkl \
+    --output_name "mixedcode_${GEN_MODEL}_50files-new1"
+
+
 
 } 2>&1 | tee "${LOG_FILE}"

@@ -1,136 +1,72 @@
-def hwc_mixed_005_01(self):
-        """ Return handler capture statistics
+def agc_mixed_005_01(text, width=100, height=3, corner="+", horizontal="-", vertical="|"):
+        """Return a ascii box, with your text center-aligned.
 
-        Return a dictionary of capture handler statistics of the form:
+        Usage Example::
 
-        .. code-block:: none
-
-            [{
-                'name': The handler's name,
-
-                'reads': The number of packet reads this handler has received
-
-                'data_read_length': The total length of the data received
-
-                'approx_data_rate': The approximate data rate for this handler
-            }, ...]
-
+            >>> StringTemplate.box("Hello world!", 20, 5)
+            +------------------+
+            |                  |
+            |   Hello world!   |
+            |                  |
+            +------------------+
         """
-        stats = []
-        for h in self.capture_handlers:
-            now = calendar.timegm(time.gmtime())
-            rot_time = calendar.timegm(h['log_rot_time'])
-            time_delta = now - rot_time
-            approx_data_rate = '{} bytes/second'.format(h['data_read'] / float(time_delta))
+        box_width = max(len(text), width)
+        box_height = max(height, 3)
+        box = [corner + horizontal * box_width + corner]
+        for _ in range(box_height - 2):
+            box.append(vertical + " " * box_width + vertical)
+        box.append(corner + horizontal * box_width + corner)
+        text_width = len(text)
+        text_height = 1
+        text_x = (box_width - text_width) // 2
+        text_y = (box_height - text_height) // 2
+        box[text_y] = box[text_y][:text_x] + " " * text_width + box[text_y][text_x + text_width:]
+        box[text_y] = box[text_y][:text_x] + text + box[text_y][text_x + text_width:]
 
-            stats.append({
-                'name': h['name'],
-                'reads': h['reads'],
-                'data_read_length': '{} bytes'.format(h['data_read']),
-                'approx_data_rate': approx_data_rate
-            })
+        return "\n".join(box) 
 
-        return stats 
-
-def agc_mixed_005_02(start, end, periods, offset):
-    """Generate a regular range of cftime.datetime objects with a
-    given time offset.
-
-    Adapted from pandas.tseries.offsets.generate_range.
-
-    Parameters
-    ----------
-    start : cftime.datetime, or None
-        Start of range
-    end : cftime.datetime, or None
-        End of range
-    periods : int, or None
-        Number of elements in the sequence
-    offset : BaseCFTimeOffset
-        An offset class designed for working with cftime.datetime objects
-
-    Returns
-    -------
-    A generator object
+def hwc_mixed_005_02():
+    """returns a list of files that should be watched by the Flask server
+    when in debug mode to trigger a reload of the server
     """
-    if periods is not None:
-        if start is not None:
-            end = start + offset * (periods - 1)
-        else:
-            start = end - offset * (periods - 1)
-    else:
-        if start is not None and end is not None:
-            periods = int((end - start) / offset) + 1
-        else:
-            raise ValueError("Either `periods` or both `start` and `end` must be specified")
+    FILES_TO_SKIP = ["src/gdbgui.js"]
+    THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+    extra_dirs = [THIS_DIR]
+    extra_files = []
+    for extra_dir in extra_dirs:
+        for dirname, _, files in os.walk(extra_dir):
+            for filename in files:
+                filepath = os.path.join(dirname, filename)
+                if os.path.isfile(filepath) and filepath not in extra_files:
+                    for skipfile in FILES_TO_SKIP:
+                        if skipfile not in filepath:
+                            extra_files.append(filepath)
+    return extra_files 
 
-    if start is not None:
-        yield start
-
-    for _ in range(periods - 1):
-        start += offset
-        yield start 
-
-def agc_mixed_005_03(self, ostream, treeish=None, prefix=None, **kwargs):
-        """Archive the tree at the given revision.
-
-        :param ostream: file compatible stream object to which the archive will be written as bytes
-        :param treeish: is the treeish name/id, defaults to active branch
-        :param prefix: is the optional prefix to prepend to each filename in the archive
-        :param kwargs: Additional arguments passed to git-archive
-
-            * Use the 'format' argument to define the kind of format. Use
-              specialized ostreams to write any format supported by python.
-            * You may specify the special **path** keyword, which may either be a repository-relative
-              path to a directory or file to place into the archive, or a list or tuple of multiple paths.
-
-        :raise GitCommandError: in case something went wrong
-        :return: self"""
-        if treeish is None:
-            treeish = self.active_branch
-        cmd = ['git', 'archive']
-        if prefix is not None:
-            cmd.extend(['--prefix', prefix])
-        cmd.extend([treeish, '--output', ostream.name])
-        if 'format' in kwargs:
-            cmd.extend(['--format', kwargs['format']])
-        if 'path' in kwargs:
-            if isinstance(kwargs['path'], (list, tuple)):
-                cmd.extend(kwargs['path'])
-            else:
-                cmd.append(kwargs['path'])
-        self.git.execute(cmd)
-        return self 
-
-def hwc_mixed_005_04(client):
-        """Returns a list of all the roles for an account. Returns a list containing all the roles for the account.
-
-        Args:
-            client (:obj:`boto3.session.Session`): A boto3 Session object
-
-        Returns:
-            :obj:`list` of `dict`
+def agc_mixed_005_03(self, root_path, dir_cb, listing_cb, max_listing_size=0, 
+                max_depth=MAX_REMOTE_RECURSION_DEPTH):
+        """Recursively iterate a directory. Invoke callbacks for directories 
+        and entries (both are optional, but it doesn't make sense unless one is 
+        provided). "max_listing_size" will allow for the file-listing to be 
+        chunked into manageable pieces. "max_depth" limited how deep recursion 
+        goes. This can be used to make it easy to simply read a single 
+        directory in chunks.
         """
-        done = False
-        marker = None
-        roles = []
 
-        while not done:
-            if marker:
-                response = client.list_roles(Marker=marker)
-            else:
-                response = client.list_roles()
+        def recurse_helper(path, depth):
+            if depth > max_depth:
+                return
+            if dir_cb:
+                dir_cb(path)
+            if listing_cb:
+                for entry in self.list_dir(path, max_listing_size):
+                    listing_cb(entry)
+                    if entry.is_dir():
+                        recurse_helper(entry.path, depth + 1)
 
-            roles += response['Roles']
+        recurse_helper(root_path, 0) 
 
-            if response['IsTruncated']:
-                marker = response['Marker']
-            else:
-                done = True
-
-        return roles 
-
-def hwc_mixed_005_05(cls, d, encoding='base64'):
+def hwc_mixed_005_04(cls, d, encoding='base64'):
         """
         Construct a ``Report`` object from dictionary.
 
@@ -154,24 +90,48 @@ def hwc_mixed_005_05(cls, d, encoding='base64'):
 
         return report 
 
-def agc_mixed_005_06(self):
-        """Create a property dict that is used to recreate an edge dictionary for a :class:`BELGraph`.
+def hwc_mixed_005_05(self, instance_or_query):
+        """Delete an ``instance`` or a ``query``.
 
-        :return: Property dictionary of an edge that is participant (sub/obj) related.
-        :rtype: dict
+        Adds ``instance_or_query`` to this :class:`Session` list
+        of data to be deleted. If the session is not in a
+        :ref:`transactional state <transactional-state>`, this operation
+        commits changes to the backend server immediately.
+
+        :parameter instance_or_query: a :class:`Model` instance or
+            a :class:`Query`.
         """
-        return {
-            "subject": self.subject,
-            "object": self.object,
-            "relation": self.relation,
-            "name": self.name,
-            "namespace": self.namespace,
-            "identifier": self.identifier,
-            "resource": self.resource,
-            "variant": self.variant,
-            "location": self.location,
-            "evidence": self.evidence,
-            "annotations": self.annotations,
-            "citation": self.citation,
-            "support": self.support,
-        }
+        sm = self.model(instance_or_query)
+        # not an instance of a Model. Assume it is a query.
+        if is_query(instance_or_query):
+            if instance_or_query.session is not self:
+                raise ValueError('Adding a query generated by another session')
+            sm._delete_query.append(instance_or_query)
+        else:
+            instance_or_query = sm.delete(instance_or_query, self)
+        if not self.transaction:
+            transaction = self.begin()
+            return transaction.commit(
+                lambda: transaction.deleted.get(sm._meta))
+        else:
+            return instance_or_query 
+
+def agc_mixed_005_06(self, key):
+        """
+        Returns a list with keys of this DAWG that are prefixes of the ``key``.
+        """
+        prefixes = []
+        node = self.root
+        for char in key:
+            if char not in node.children:
+                return []
+            node = node.children[char]
+        queue = [(node, key)]
+        while queue:
+            node, prefix = queue.pop(0)
+            if node.is_word:
+                prefixes.append(prefix)
+            for char, child in node.children.items():
+                queue.append((child, prefix + char))
+
+        return prefixes

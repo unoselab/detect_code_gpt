@@ -50,17 +50,29 @@ mkdir -p "${LOG_DIR}"
 
   cd "${CODE_SELECTION_DIR}"
 
-  echo "[RUN] python generate_mixedcode_benchmark.py \\"
-  echo "        --input_csv \"${INPUT_CSV}\" \\"
-  echo "        --out_dir \"${OUTPUT_DIR}\" \\"
-  echo "        --files_per_type \"${FILES_PER_TYPE}\" \\"
-  echo "        --seed \"${SEED}\""
-  echo ""
+  # echo "[RUN] python generate_mixedcode_benchmark.py \\"
+  # echo "        --input_csv \"${INPUT_CSV}\" \\"
+  # echo "        --out_dir \"${OUTPUT_DIR}\" \\"
+  # echo "        --files_per_type \"${FILES_PER_TYPE}\" \\"
+  # echo "        --seed \"${SEED}\""
+  # echo ""
+
+  # python generate_mixedcode_benchmark.py \
+  #   --input_csv "${INPUT_CSV}" \
+  #   --out_dir "${OUTPUT_DIR}" \
+  #   --files_per_type "${FILES_PER_TYPE}" \
+  #   --seed "${SEED}"
 
   python generate_mixedcode_benchmark.py \
-    --input_csv "${INPUT_CSV}" \
+    --input_csv "$INPUT_CSV" \
     --out_dir "${OUTPUT_DIR}" \
-    --files_per_type "${FILES_PER_TYPE}" \
-    --seed "${SEED}"
+    --only_targets 190 \
+    --bucket_width_overrides 190:15 \
+    --exclude_used_dir "${OUTPUT_DIR}" \
+    --exclude_roles AGC \
+    --type_suffix new1 \
+    --files_per_type 5 \
+    --seed 4
+
 
 } 2>&1 | tee "${LOG_FILE}"

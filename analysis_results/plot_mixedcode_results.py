@@ -59,10 +59,11 @@ BUCKET_LABELS = {
 }
 
 MODEL_STYLES = {
-    "CL7B":   {"linestyle": "-",  "marker": "o"},
-    "SC7B":   {"linestyle": "--", "marker": "s"},
-    "SC15B":  {"linestyle": "-.", "marker": "^"},
-    "GO120B": {"linestyle": ":",  "marker": "D"},
+    "CL7B": {"linestyle": "-", "marker": "o"},
+    "SC7B": {"linestyle": "--", "marker": "s"},
+    "SC15B": {"linestyle": "-.", "marker": "^"},
+    "GO120B": {"linestyle": ":", "marker": "D"},
+    "Gemma": {"linestyle": (0, (5, 1, 1, 1)), "marker": "v"},
 }
 
 BUCKET_ORDER = list(BUCKET_LABELS.keys())
@@ -380,6 +381,7 @@ def plot_auc_by_bucket(bucket_df: pd.DataFrame, out_dir: Path) -> None:
     """
     Plot mixed-code AUROC by implementation-body length bucket
     using black-only line styles and a broken y-axis.
+
     Expected columns in bucket_df:
         - model
         - bucket
@@ -389,7 +391,7 @@ def plot_auc_by_bucket(bucket_df: pd.DataFrame, out_dir: Path) -> None:
 
     df = bucket_df.copy()
 
-    # normalize / guard
+    # Normalize / guard.
     if "benchmark_type" in df.columns and "bucket" not in df.columns:
         df["bucket"] = df["benchmark_type"]
 
@@ -407,27 +409,30 @@ def plot_auc_by_bucket(bucket_df: pd.DataFrame, out_dir: Path) -> None:
     x = np.arange(len(BUCKET_ORDER))
     xlabels = [BUCKET_LABELS[b] for b in BUCKET_ORDER]
 
+    # Top axis shows the meaningful AUROC range and random baseline.
+    # Bottom axis keeps the visible origin but compresses the empty region.
     fig, (ax_top, ax_bot) = plt.subplots(
         2,
         1,
         sharex=True,
-        figsize=(12.5, 5.4),
-        gridspec_kw={"height_ratios": [4, 1], "hspace": 0.05},
+        figsize=(12.5, 5.2),
+        gridspec_kw={"height_ratios": [7.5, 1.0], "hspace": 0.04},
     )
 
-    # black-only academic style
+    # Black-only academic style.
     for model in MODEL_ORDER:
         sub = df[df["model"] == model].copy()
         if sub.empty:
             continue
 
         sub = sub.set_index("bucket").reindex(BUCKET_ORDER).reset_index()
-        y = sub["auc"].to_numpy()
+        y = sub["auc"].to_numpy(dtype=float)
 
         style = MODEL_STYLES.get(model, {"linestyle": "-", "marker": "o"})
 
         ax_top.plot(
-            x, y,
+            x,
+            y,
             color="black",
             linestyle=style["linestyle"],
             marker=style["marker"],
@@ -435,8 +440,12 @@ def plot_auc_by_bucket(bucket_df: pd.DataFrame, out_dir: Path) -> None:
             markersize=5.5,
             label=model,
         )
+
+        # Plot same data on bottom axis so clipped continuation is consistent,
+        # although data points are outside the bottom y-range.
         ax_bot.plot(
-            x, y,
+            x,
+            y,
             color="black",
             linestyle=style["linestyle"],
             marker=style["marker"],
@@ -444,34 +453,70 @@ def plot_auc_by_bucket(bucket_df: pd.DataFrame, out_dir: Path) -> None:
             markersize=5.5,
         )
 
-    # broken y-axis ranges
+    # Broken y-axis ranges.
+    # Bottom preserves the fact that AUROC starts at 0.
+    # Top keeps random baseline and all observed values visible.
     ax_top.set_ylim(0.45, 1.005)
-    ax_bot.set_ylim(0.00, 0.1)
+    ax_bot.set_ylim(0.00, 0.10)
 
-    # random baseline
-    ax_bot.axhline(0.7, color="black", linestyle="--", linewidth=1.2)
-    ax_bot.text(len(BUCKET_ORDER) - 1.65, 0.17, "random", fontsize=11)
+    # Random baseline must be drawn on the top axis because y=0.5 is in ax_top range.
+    ax_top.axhline(0.5, color="black", linestyle="--", linewidth=1.2)
+    ax_top.text(
+        len(BUCKET_ORDER) - 1.65,
+        0.515,
+        "random",
+        fontsize=11,
+        ha="left",
+        va="bottom",
+    )
 
-    # styling
+    # Remove spines between the two axes.
     ax_top.spines["bottom"].set_visible(False)
     ax_bot.spines["top"].set_visible(False)
-    ax_top.tick_params(labeltop=False)
+
+    # Prevent duplicated x ticks in the broken-axis gap.
+    ax_top.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
     ax_bot.xaxis.tick_bottom()
 
-    # zigzag / break marks 
+    # Zigzag / broken-axis marks.
     d = 0.008
     kwargs = dict(color="black", clip_on=False, linewidth=1.2)
 
-    ax_top.plot((-d, +d), (-d, +d), transform=ax_top.transAxes, **kwargs)
-    ax_top.plot((1 - d, 1 + d), (-d, +d), transform=ax_top.transAxes, **kwargs)
+    ax_top.plot(
+        (-d, +d),
+        (-d, +d),
+        transform=ax_top.transAxes,
+        **kwargs,
+    )
+    ax_top.plot(
+        (1 - d, 1 + d),
+        (-d, +d),
+        transform=ax_top.transAxes,
+        **kwargs,
+    )
 
-    ax_bot.plot((-d, +d), (1 - d, 1 + d), transform=ax_bot.transAxes, **kwargs)
-    ax_bot.plot((1 - d, 1 + d), (1 - d, 1 + d), transform=ax_bot.transAxes, **kwargs)
+    ax_bot.plot(
+        (-d, +d),
+        (1 - d, 1 + d),
+        transform=ax_bot.transAxes,
+        **kwargs,
+    )
+    ax_bot.plot(
+        (1 - d, 1 + d),
+        (1 - d, 1 + d),
+        transform=ax_bot.transAxes,
+        **kwargs,
+    )
 
+    # Labels and ticks.
     ax_top.set_ylabel("Detection AUROC")
     ax_bot.set_xlabel("Implementation-body length bucket (whitespace tokens)")
     ax_bot.set_xticks(x)
     ax_bot.set_xticklabels(xlabels, rotation=35, ha="right")
+
+    # Keep bottom y-axis minimal: only show origin area.
+    ax_bot.set_yticks([0.00, 0.05, 0.10])
+    ax_bot.set_yticklabels(["0.00", "0.05", "0.10"])
 
     ax_top.legend(
         loc="upper center",
@@ -488,6 +533,7 @@ def plot_auc_by_bucket(bucket_df: pd.DataFrame, out_dir: Path) -> None:
     fig.savefig(png_path, dpi=300, bbox_inches="tight")
     fig.savefig(pdf_path, bbox_inches="tight")
     plt.close(fig)
+
 
 
 def plot_overall_auc(overall: pd.DataFrame, out_dir: Path) -> None:

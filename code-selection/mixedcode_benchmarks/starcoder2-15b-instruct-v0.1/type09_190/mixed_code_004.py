@@ -1,129 +1,137 @@
-def agc_mixed_004_01(align_bams, ref_file, items):
-    """Ensure inputs to calling are indexed as expected.
-    """
-    if not align_bams:
-        raise ValueError("No align_bams provided!")
-    if not ref_file:
-        raise ValueError("No ref_file provided!")
-    if not items:
-        raise ValueError("No items provided!")
-    if not isinstance(align_bams, list):
-        raise TypeError("align_bams must be a list!")
-    if not isinstance(ref_file, str):
-        raise TypeError("ref_file must be a string!")
-    if not isinstance(items, list):
-        raise TypeError("items must be a list!")
-    for bam in align_bams:
-        if not bam.endswith(".bam"):
-            raise ValueError("All align_bams must be BAM files!")
-    for item in items:
-        if not isinstance(item, str):
-            raise TypeError("All items must be strings!") 
-
-def agc_mixed_004_02(a, b, scale=1):
-    """Intersection between two segments."""
-    x1, y1 = a[0], a[1]
-    x2, y2 = a[2], a[3]
-    x3, y3 = b[0], b[1]
-    x4, y4 = b[2], b[3]
-    denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-    if denominator == 0:
-        return None
-    u_a = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denominator
-    u_b = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denominator
-    if 0 <= u_a <= 1 and 0 <= u_b <= 1:
-        x = x1 + u_a * (x2 - x1)
-        y = y1 + u_a * (y2 - y1)
-        return (x * scale, y * scale)
-    else:
-        return None 
-
-def agc_mixed_004_03(self):
+def hwc_mixed_004_01(self, channel, value, unit='A'):
+        """Setting current of current source
         """
-        Returns errors on:
-        Certificate, PrivateKey or Chain not being properly formatted
-        Arn not existing if its provided
-        PrivateKey size > 2048
-        Certificate expired or is not yet in effect
-
-        Does not return errors on:
-        Checking Certificate is legit, or a selfsigned chain is provided
-
-        :return: str(JSON) for response
-        """
-        errors = []
-        if not self.certificate:
-            errors.append("Certificate not properly formatted")
-        if not self.private_key:
-            errors.append("PrivateKey not properly formatted")
-        if not self.chain:
-            errors.append("Chain not properly formatted")
-        if self.arn and not self.certificate_manager.get_certificate(self.arn):
-            errors.append("Arn not existing")
-        if len(self.private_key) > 2048:
-            errors.append("PrivateKey size > 2048")
-        if self.certificate.not_valid_before > datetime.now() or self.certificate.not_valid_after < datetime.now():
-            errors.append("Certificate expired or is not yet in effect")
-        return json.dumps(errors) 
-
-def hwc_mixed_004_04(self):
-        """
-        Returns combined size in bytes for all repository files
-        """
-
-        size = 0
-        try:
-            tip = self.get_changeset()
-            for topnode, dirs, files in tip.walk('/'):
-                for f in files:
-                    size += tip.get_file_size(f.path)
-                for dir in dirs:
-                    for f in files:
-                        size += tip.get_file_size(f.path)
-
-        except RepositoryError:
-            pass
-        return size 
-
-def hwc_mixed_004_05(self, field_name, field_body):
-        """Fill content into nodes.
-
-        :param string field_name: Field name of the field
-        :param field_name: Field body if the field
-        :type field_name: str or instance of docutils.nodes
-        :return: field instance filled with given name and body
-        :rtype: nodes.field
-
-        """
-        name = nodes.field_name()
-        name += nodes.Text(field_name)
-
-        paragraph = nodes.paragraph()
-        if isinstance(field_body, str):
-            # This is the case when field_body is just a string:
-            paragraph += nodes.Text(field_body)
+        dac_offset = self._ch_cal[channel]['DAC']['offset']
+        dac_gain = self._ch_cal[channel]['DAC']['gain']
+        if unit == 'raw':
+            value = value
+        elif unit == 'A':
+            value = int((-value * 1000000 - dac_offset) / dac_gain)  # fix sign of output
+        elif unit == 'mA':
+            value = int((-value * 1000 - dac_offset) / dac_gain)  # fix sign of output
+        elif unit == 'uA':
+            value = int((-value - dac_offset) / dac_gain)  # fix sign of output
         else:
-            # This is the case when field_body is a complex node:
-            # useful when constructing nested field lists
-            paragraph += field_body
+            raise TypeError("Invalid unit type.")
 
-        body = nodes.field_body()
-        body += paragraph
+        self._set_dac_value(channel=channel, value=value) 
 
-        field = nodes.field()
-        field.extend([name, body])
-        return field 
+def agc_mixed_004_02(self, device):
+        """ Updates the device information based on files from its 'mount_point'
+            @param device Dictionary containing device information
+        """
+        device_name = device['name']
+        device_mount_point = device['mount_point']
+        device_files = os.listdir(device_mount_point)
+        for file_name in device_files:
+            file_path = os.path.join(device_mount_point, file_name)
+            if os.path.isfile(file_path):
+                file_size = os.path.getsize(file_path)
+                file_modification_time = os.path.getmtime(file_path)
+                device[file_name] = {
+                   'size': file_size,
+                   'modification_time': file_modification_time
+                } 
 
-def hwc_mixed_004_06(self, binstring):
-        """Same as _setbin_safe, but input isn't sanity checked. binstring mustn't start with '0b'."""
-        length = len(binstring)
-        # pad with zeros up to byte boundary if needed
-        boundary = ((length + 7) // 8) * 8
-        padded_binstring = binstring + '0' * (boundary - length)\
-                           if len(binstring) < boundary else binstring
+def hwc_mixed_004_03(traceback):
+    """
+    For internal use only (until further notice)
+    """
+    if email().format == 'html':
         try:
-            bytelist = [int(padded_binstring[x:x + 8], 2)
-                        for x in xrange(0, len(padded_binstring), 8)]
-        except ValueError:
-            raise CreationError("Invalid character in bin initialiser {0}.", binstring)
-        self._setbytes_unsafe(bytearray(bytelist), length, 0)
+            from pygments import highlight
+            from pygments.lexers import PythonTracebackLexer
+            from pygments.formatters import HtmlFormatter
+            with_pygments = True
+        except ImportError:
+            with_pygments = False
+
+        if with_pygments:
+            formatter = HtmlFormatter(noclasses=True)
+            wrapped = highlight(traceback, PythonTracebackLexer(), formatter)
+        else:
+            wrapped = '<pre>%s</pre>' % traceback
+    else:
+        wrapped = traceback
+
+    return wrapped 
+
+def agc_mixed_004_04(self, subnetId, domainId):
+        """ Function removeDomain
+        Delete a domain from a subnet
+
+        @param subnetId: The subnet Id
+        @param domainId: The domainId to be attached wiuth the subnet
+        @return RETURN: boolean
+        """
+        try:
+            subnet = self.getSubnet(subnetId)
+            if subnet is None:
+                return False
+
+            if domainId in subnet.domains:
+                subnet.domains.remove(domainId)
+                subnet.save()
+                return True
+            else:
+                return False
+        except Exception as e:
+            log.error("Exception: %s" % str(e))
+            return False 
+
+def agc_mixed_004_05(self, garbage=0, clean=0, deflate=0, ascii=0, expand=0, linear=0, pretty=0, decrypt=1):
+        """Write document to a bytes object."""
+
+        if garbage:
+            return b'GARBAGE'
+        if clean:
+            return b'CLEAN'
+        if deflate:
+            return b'DEFLATE'
+        if ascii:
+            return b'ASCII'
+        if expand:
+            return b'EXPAND'
+        if linear:
+            return b'LINEAR'
+        if pretty:
+            return b'PRETTY'
+        if decrypt:
+            return b'DECRYPT'
+        return b'' 
+
+def hwc_mixed_004_06(target, mobile, target_i=0, mobile_i=0):
+    """Aligns one Polypeptide (mobile) to another (target).
+
+    Notes
+    -----
+    This function directly modifies atoms of the mobile Polypeptide!
+    It does not return a new object.
+
+    Parameters
+    ----------
+    target : Polypeptide
+        Polypeptide to be aligned to.
+    mobile : Polypeptide
+        Polypeptide to be moved during alignment.
+    target_i : int, optional
+        Index of `Residue` in target to align to.
+    mobile_i : int, optional
+        Index of `Residue` in mobile to be aligned.
+    """
+    # First, align N->CA vectors.
+    s1, e1, s2, e2 = [x._vector
+                      for x in [mobile[mobile_i]['N'], mobile[mobile_i]['CA'],
+                                target[target_i]['N'], target[target_i]['CA']]]
+    translation, angle, axis, point = find_transformations(
+        s1, e1, s2, e2, radians=False)
+    # Rotation first, Then translation.
+    mobile.rotate(angle=angle, axis=axis, point=point, radians=False)
+    mobile.translate(vector=translation)
+    # Second, rotate about N->CA axis to align CA->C vectors.
+    angle = dihedral(mobile[mobile_i]['C'], mobile[mobile_i]
+                     ['N'], mobile[mobile_i]['CA'], target[target_i]['C'])
+    axis = target[target_i]['CA'] - target[target_i]['N']
+    point = target[target_i]['N']._vector
+    mobile.rotate(angle=angle, axis=axis, point=point)
+    return

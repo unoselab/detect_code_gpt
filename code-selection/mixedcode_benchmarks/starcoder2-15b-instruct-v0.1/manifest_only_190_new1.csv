@@ -1,0 +1,2 @@
+benchmark_type,target,token_range,n_hwc_candidates,n_agc_candidates,n_files,out_dir
+type09_190_new1,190,176-190,125,24,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/starcoder2-15b-instruct-v0.1/type09_190_new1

@@ -1,142 +1,137 @@
-def agc_mixed_002_01(self, seqprop, structprop, chain_id,
-                                      seq_ident_cutoff=0.5, allow_missing_on_termini=0.2,
-                                      allow_mutants=True, allow_deletions=False,
-                                      allow_insertions=False, allow_unresolved=True):
-        """Report if a structure's chain meets the defined cutoffs for sequence quality."""
-        seq_ident = seqprop.get_sequence_identity(structprop, chain_id)
-        if seq_ident < seq_ident_cutoff:
-            return False
-        missing_residues = seqprop.get_missing_residues(structprop, chain_id)
-        if missing_residues > allow_missing_on_termini:
-            return False
-        if not allow_mutants and seqprop.has_mutants(structprop, chain_id):
-            return False
-        if not allow_deletions and seqprop.has_deletions(structprop, chain_id):
-            return False
-        if not allow_insertions and seqprop.has_insertions(structprop, chain_id):
-            return False
-        if not allow_unresolved and seqprop.has_unresolved(structprop, chain_id):
-            return False
-        return True 
+def hwc_mixed_002_01(prompt):
+    """Ask user for agreeing to data set licenses."""
+    # raw_input returns the empty string for "enter"
+    yes = set(['yes', 'y'])
+    no = set(['no','n'])
 
-def hwc_mixed_002_02(self, env, target_name='control',
-                     file_name='control.json',
-                     encoder_cls=SConsEncoder):
-        """
-        Adds a target to build a control file at each of the current leaves.
+    try:
+        print(prompt)
+        choice = input().lower()
+        # would like to test for exception here, but not sure if we can do that without importing IPython
+    except:
+        print('Stdin is not implemented.')
+        print('You need to set')
+        print('overide_manual_authorize=True')
+        print('to proceed with the download. Please set that variable and continue.')
+        raise
 
-        :param env: SCons Environment object
-        :param target_name: Name for target in nest
-        :param file_name: Name for output file.
-        """
-        if not HAS_SCONS:
-            raise ImportError('SCons not available')
 
-        @self.add_target(name=target_name)
-        def control(outdir, c):
-            return env.Command(os.path.join(outdir, file_name),
-                               [],
-                               action=_create_control_file,
-                               control_dict=c,
-                               encoder_cls=encoder_cls) 
-
-def agc_mixed_002_03(self, bbox):
-    """See base class for details."""
-    # Validate the coordinates
-    if not isinstance(bbox, np.ndarray):
-        raise TypeError("bbox must be a numpy array")
-    if bbox.shape!= (4,):
-        raise ValueError("bbox must be a 1D array of length 4")
-    if not np.issubdtype(bbox.dtype, np.floating):
-        raise ValueError("bbox must be a floating-point array")
-    if not np.all(np.isfinite(bbox)):
-        raise ValueError("bbox must contain only finite values")
-    if not np.all(bbox >= 0):
-        raise ValueError("bbox must contain only non-negative values")
-    if not np.all(bbox <= 1):
-        raise ValueError("bbox must contain values in the range [0, 1]")
-    encoded_example = np.zeros(self.encoded_example_size, dtype=np.float32)
-    encoded_example[0] = bbox[0] * self.encoded_example_size
-    encoded_example[1] = bbox[1] * self.encoded_example_size
-    encoded_example[2] = np.log(bbox[2] / bbox[0]) * self.encoded_example_size
-    encoded_example[3] = np.log(bbox[3] / bbox[1]) * self.encoded_example_size
-
-    return encoded_example 
-
-def hwc_mixed_002_04():
-    """
-    Shortcut for instantiating and returning a boto SESConnection object.
-
-    :rtype: boto.ses.SESConnection
-    :returns: A boto SESConnection object, from which email sending is done.
-    """
-
-    access_key_id = getattr(
-        settings, 'CUCUMBER_SES_ACCESS_KEY_ID',
-        getattr(settings, 'AWS_ACCESS_KEY_ID', None))
-    access_key = getattr(
-        settings, 'CUCUMBER_SES_SECRET_ACCESS_KEY',
-        getattr(settings, 'AWS_SECRET_ACCESS_KEY', None))
-    region_name = getattr(
-        settings, 'CUCUMBER_SES_REGION_NAME',
-        getattr(settings, 'AWS_SES_REGION_NAME', None))
-
-    if region_name != None:
-        return boto.ses.connect_to_region(
-            region_name,
-            aws_access_key_id=access_key_id,
-            aws_secret_access_key=access_key,
-        )
+    if choice in yes:
+        return True
+    elif choice in no:
+        return False
     else:
-        return boto.connect_ses(
-            aws_access_key_id=access_key_id,
-            aws_secret_access_key=access_key,
-        ) 
+        print(("Your response was a " + choice))
+        print("Please respond with 'yes', 'y' or 'no', 'n'") 
 
-def agc_mixed_002_05(
-            self, environment: Environment, template: str,
-    ) -> Tuple[str, Optional[str], Callable]:
-        """Returns the template source from the environment.
+def hwc_mixed_002_02(self):
+    """Returns a list of entities for this blob."""
+    start = 0
+    end = 0
+    prev_tag = u'O'
+    chunks = []
+    for i, (w, tag) in enumerate(self.ne_chunker.annotate(self.words)):
+      if tag != prev_tag:
+        if prev_tag == u'O':
+          start = i
+        else:
+          chunks.append(Chunk(self.words[start: i], start, i, tag=prev_tag,
+                              parent=self))
+        prev_tag = tag
+    if tag != u'O':
+      chunks.append(Chunk(self.words[start: i+1], start, i+1, tag=tag,
+                          parent=self))
+    return chunks 
 
-        This considers the loaders on the :attr:`app` and blueprints.
+def agc_mixed_002_03(self, block_id, addresses):
+        """Returns a list of address/data pairs (str, bytes)"""
+        if not isinstance(block_id, str):
+            raise TypeError("block_id must be a str")
+        if not isinstance(addresses, list):
+            raise TypeError("addresses must be a list")
+        if not all(isinstance(address, str) for address in addresses):
+            raise TypeError("addresses must be a list of str")
+        if not all(len(address) == 42 for address in addresses):
+            raise ValueError("addresses must be a list of 42-char str")
+        results = []
+        for address in addresses:
+            data = self.state_db.get(block_id, address)
+            results.append((address, data))
+
+        return results 
+
+def agc_mixed_002_04(start, end, periods, offset):
+    """Generate a regular range of cftime.datetime objects with a
+    given time offset.
+
+    Adapted from pandas.tseries.offsets.generate_range.
+
+    Parameters
+    ----------
+    start : cftime.datetime, or None
+        Start of range
+    end : cftime.datetime, or None
+        End of range
+    periods : int, or None
+        Number of elements in the sequence
+    offset : BaseCFTimeOffset
+        An offset class designed for working with cftime.datetime objects
+
+    Returns
+    -------
+    A generator object
+    """
+    if periods is not None:
+        if start is not None:
+            end = start + offset * (periods - 1)
+        else:
+            start = end - offset * (periods - 1)
+    else:
+        if start is not None and end is not None:
+            periods = int((end - start) / offset) + 1
+        else:
+            raise ValueError("Either `periods` or both `start` and `end` must be specified")
+
+    if start is not None:
+        yield start
+
+    for _ in range(periods - 1):
+        start += offset
+        yield start 
+
+def hwc_mixed_002_05(self):
+        """Delete an existing profile."""
+        self.validate_profile_exists()
+
+        profile_data = self.profiles.get(self.args.profile_name)
+        fqfn = profile_data.get('fqfn')
+        with open(fqfn, 'r+') as fh:
+            data = json.load(fh)
+            for profile in data:
+                if profile.get('profile_name') == self.args.profile_name:
+                    data.remove(profile)
+            fh.seek(0)
+            fh.write(json.dumps(data, indent=2, sort_keys=True))
+            fh.truncate()
+
+        if not data:
+            # remove empty file
+            os.remove(fqfn) 
+
+def agc_mixed_002_06(self, instance_count, node_reg, node_ids):
+        # Select primaries for current view_no
+        if instance_count == 0:
+            return []
+
         """
-        for loader in self.app.template_loaders:
-            if hasattr(loader, "get_source"):
-                source, path, uid = loader.get_source(environment, template)
-                if source is not None:
-                    return source, path, uid
-
-        for loader in self.app.template_loaders:
-            if hasattr(loader, "get_source"):
-                source, path, uid = loader.get_source(environment, template)
-                if source is not None:
-                    return source, path, uid
-
-        raise TemplateNotFound(template) 
-
-def hwc_mixed_002_06(config=None, name=None, name_label='name'):
+        Build a set of names of primaries, it is needed to avoid
+        duplicates of primary nodes for different replicas.
         """
-        Fetches a K8sDeployment by name.
-
-        :param config: A K8sConfig object.
-        :param name: The name we want.
-        :param name_label: The label key to use for name.
-        :return: A list of K8sDeployment objects.
-        """
-
-        if name is None:
-            raise SyntaxError(
-                'Deployment: name: [ {0} ] cannot be None.'.format(name))
-        if not isinstance(name, str):
-            raise SyntaxError(
-                'Deployment: name: [ {0} ] must be a string.'.format(name))
-
-        if config is not None and not isinstance(config, K8sConfig):
-            raise SyntaxError(
-                'Deployment: config: [ {0} ] must be a K8sConfig'.format(config))
-
-        deps = K8sDeployment(config=config, name=name).list(labels={
-            name_label: name
-        })
-
-        return deps
+        primaries = set()
+        for node_id in node_ids:
+            node = node_reg.get(node_id)
+            if node is None:
+                continue
+            if node.is_primary:
+                primaries.add(node.name)
+        return list(primaries)
