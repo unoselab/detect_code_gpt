@@ -1,9 +1,0 @@
-
-cp ./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files.csv ./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-bak1.csv
-cp ./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-new1.csv ./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files.csv
-
-cp ./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files_bucket_summary.csv ./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files_bucket_summary-bak1.csv
-cp ./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-new1_bucket_summary.csv ./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files_bucket_summary.csv
-
-cp ./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files.csv ./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-bak1.csv
-cp ./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-new1.csv ./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files.csv

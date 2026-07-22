@@ -47,6 +47,7 @@
 # 
 # PYTHON_BIN=/home/user1-system12/miniconda3/envs/agcparse312/bin/python MAX_EVENTS=100 OUTPUT_DIR=output/commit_function/run-1a/smoke100 OVERWRITE_OUTPUT=1 bash proc_sh/run-1a-prepare-input-commit-func.sh
 # 
+# PYTHON_BIN=/home/user1-system12/miniconda3/envs/agcparse312/bin/python OUTPUT_DIR=output/commit_function/run-1a/strict bash proc_sh/run-1a-prepare-input-commit-func.sh
 
 set -euo pipefail
 
