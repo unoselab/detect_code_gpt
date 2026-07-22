@@ -1,0 +1,17 @@
+% APPENDIX: chunk-level AUROC + degenerate (NPR<1) rate by length quartile.
+\begin{table}[t]
+\centering
+\caption{Chunk-level analysis by chunk length quartile. AUROC pools all HWC chunks (label 0) against all MGC chunks (label 1) within a bucket. ``MGC$<$1\%'' is the fraction of machine chunks with degenerate NPR $<1$, concentrated in the shortest bucket.}
+\label{tab:chunk-by-length}
+\begin{tabular}{lrr}
+\toprule
+Chunk length & \multicolumn{2}{c}{GPT-OSS-120B} \\
+ & AUROC & MGC$<$1\% \\
+\midrule
+$\leq$45 & 0.616 & 3.3 \\
+45--91 & 0.792 & 0.0 \\
+91--128 & 0.829 & 0.1 \\
+>128 & 0.911 & 0.0 \\
+\bottomrule
+\end{tabular}
+\end{table}

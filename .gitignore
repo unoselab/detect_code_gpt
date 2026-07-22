@@ -143,4 +143,4 @@ data/
 .DS_Store
 etc/
 etc2
-analysis_results/
+output/commit_function

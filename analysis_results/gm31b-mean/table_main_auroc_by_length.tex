@@ -1,0 +1,18 @@
+% MAIN: pair-level AUROC by length quartile (bootstrap 95% CI).
+\begin{table}[t]
+\centering
+\caption{DetectCodeGPT (NPR) detection AUROC stratified by function body length (whitespace tokens), pair-level. Buckets are quartiles of $\min(\text{HWC},\text{MGC})$ body length. Values are AUROC with a percentile bootstrap 95\% CI. AUROC $<0.5$ indicates a sign reversal (human code scores higher than machine code).}
+\label{tab:auroc-by-length}
+\begin{tabular}{lrc}
+\toprule
+Length bucket & \#pairs & Gemma4-31B \\
+\midrule
+$\leq$20 & 1058 & 0.278\,\tiny[0.257,0.300] \\
+20--43 & 1173 & 0.551\,\tiny[0.528,0.575] \\
+43--83 & 1130 & 0.692\,\tiny[0.670,0.713] \\
+>83 & 1139 & 0.794\,\tiny[0.775,0.813] \\
+\midrule
+All & 4500 & 0.576\,\tiny[0.565,0.588] \\
+\bottomrule
+\end{tabular}
+\end{table}
