@@ -75,7 +75,7 @@ echo "=== DETECTION ANALYSIS ==="
 ## === ANALYSIS ============================ 
 cd "${ANALYSIS_DIR}"
 
-echo "CodeLlama-7B & StarCoder2-7B & StarCoder2-15B & GPT-OSS-120B"
+echo "CodeLlama-7B | StarCoder2-7B | StarCoder2-15B | GPT-OSS-120B | Gemma4-31B"
 echo "===================================="
 echo ""
 
@@ -95,17 +95,18 @@ echo ""
 #     --out-dir ./go120b-mean
 
 python make_paper_artifacts.py \
-    --cache "StarCoder2-15B=${LOG_DIR}/results_cache_main_adapter_starcoder2-15b-instruct-v0.1_4500_refreshed.pkl" \
+    --cache "Gemma4-31B=${LOG_DIR}/results_cache_main_adapter_gemma_4500_complexity_refreshed.pkl" \
     --aggregate weighted_mean \
-    --out-dir ./sc15b-mean
+    --out-dir ./gm31b-mean
 
 python make_paper_artifacts.py \
     --cache "CodeLlama-7B=${LOG_DIR}/results_cache_main_adapter_codellama-7b_4500_refreshed.pkl" \
     --cache "StarCoder2-7B=${LOG_DIR}/results_cache_main_adapter_starcoder2-7b_4500_refreshed.pkl" \
     --cache "StarCoder2-15B=${LOG_DIR}/results_cache_main_adapter_starcoder2-15b-instruct-v0.1_4500_refreshed.pkl" \
     --cache "GPT-OSS-120B=${LOG_DIR}/results_cache_main_adapter_gpt-oss_4500_refreshed.pkl" \
+    --cache "Gemma4-31B=${LOG_DIR}/results_cache_main_adapter_gemma_4500_complexity_refreshed.pkl" \
     --aggregate weighted_mean \
-    --out-dir ./cl7b-sc7b-sc15b-go120b-mean
+    --out-dir ./cl7b-sc7b-sc15b-go120b-gm31b-mean
 
 # check the empty HWC and MGC
 # python main_adapter.py \
