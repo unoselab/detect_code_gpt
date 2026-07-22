@@ -1,0 +1,27 @@
+// ============================================================
+// Step 1: Open your Global keybindings.json
+// Press Cmd + Shift + P (or Ctrl + Shift + P).
+// Search for and select: Preferences: Open Keyboard Shortcuts (JSON) (make sure to pick the JSON option, not the UI).
+// This opens your true system-wide keybindings file.
+// 
+// Step 2: Paste your rules into the Global file
+// Combine your conditions using && in the when clause:
+// ============================================================
+[
+    {
+        "key": "alt+cmd+t =",
+        "command": "workbench.action.terminal.fontZoomIn",
+        "when": "terminalProcessSupported"
+        // "when": "config.myProjectKeybindings.enabled"
+    },
+    {
+        "key": "alt+cmd+t -",
+        "command": "workbench.action.terminal.fontZoomOut",
+        "when": "terminalProcessSupported"
+    },
+    {
+        "key": "alt+cmd+t 0",
+        "command": "workbench.action.terminal.fontZoomReset",
+        "when": "terminalProcessSupported"
+    },
+]

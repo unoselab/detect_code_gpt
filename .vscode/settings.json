@@ -1,13 +1,14 @@
 {
+    "myProjectKeybindings.enabled": true,
     // font
     "markdown.preview.fontSize": 18,
     "editor.fontSize": 12,
-    "terminal.integrated.fontSize": 13.5,
+    "terminal.integrated.fontSize": 14,
 
     "files.watcherExclude": {
         "**/env*": false
     },
     "files.exclude": {
         "**/env*": false
-    },
+    }
 }
