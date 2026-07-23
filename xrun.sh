@@ -1,59 +1,25 @@
-# python - <<'PY'
-# import pandas as pd
-# manifest = pd.read_csv(
-#     "../ai_code_complexity_study_python/ai-code-complexity-study/repo_python/run-py-5a-py312/strict/commit_function_detection_manifest.csv"
-# )
-# treatment = manifest.loc[manifest["dataset_source"] == "treatment"]
-# # getsentry/tux처럼 이전에 문제가 많았던 repo를 의도적으로 포함
-# sample = pd.concat([
-#     treatment.loc[treatment["repo_name"] == "getsentry/sentry"].sample(n=200, random_state=1),
-#     treatment.loc[treatment["repo_name"] == "allthingslinux/tux"].sample(n=200, random_state=1),
-#     treatment.sample(n=200, random_state=1),
-# ])["function_event_id"].drop_duplicates()
-# sample.to_csv("event_ids_treatment_stress.csv", index=False)
-# print(len(sample), "events selected")
-# PY
-
-# PYTHON_BIN=/home/user1-system12/miniconda3/envs/agcparse312/bin/python \
-# EVENT_ID_FILE=event_ids_treatment_stress.csv \
-# OUTPUT_DIR=output/commit_function/run-1a/smoke_treatment OVERWRITE_OUTPUT=1 \
-#   bash proc_sh/run-1a-prepare-input-commit-func.sh
-
-
-mkdir -p output/commit_function/run-1a/selections
-
-/home/user1-system12/miniconda3/envs/agcparse312/bin/python - <<'PY'
+python - <<'PY'
 import pandas as pd
 
-manifest_path = (
-    "../ai_code_complexity_study_python/ai-code-complexity-study/"
-    "repo_python/run-py-5a-py312/strict/"
-    "commit_function_detection_manifest.csv"
-)
-output_path = (
-    "output/commit_function/run-1a/selections/"
-    "balanced-treatment-control-1000-v1.csv"
+unique_bodies = pd.read_csv(
+    "output/commit_function/run-1a/strict/commit_function_detectcodegpt_unique_bodies.csv"
 )
 
-df = pd.read_csv(manifest_path, dtype=str, low_memory=False)
-
-selected = []
-for source in ["treatment", "control"]:
-    group = df[df["dataset_source"].eq(source)]
-    if len(group) < 500:
-        raise SystemExit(f"Not enough {source} events: {len(group)}")
-    selected.append(group.sample(n=500, random_state=20260722))
-
-out = pd.concat(selected, ignore_index=True)
-out[["function_event_id"]].to_csv(output_path, index=False)
-
-print(out["dataset_source"].value_counts().to_string())
-print(f"Saved: {output_path}")
+for sha in [
+    "3dc5668d3020efd0db870791431326ed9b4280002af4ef7d61ca4dc4d4229f69",
+    "b53a8eeefef8476fcf425814a58cc61771df95d39feb2f37f8bd211c0142b11e",
+]:
+    row = unique_bodies.loc[unique_bodies["function_body_sha256"] == sha]
+    if row.empty:
+        print(f"=== {sha[:12]} === NOT FOUND in unique_bodies manifest")
+        continue
+    row = row.iloc[0]
+    path = f"output/commit_function/run-1a/strict/{row['function_body_relative_path']}"
+    print(f"=== {sha[:12]} ===")
+    print(f"token_count={row.get('function_body_split_space_token_count')}  "
+          f"windows={row.get('n_128_token_windows')}  "
+          f"references={row.get('referencing_function_event_count')}")
+    print("-" * 40)
+    print(open(path, encoding="utf-8").read())
+    print()
 PY
-
-PYTHON_BIN=/home/user1-system12/miniconda3/envs/agcparse312/bin/python \
-EVENT_ID_FILE=output/commit_function/run-1a/selections/balanced-treatment-control-1000-v1.csv \
-OUTPUT_DIR=output/commit_function/run-1a/smoke1000-balanced-v1 \
-OVERWRITE_OUTPUT=1 \
-bash proc_sh/run-1a-prepare-input-commit-func.sh
-

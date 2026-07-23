@@ -6,9 +6,11 @@
     "terminal.integrated.fontSize": 16,
 
     "files.watcherExclude": {
-        "**/env*": false
+        "**/env*": false,
+        "**/__pycache__": true,
     },
     "files.exclude": {
-        "**/env*": false
+        "**/env*": false,
+        "**/__pycache__": true,
     }
 }
