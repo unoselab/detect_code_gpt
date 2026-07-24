@@ -1,4 +1,4 @@
-(detectcodegpt) OISSE-IST173C01:detect_code_gpt$ tree -I 'function_bodies' . 
+tree -I 'function_bodies|cache' .
 .
 ├── 0-install.txt
 ├── analysis_results
@@ -81,6 +81,8 @@
 │   └── token_tagging.py
 ├── code-detection
 │   ├── analyze_by_length.py
+│   ├── analyze_commit_function_input_support_by_repo.py
+│   ├── analyze_commit_function_input_support.py
 │   ├── bak
 │   │   ├── identifier_tagging.py.org
 │   │   ├── main_adapter_v0.1a.py
@@ -126,24 +128,36 @@
 │   │       │   ├── preprocessing.cpython-311.pyc
 │   │       │   └── run_baseline.cpython-311.pyc
 │   │       └── run_baseline.py
+│   ├── calibrate_mixedcode_overlap_threshold.py
 │   ├── check_prompt_match.py
 │   ├── evaluate_benchmark.py
 │   ├── identifier_tagging.py
 │   ├── main_adapter.py
+│   ├── main_mixedcode_benchmark_overlap.py
 │   ├── main_mixedcode_benchmark.py
 │   ├── main.py
+│   ├── npr_overlap_core.py
 │   ├── plot_threshold_multi_llms.py
 │   ├── plot_threshold_sweep.py
 │   ├── prepare_input_commit_func.py
 │   ├── __pycache__
+│   │   ├── analyze_commit_function_input_support_by_repo.cpython-312.pyc
+│   │   ├── analyze_commit_function_input_support.cpython-312.pyc
 │   │   ├── evaluate_benchmark.cpython-311.pyc
 │   │   ├── identifier_tagging.cpython-311.pyc
 │   │   ├── main.cpython-311.pyc
+│   │   ├── npr_overlap_core.cpython-311.pyc
 │   │   ├── prepare_input_commit_func.cpython-311.pyc
-│   │   └── prepare_input_commit_func.cpython-312.pyc
+│   │   ├── prepare_input_commit_func.cpython-312.pyc
+│   │   ├── score_commit_function_npr.cpython-311.pyc
+│   │   └── score_commit_function_npr_full.cpython-311.pyc
 │   ├── recalc_auc_from_npr_csv_v1.py
 │   ├── recalc_auc_from_npr_csv_v2.py
 │   ├── results.pdf
+│   ├── score_commit_function_npr_full.py
+│   ├── score_commit_function_npr.py
+│   ├── score_commit_function_npr-v0.1.py
+│   ├── score_commit_function_npr-v0.2.py
 │   └── view_benchmark_record.py
 ├── code_detection -> code-detection
 ├── code-download-rawdata
@@ -916,6 +930,23 @@
 │   │   ├── run-1a-prepare-input-commit-func-20260722-145052.log
 │   │   ├── run-1a-prepare-input-commit-func-20260722-145224.log
 │   │   └── run-1a-prepare-input-commit-func-20260722-145712.log
+│   ├── run-1b
+│   │   ├── run-1b-analyze-commit-func-input-support-20260723-014728.log
+│   │   └── run-1b-analyze-commit-func-input-support-20260723-020006.log
+│   ├── run-1b2
+│   │   └── run-1b2-analyze-commit-func-input-support-by-repo-20260723-123251.log
+│   ├── run-1c
+│   │   ├── run-1c-score-commit-func-npr-pilot-v1-20260723-154817.log
+│   │   ├── run-1c-score-commit-func-npr-pilot-v4-20260723-163654.log
+│   │   ├── run-1c-score-commit-func-npr-pilot-v7-20260724-002529.log
+│   │   └── run-1c-score-commit-func-npr-pilot-v7-20260724-002902.log
+│   ├── run-1c0a
+│   │   └── run-1c0a-mixedcode_starcoder2-7b_50files_overlap-v1-20260723-233944.log
+│   ├── run-1c0b
+│   │   └── run-1c0b-calibrate-mixedcode-overlap-threshold-20260724-000000.log
+│   ├── run-1d
+│   │   ├── run-1d-score-commit-func-npr-full-v1-20260724-013158.log
+│   │   └── run-1d-score-commit-func-npr-full-v1-20260724-013541.log
 │   ├── threshold_sweep_codellama-7b-hf.png
 │   └── threshold_sweep_starcoder2-7b.png
 ├── logs-backup-may12-13
@@ -960,71 +991,176 @@
 │   │       ├── valid_mgc.jsonl
 │   │       └── valid_mgc_salvaged.jsonl
 │   └── commit_function
-│       └── run-1a
-│           ├── selections
-│           │   └── balanced-treatment-control-1000-v1.csv
-│           ├── smoke10
-│           │   ├── commit_function_detectcodegpt_blob_audit.csv
-│           │   ├── commit_function_detectcodegpt_input_events.csv
-│           │   ├── commit_function_detectcodegpt_repo_month_audit.csv
-│           │   ├── commit_function_detectcodegpt_unique_bodies.csv
-│           │   └── qc
-│           │       ├── commit_function_detectcodegpt_checks.csv
-│           │       ├── commit_function_detectcodegpt_exclusions.csv
-│           │       ├── commit_function_detectcodegpt_metadata.json
-│           │       └── commit_function_detectcodegpt_summary.json
-│           ├── smoke100
-│           │   ├── commit_function_detectcodegpt_blob_audit.csv
-│           │   ├── commit_function_detectcodegpt_input_events.csv
-│           │   ├── commit_function_detectcodegpt_repo_month_audit.csv
-│           │   ├── commit_function_detectcodegpt_unique_bodies.csv
-│           │   └── qc
-│           │       ├── commit_function_detectcodegpt_checks.csv
-│           │       ├── commit_function_detectcodegpt_exclusions.csv
-│           │       ├── commit_function_detectcodegpt_metadata.json
-│           │       └── commit_function_detectcodegpt_summary.json
-│           ├── smoke1000
-│           │   ├── commit_function_detectcodegpt_blob_audit.csv
-│           │   ├── commit_function_detectcodegpt_input_events.csv
-│           │   ├── commit_function_detectcodegpt_repo_month_audit.csv
-│           │   ├── commit_function_detectcodegpt_unique_bodies.csv
-│           │   └── qc
-│           │       ├── commit_function_detectcodegpt_checks.csv
-│           │       ├── commit_function_detectcodegpt_exclusions.csv
-│           │       ├── commit_function_detectcodegpt_metadata.json
-│           │       └── commit_function_detectcodegpt_summary.json
-│           ├── smoke1000-balanced-v1
-│           │   ├── commit_function_detectcodegpt_blob_audit.csv
-│           │   ├── commit_function_detectcodegpt_input_events.csv
-│           │   ├── commit_function_detectcodegpt_repo_month_audit.csv
-│           │   ├── commit_function_detectcodegpt_unique_bodies.csv
-│           │   └── qc
-│           │       ├── commit_function_detectcodegpt_checks.csv
-│           │       ├── commit_function_detectcodegpt_exclusions.csv
-│           │       ├── commit_function_detectcodegpt_metadata.json
-│           │       └── commit_function_detectcodegpt_summary.json
-│           ├── smoke_treatment
-│           │   ├── commit_function_detectcodegpt_blob_audit.csv
-│           │   ├── commit_function_detectcodegpt_input_events.csv
-│           │   ├── commit_function_detectcodegpt_repo_month_audit.csv
-│           │   ├── commit_function_detectcodegpt_unique_bodies.csv
-│           │   └── qc
-│           │       ├── commit_function_detectcodegpt_checks.csv
-│           │       ├── commit_function_detectcodegpt_exclusions.csv
-│           │       ├── commit_function_detectcodegpt_metadata.json
-│           │       └── commit_function_detectcodegpt_summary.json
-│           └── strict
-│               ├── commit_function_detectcodegpt_blob_audit.csv
-│               ├── commit_function_detectcodegpt_input_events.csv
-│               ├── commit_function_detectcodegpt_repo_month_audit.csv
-│               ├── commit_function_detectcodegpt_unique_bodies.csv
+│       ├── run-1a
+│       │   ├── selections
+│       │   │   └── balanced-treatment-control-1000-v1.csv
+│       │   ├── smoke10
+│       │   │   ├── commit_function_detectcodegpt_blob_audit.csv
+│       │   │   ├── commit_function_detectcodegpt_input_events.csv
+│       │   │   ├── commit_function_detectcodegpt_repo_month_audit.csv
+│       │   │   ├── commit_function_detectcodegpt_unique_bodies.csv
+│       │   │   └── qc
+│       │   │       ├── commit_function_detectcodegpt_checks.csv
+│       │   │       ├── commit_function_detectcodegpt_exclusions.csv
+│       │   │       ├── commit_function_detectcodegpt_metadata.json
+│       │   │       └── commit_function_detectcodegpt_summary.json
+│       │   ├── smoke100
+│       │   │   ├── commit_function_detectcodegpt_blob_audit.csv
+│       │   │   ├── commit_function_detectcodegpt_input_events.csv
+│       │   │   ├── commit_function_detectcodegpt_repo_month_audit.csv
+│       │   │   ├── commit_function_detectcodegpt_unique_bodies.csv
+│       │   │   └── qc
+│       │   │       ├── commit_function_detectcodegpt_checks.csv
+│       │   │       ├── commit_function_detectcodegpt_exclusions.csv
+│       │   │       ├── commit_function_detectcodegpt_metadata.json
+│       │   │       └── commit_function_detectcodegpt_summary.json
+│       │   ├── smoke1000
+│       │   │   ├── commit_function_detectcodegpt_blob_audit.csv
+│       │   │   ├── commit_function_detectcodegpt_input_events.csv
+│       │   │   ├── commit_function_detectcodegpt_repo_month_audit.csv
+│       │   │   ├── commit_function_detectcodegpt_unique_bodies.csv
+│       │   │   └── qc
+│       │   │       ├── commit_function_detectcodegpt_checks.csv
+│       │   │       ├── commit_function_detectcodegpt_exclusions.csv
+│       │   │       ├── commit_function_detectcodegpt_metadata.json
+│       │   │       └── commit_function_detectcodegpt_summary.json
+│       │   ├── smoke1000-balanced-v1
+│       │   │   ├── commit_function_detectcodegpt_blob_audit.csv
+│       │   │   ├── commit_function_detectcodegpt_input_events.csv
+│       │   │   ├── commit_function_detectcodegpt_repo_month_audit.csv
+│       │   │   ├── commit_function_detectcodegpt_unique_bodies.csv
+│       │   │   └── qc
+│       │   │       ├── commit_function_detectcodegpt_checks.csv
+│       │   │       ├── commit_function_detectcodegpt_exclusions.csv
+│       │   │       ├── commit_function_detectcodegpt_metadata.json
+│       │   │       └── commit_function_detectcodegpt_summary.json
+│       │   ├── smoke_treatment
+│       │   │   ├── commit_function_detectcodegpt_blob_audit.csv
+│       │   │   ├── commit_function_detectcodegpt_input_events.csv
+│       │   │   ├── commit_function_detectcodegpt_repo_month_audit.csv
+│       │   │   ├── commit_function_detectcodegpt_unique_bodies.csv
+│       │   │   └── qc
+│       │   │       ├── commit_function_detectcodegpt_checks.csv
+│       │   │       ├── commit_function_detectcodegpt_exclusions.csv
+│       │   │       ├── commit_function_detectcodegpt_metadata.json
+│       │   │       └── commit_function_detectcodegpt_summary.json
+│       │   └── strict
+│       │       ├── commit_function_detectcodegpt_blob_audit.csv
+│       │       ├── commit_function_detectcodegpt_input_events.csv
+│       │       ├── commit_function_detectcodegpt_repo_month_audit.csv
+│       │       ├── commit_function_detectcodegpt_unique_bodies.csv
+│       │       └── qc
+│       │           ├── commit_function_detectcodegpt_checks.csv
+│       │           ├── commit_function_detectcodegpt_exclusions.csv
+│       │           ├── commit_function_detectcodegpt_metadata.json
+│       │           └── commit_function_detectcodegpt_summary.json
+│       ├── run-1b
+│       │   └── strict
+│       │       ├── commit_function_body_eligibility_by_change_type.csv
+│       │       ├── commit_function_body_eligibility_by_cohort.csv
+│       │       ├── commit_function_body_eligibility_by_function_category.csv
+│       │       ├── commit_function_body_eligibility_by_period.csv
+│       │       ├── commit_function_body_eligibility_support.csv
+│       │       ├── commit_function_body_size_distribution_events.csv
+│       │       ├── commit_function_body_size_distribution_unique_bodies.csv
+│       │       ├── commit_function_detectcodegpt_scoring_spec.json
+│       │       ├── commit_function_input_exclusions_enriched.csv
+│       │       ├── commit_function_input_exclusion_summary.csv
+│       │       ├── commit_function_npr_scoring_cost_estimates.csv
+│       │       └── qc
+│       │           ├── commit_function_body_artifact_errors.csv
+│       │           ├── commit_function_input_support_checks.csv
+│       │           ├── commit_function_input_support_metadata.json
+│       │           └── commit_function_input_support_summary.json
+│       ├── run-1b2
+│       │   └── strict
+│       │       ├── commit_function_eligibility_by_repository.csv
+│       │       ├── commit_function_repository_concentration_summary.csv
+│       │       ├── commit_function_repository_retention_summary.csv
+│       │       ├── commit_function_retention_gap_leave_top_repos_out.csv
+│       │       ├── commit_function_zero_eligible_repositories.csv
+│       │       └── qc
+│       │           ├── commit_function_repository_support_checks.csv
+│       │           ├── commit_function_repository_support_metadata.json
+│       │           └── commit_function_repository_support_summary.json
+│       ├── run-1c
+│       │   ├── pilot200-dual-profile-v1
+│       │   │   ├── commit_function_npr_body_scores.csv
+│       │   │   ├── commit_function_npr_checkpoint_index.csv
+│       │   │   ├── commit_function_npr_failures.csv
+│       │   │   ├── commit_function_npr_full_run_estimates.csv
+│       │   │   ├── commit_function_npr_pilot_manifest.csv
+│       │   │   ├── commit_function_npr_pilot_profile_support.csv
+│       │   │   ├── commit_function_npr_runtime_metrics.csv
+│       │   │   ├── commit_function_npr_window_scores.csv
+│       │   │   └── qc
+│       │   │       ├── commit_function_npr_artifact_errors.csv
+│       │   │       ├── commit_function_npr_checks.csv
+│       │   │       ├── commit_function_npr_metadata.json
+│       │   │       ├── commit_function_npr_reproducibility_checks.csv
+│       │   │       ├── commit_function_npr_run_history.jsonl
+│       │   │       └── commit_function_npr_summary.json
+│       │   ├── pilot200-dual-profile-v4
+│       │   │   ├── commit_function_npr_body_scores.csv
+│       │   │   ├── commit_function_npr_checkpoint_index.csv
+│       │   │   ├── commit_function_npr_failures.csv
+│       │   │   ├── commit_function_npr_full_run_estimates.csv
+│       │   │   ├── commit_function_npr_pilot_manifest.csv
+│       │   │   ├── commit_function_npr_pilot_profile_support.csv
+│       │   │   ├── commit_function_npr_runtime_metrics.csv
+│       │   │   ├── commit_function_npr_window_scores.csv
+│       │   │   └── qc
+│       │   │       ├── commit_function_npr_artifact_errors.csv
+│       │   │       ├── commit_function_npr_checks.csv
+│       │   │       ├── commit_function_npr_metadata.json
+│       │   │       ├── commit_function_npr_reproducibility_checks.csv
+│       │   │       ├── commit_function_npr_run_history.jsonl
+│       │   │       └── commit_function_npr_summary.json
+│       │   └── pilot200-dual-profile-v7
+│       │       ├── commit_function_npr_body_scores.csv
+│       │       ├── commit_function_npr_checkpoint_index.csv
+│       │       ├── commit_function_npr_failures.csv
+│       │       ├── commit_function_npr_full_run_estimates.csv
+│       │       ├── commit_function_npr_pilot_manifest.csv
+│       │       ├── commit_function_npr_pilot_profile_support.csv
+│       │       ├── commit_function_npr_runtime_metrics.csv
+│       │       ├── commit_function_npr_window_scores.csv
+│       │       └── qc
+│       │           ├── commit_function_npr_artifact_errors.csv
+│       │           ├── commit_function_npr_checks.csv
+│       │           ├── commit_function_npr_metadata.json
+│       │           ├── commit_function_npr_reproducibility_checks.csv
+│       │           ├── commit_function_npr_run_history.jsonl
+│       │           └── commit_function_npr_summary.json
+│       ├── run-1c0a
+│       │   └── mixedcode-overlap-v1
+│       │       ├── npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files_overlap-v1.csv
+│       │       ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files_overlap-v1_bucket_summary.csv
+│       │       ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files_overlap-v1.csv
+│       │       └── results_cache_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files_overlap-v1.pkl
+│       ├── run-1c0b
+│       │   └── mixedcode-overlap-threshold-v1
+│       │       ├── mixedcode_overlap_bucket_metrics.csv
+│       │       ├── mixedcode_overlap_calibrated_predictions.csv
+│       │       ├── mixedcode_overlap_overall_metrics.csv
+│       │       ├── mixedcode_overlap_threshold_candidates.csv
+│       │       ├── mixedcode_overlap_threshold_specification.json
+│       │       └── qc
+│       │           ├── mixedcode_overlap_calibration_checks.csv
+│       │           └── mixedcode_overlap_calibration_summary.json
+│       └── run-1d
+│           └── range100_200-overlap-v1
 │               └── qc
-│                   ├── commit_function_detectcodegpt_checks.csv
-│                   ├── commit_function_detectcodegpt_exclusions.csv
-│                   ├── commit_function_detectcodegpt_metadata.json
-│                   └── commit_function_detectcodegpt_summary.json
 ├── proc_sh
-│   └── run-1a-prepare-input-commit-func.sh
+│   ├── run-1a-prepare-input-commit-func.sh
+│   ├── run-1b2-analyze-commit-func-input-support-by-repo.sh
+│   ├── run-1b-analyze-commit-func-input-support.sh
+│   ├── run-1c0a-score-mixedcode-overlap-benchmark.sh
+│   ├── run-1c0b-calibrate-mixedcode-overlap-threshold.sh
+│   ├── run-1c-score-commit-func-npr.sh
+│   ├── run-1c-score-commit-func-npr-v0.1.sh
+│   ├── run-1c-score-commit-func-npr-v0.2.sh
+│   └── run-1d-score-commit-func-npr-full.sh
 ├── README.md
 ├── requirements.txt
 ├── run1-generate.sh
@@ -1156,8 +1292,9 @@
 │       ├── mixed_code_004.py
 │       ├── mixed_code_005.json
 │       └── mixed_code_005.py
-├── workspace-structure.txt
+├── workspace-structure-detect-code-gpt-workspace-jul24.txt
+├── workspace-structure-detect-code-gpt-workspace.txt
 ├── xrun.sh
 └── ylog.txt
 
-131 directories, 1028 files
+158 directories, 1138 files
