@@ -1,25 +1,33 @@
-python - <<'PY'
-import pandas as pd
+git switch -c run-1d-gt200-3gpu
 
-unique_bodies = pd.read_csv(
-    "output/commit_function/run-1a/strict/commit_function_detectcodegpt_unique_bodies.csv"
-)
+# Remove xrun.sh and stage its deletion
+git rm xrun.sh
 
-for sha in [
-    "3dc5668d3020efd0db870791431326ed9b4280002af4ef7d61ca4dc4d4229f69",
-    "b53a8eeefef8476fcf425814a58cc61771df95d39feb2f37f8bd211c0142b11e",
-]:
-    row = unique_bodies.loc[unique_bodies["function_body_sha256"] == sha]
-    if row.empty:
-        print(f"=== {sha[:12]} === NOT FOUND in unique_bodies manifest")
-        continue
-    row = row.iloc[0]
-    path = f"output/commit_function/run-1a/strict/{row['function_body_relative_path']}"
-    print(f"=== {sha[:12]} ===")
-    print(f"token_count={row.get('function_body_split_space_token_count')}  "
-          f"windows={row.get('n_128_token_windows')}  "
-          f"references={row.get('referencing_function_event_count')}")
-    print("-" * 40)
-    print(open(path, encoding="utf-8").read())
-    print()
-PY
+# Keep and stage ylog.txt
+git add ylog.txt
+
+# Stage all other intended changes
+git add -A -- \
+  code-detection/score_commit_function_npr-v0.1.py \
+  code-detection/score_commit_function_npr-v0.2.py \
+  code-detection/bak/score_commit_function_npr-v0.1.py \
+  code-detection/bak/score_commit_function_npr-v0.2.py \
+  proc_sh/run-1c-score-commit-func-npr-v0.1.sh \
+  proc_sh/run-1c-score-commit-func-npr-v0.2.sh \
+  proc_sh/bak/
+
+git add \
+  code-detection/analyze_commit_function_input_support-gt200.py \
+  code-detection/score_commit_function_npr_full-gt200.py \
+  proc_sh/run-1b-analyze-commit-func-input-support-gt200.sh \
+  proc_sh/run-1d-score-commit-func-npr-full-gt200.sh \
+  workspace-structure-detect-code-gpt-workspace-jul24-r158.txt
+
+# Review before committing
+git status
+git diff --cached --stat
+git diff --cached --summary
+
+git commit -m "Add gt200 three-GPU NPR scoring pipeline"
+git push -u origin run-1d-gt200-3gpu
+
