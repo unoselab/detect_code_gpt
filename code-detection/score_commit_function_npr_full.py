@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Run a dual-profile StarCoder2 NPR pilot on unique implementation bodies.
+"""Run full StarCoder2 NPR scoring for one frozen eligibility specification.
 
 This experiment follows run-1a, run-1b, and run-1b2.
 
 Purpose:
-    1. Select a deterministic calibration-range sample from 100-200
-       literal-space tokens.
-    2. Select a deterministic long-body sample above 200 literal-space tokens.
-    3. Score each unique implementation body with the existing DetectCodeGPT
-       perturbation and rank-scoring implementation.
-    4. Measure profile-specific throughput, cache size, GPU memory, resume
-       behavior, and same-seed reproducibility before a full scoring run.
+    1. Select every unique implementation body admitted by one frozen
+       run-1b eligibility specification.
+    2. Score each selected body with the calibrated overlap-window NPR
+       detector and frozen run-1c0b threshold.
+    3. Save one resumable cache artifact per body and produce complete
+       body-, window-, failure-, runtime-, and QC-level outputs.
+    4. Preserve deterministic scoring, configuration fingerprints, and
+       same-seed reproducibility checks during the long-running full job.
 
 Scientific unit:
     One approved commit-function change event.
@@ -18,9 +19,9 @@ Scientific unit:
 Computational unit:
     One unique implementation body identified by SHA-256.
 
-The program does not aggregate repository-month outcomes or run DiD. The
-current run-1b specification remains an audit input; this pilot does not
-silently redefine the primary specification.
+The program does not aggregate repository-month outcomes or run DiD. It scores
+all bodies in the explicitly selected frozen eligibility specification and
+records the selection and detector configuration for later aggregation.
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ import numpy as np
 import pandas as pd
 
 
-SCRIPT_VERSION = "run-1c-v7"
+SCRIPT_VERSION = "run-1d-v1"
 # Policy label history (embedded in the config fingerprint, so any change
 # here also invalidates prior caches):
 #   incomplete_tail_zero_original_rank_only-v1  (run-1c-v4 and earlier):
@@ -475,15 +476,11 @@ def find_spec(config: DetectorConfig, name: str) -> dict[str, Any]:
 
 def build_profile_definition(args: argparse.Namespace) -> dict[str, Any]:
     return {
-        "calibration_profile_name": args.calibration_profile_name,
-        "calibration_profile_size": args.calibration_profile_size,
-        "calibration_bands": args.calibration_bands,
-        "long_profile_name": args.long_profile_name,
-        "long_profile_size": args.long_profile_size,
-        "long_window_strata": args.long_window_strata,
-        "sampling_method": "seeded_sha256_order",
+        "full_spec_name": args.spec_name,
+        "full_profile_name": args.profile_name,
+        "selection_method": "all_unique_bodies_within_frozen_eligibility_bounds",
+        "ordering_method": "function_body_sha256",
     }
-
 
 def config_fingerprint(config: DetectorConfig, profile_definition: dict[str, Any]) -> str:
     payload = config.fingerprint_payload(profile_definition)
@@ -681,41 +678,41 @@ def prepare_manifest(
     config: DetectorConfig,
     args: argparse.Namespace,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    calibration_ranges = parse_ranges(args.calibration_bands)
-    long_ranges = parse_ranges(args.long_window_strata, allow_open_max=True)
+    """Select every unique body admitted by one frozen run-1b specification."""
+    specification = find_spec(config, args.spec_name)
+    minimum = int(specification["minimum_literal_space_tokens"])
+    maximum_raw = specification.get("maximum_literal_space_tokens")
+    maximum = None if maximum_raw is None else int(maximum_raw)
 
-    calibration, calibration_support = select_calibration_profile(
-        unique_bodies,
-        config,
-        args.calibration_profile_name,
-        args.calibration_profile_size,
-        calibration_ranges,
-    )
-    long_profile, long_support = select_long_profile(
-        unique_bodies,
-        config,
-        args.long_profile_name,
-        args.long_profile_size,
-        long_ranges,
-        minimum_body_tokens=max(maximum for _, maximum in calibration_ranges if maximum is not None),
-    )
-    overlap = set(calibration["function_body_sha256"]) & set(long_profile["function_body_sha256"])
-    if overlap:
-        raise RuntimeError(f"Pilot profiles overlap on {len(overlap)} body hashes.")
+    token_count = unique_bodies["function_body_split_space_token_count"]
+    mask = token_count.ge(minimum)
+    if maximum is not None:
+        mask &= token_count.le(maximum)
 
-    manifest = pd.concat([calibration, long_profile], ignore_index=True)
-    manifest = manifest.sort_values(
-        ["profile_name", "stratum_order", "deterministic_sample_key", "function_body_sha256"],
-        kind="mergesort",
-    ).reset_index(drop=True)
-    manifest["sample_rank"] = manifest.groupby("profile_name").cumcount() + 1
+    manifest = unique_bodies.loc[mask].copy()
+    manifest = manifest.sort_values("function_body_sha256", kind="mergesort").reset_index(drop=True)
+    manifest["profile_name"] = args.profile_name
+    manifest["stratum_name"] = args.spec_name
+    manifest["stratum_order"] = 0
+    manifest["stratum_sample_target"] = len(manifest)
+    manifest["sampling_fill_mode"] = "full_specification"
+    manifest["deterministic_sample_key"] = manifest["function_body_sha256"]
+    manifest["sample_rank"] = np.arange(1, len(manifest) + 1)
     manifest["n_expected_windows"] = manifest["n_128_token_windows"].astype(int)
-    manifest["selected_for_pilot"] = 1
+    manifest["selected_for_full_scoring"] = 1
     manifest = enrich_manifest_context(manifest, events, panel)
 
-    support = pd.DataFrame(calibration_support + long_support)
+    support = pd.DataFrame([{
+        "profile_name": args.profile_name,
+        "spec_name": args.spec_name,
+        "minimum_literal_space_tokens": minimum,
+        "maximum_literal_space_tokens": maximum,
+        "eligible_unique_bodies": int(len(manifest)),
+        "total_windows": int(manifest["n_expected_windows"].sum()),
+        "total_scoring_sequences": int(manifest["n_expected_windows"].sum()) * (config.perturbations_per_window + 1),
+        "selection_complete": True,
+    }])
     return manifest, support
-
 
 def verify_selected_artifacts(
     manifest: pd.DataFrame,
@@ -1520,9 +1517,16 @@ def score_pending_bodies(
             atomic_json(failure, failure_cache_path(paths.cache_dir, body_sha))
             failures.append(failure)
         if offset == 1 or offset % args.progress_every_bodies == 0 or offset == total_pending:
+            elapsed = max(time.perf_counter() - scoring_started, 1e-9)
+            bodies_per_second = offset / elapsed
+            remaining_bodies = total_pending - offset
+            eta_seconds = remaining_bodies / bodies_per_second if bodies_per_second > 0 else math.nan
+            eta_hours = eta_seconds / 3600 if math.isfinite(eta_seconds) else math.nan
             print(
                 f"Progress: {offset}/{total_pending} pending bodies processed; "
-                f"success_total={len(completed)}, failures_this_run={len(failures)}"
+                f"success_total={len(completed)}, failures_this_run={len(failures)}, "
+                f"rate_bodies_per_hour={bodies_per_second * 3600:.3f}, "
+                f"eta_hours={eta_hours:.2f}"
             )
 
     return completed, failures, runtime, float(time.perf_counter() - scoring_started)
@@ -1846,59 +1850,27 @@ def build_full_run_estimates(
     calibration_profile_name: str,
     long_profile_name: str,
 ) -> pd.DataFrame:
-    summary = profile_summary.set_index("profile_name")
-    cal_wps = sanitize_float(summary.loc[calibration_profile_name, "measured_windows_per_second"])
-    long_wps = sanitize_float(summary.loc[long_profile_name, "measured_windows_per_second"])
-    cal_bytes = sanitize_float(summary.loc[calibration_profile_name, "cache_bytes_per_window"])
-    long_bytes = sanitize_float(summary.loc[long_profile_name, "cache_bytes_per_window"])
-    support_index = support.set_index("spec_name")
-    rows: list[dict[str, Any]] = []
-
-    for spec_name in ("range100_200", "min100"):
-        if spec_name not in support_index.index:
-            continue
-        total_windows = int(support_index.loc[spec_name, "total_windows"])
-        if spec_name == "range100_200":
-            calibration_windows = total_windows
-            long_windows = 0
-        else:
-            range_windows = int(support_index.loc["range100_200", "total_windows"])
-            calibration_windows = range_windows
-            long_windows = max(0, total_windows - range_windows)
-        seconds = 0.0
-        estimated_cache_bytes = 0.0
-        feasible = True
-        if calibration_windows:
-            if not cal_wps or cal_wps <= 0:
-                feasible = False
-            else:
-                seconds += calibration_windows / cal_wps
-            if cal_bytes:
-                estimated_cache_bytes += calibration_windows * cal_bytes
-        if long_windows:
-            if not long_wps or long_wps <= 0:
-                feasible = False
-            else:
-                seconds += long_windows / long_wps
-            if long_bytes:
-                estimated_cache_bytes += long_windows * long_bytes
-        rows.append(
-            {
-                "spec_name": spec_name,
-                "total_windows": total_windows,
-                "calibration_range_windows": calibration_windows,
-                "long_body_windows": long_windows,
-                "calibration_profile_windows_per_second": cal_wps,
-                "long_profile_windows_per_second": long_wps,
-                "estimated_gpu_seconds": seconds if feasible else math.nan,
-                "estimated_gpu_hours": seconds / 3600 if feasible else math.nan,
-                "estimated_cache_bytes": estimated_cache_bytes,
-                "estimated_cache_gib": estimated_cache_bytes / (1024**3),
-                "estimation_method": "profile_specific_pilot_throughput",
-            }
-        )
-    return pd.DataFrame(rows)
-
+    """Record the full workload and measured progress without pilot extrapolation."""
+    del calibration_profile_name, long_profile_name
+    summary = profile_summary.loc[profile_summary["profile_name"] == "all_profiles"].iloc[0]
+    spec = support.iloc[0]
+    completed_windows = int(summary["scored_windows"])
+    total_windows = int(spec["total_windows"])
+    remaining_windows = max(0, total_windows - completed_windows)
+    rate = sanitize_float(summary["measured_windows_per_second"])
+    remaining_seconds = remaining_windows / rate if rate and rate > 0 else math.nan
+    return pd.DataFrame([{
+        "spec_name": spec["spec_name"],
+        "eligible_unique_bodies": int(spec["eligible_unique_bodies"]),
+        "total_windows": total_windows,
+        "completed_windows": completed_windows,
+        "remaining_windows": remaining_windows,
+        "measured_windows_per_second": rate,
+        "estimated_remaining_seconds": remaining_seconds,
+        "estimated_remaining_hours": remaining_seconds / 3600 if math.isfinite(remaining_seconds) else math.nan,
+        "progress_fraction": completed_windows / total_windows if total_windows else math.nan,
+        "estimation_method": "current_full_run_measured_throughput",
+    }])
 
 def check_row(name: str, passed: bool, observed: Any, expected: Any, note: str = "") -> dict[str, Any]:
     return {
@@ -1922,298 +1894,40 @@ def build_checks(
     args: argparse.Namespace,
 ) -> pd.DataFrame:
     checks: list[dict[str, Any]] = []
-    selected_expected = args.calibration_profile_size + args.long_profile_size
-    checks.append(check_row("specification_is_frozen", config.eligibility_status == "frozen", config.eligibility_status, "frozen"))
+    expected_bodies = int(profile_support.iloc[0]["eligible_unique_bodies"])
+    expected_windows = int(profile_support.iloc[0]["total_windows"])
+    checks.append(check_row("eligibility_specification_is_frozen", config.eligibility_status == "frozen", config.eligibility_status, "frozen"))
+    checks.append(check_row("threshold_specification_is_frozen", config.threshold_status == "frozen", config.threshold_status, "frozen"))
+    checks.append(check_row("selected_specification_matches", args.spec_name in {str(x.get("name")) for x in config.eligibility_specifications}, args.spec_name, "existing frozen specification"))
     checks.append(check_row("scoring_model_is_starcoder2_7b", config.scoring_model == "bigcode/starcoder2-7b", config.scoring_model, "bigcode/starcoder2-7b"))
     checks.append(check_row("window_size_is_128", config.window_size == 128, config.window_size, 128))
     checks.append(check_row("perturbations_per_window_is_50", config.perturbations_per_window == 50, config.perturbations_per_window, 50))
-    checks.append(check_row("threshold_specification_is_frozen", config.threshold_status == "frozen", config.threshold_status, "frozen"))
-    checks.append(check_row("algorithm_version_is_overlap_v1", config.algorithm_version == "overlap_final_full_window_valid_frontier_weighting-v1", config.algorithm_version, "overlap_final_full_window_valid_frontier_weighting-v1"))
-    checks.append(check_row("function_aggregation_is_valid_frontier", config.function_aggregation == "valid_frontier_weighted_mean", config.function_aggregation, "valid_frontier_weighted_mean"))
-    checks.append(check_row("partial_body_policy_matches", config.partial_body_policy == PARTIAL_BODY_POLICY, config.partial_body_policy, PARTIAL_BODY_POLICY))
+    checks.append(check_row("algorithm_version_matches", config.algorithm_version == "overlap_final_full_window_valid_frontier_weighting-v1", config.algorithm_version, "overlap_final_full_window_valid_frontier_weighting-v1"))
+    checks.append(check_row("aggregation_matches", config.function_aggregation == "valid_frontier_weighted_mean", config.function_aggregation, "valid_frontier_weighted_mean"))
+    checks.append(check_row("partial_body_policy_matches", config.partial_body_policy == "any_valid_window_partial_success_full_windows-v2", config.partial_body_policy, "any_valid_window_partial_success_full_windows-v2"))
     checks.append(check_row("decision_rule_matches", config.decision_rule == "function_npr > agc_threshold", config.decision_rule, "function_npr > agc_threshold"))
-    checks.append(check_row("agc_threshold_matches_frozen_specification", math.isfinite(config.agc_threshold), config.agc_threshold, "finite threshold loaded from frozen run-1c0b specification"))
-    checks.append(check_row("selected_body_count", len(manifest) == selected_expected, len(manifest), selected_expected))
+    checks.append(check_row("selected_body_count", len(manifest) == expected_bodies, len(manifest), expected_bodies))
     checks.append(check_row("selected_body_hashes_unique", manifest["function_body_sha256"].is_unique, int(manifest["function_body_sha256"].duplicated().sum()), 0))
-    reference_counts_match = pd.to_numeric(
-        manifest["context_reference_events"], errors="coerce"
-    ).eq(
-        pd.to_numeric(manifest["referencing_function_event_count"], errors="coerce")
-    )
-    checks.append(
-        check_row(
-            "selected_body_event_reference_counts_match",
-            bool(reference_counts_match.all()),
-            int((~reference_counts_match).sum()),
-            0,
-            "Event-manifest references must reconcile with the unique-body manifest.",
-        )
-    )
-    profile_counts = manifest["profile_name"].value_counts().to_dict()
-    checks.append(check_row("calibration_profile_size", profile_counts.get(args.calibration_profile_name, 0) == args.calibration_profile_size, profile_counts.get(args.calibration_profile_name, 0), args.calibration_profile_size))
-    checks.append(check_row("long_profile_size", profile_counts.get(args.long_profile_name, 0) == args.long_profile_size, profile_counts.get(args.long_profile_name, 0), args.long_profile_size))
-    checks.append(check_row("calibration_strata_targets_met", bool(profile_support.loc[profile_support["profile_name"] == args.calibration_profile_name, "target_met"].all()), int((~profile_support.loc[profile_support["profile_name"] == args.calibration_profile_name, "target_met"].astype(bool)).sum()), 0))
+    checks.append(check_row("selected_window_count", int(manifest["n_expected_windows"].sum()) == expected_windows, int(manifest["n_expected_windows"].sum()), expected_windows))
     checks.append(check_row("selected_artifacts_valid", artifact_errors.empty, len(artifact_errors), 0))
     if not args.prepare_only:
-        checks.append(check_row("successful_body_count", len(body_scores) == selected_expected, len(body_scores), selected_expected))
+        checks.append(check_row("completed_or_failed_body_count", len(body_scores) + len(failures) == expected_bodies, len(body_scores) + len(failures), expected_bodies))
+        checks.append(check_row("successful_body_count", len(body_scores) == expected_bodies, len(body_scores), expected_bodies))
         checks.append(check_row("failed_body_count", failures.empty, len(failures), 0))
-        expected_windows = int(manifest["n_expected_windows"].sum())
         checks.append(check_row("scored_window_count", len(window_scores) == expected_windows, len(window_scores), expected_windows))
-        if not window_scores.empty:
-            # The 50-valid-perturbation requirement is a hard check only
-            # for VALID windows -- the signal actually used in
-            # function_npr. Applying it to invalid windows would
-            # contradict the partial-body policy: a body is allowed to
-            # succeed with an invalid window whose valid_perturbation_scores
-            # is deficient (e.g. 0 for "no_valid_perturbation_scores"),
-            # so that same deficiency must not simultaneously fail the
-            # run-level QC. Invalid windows are reported informationally
-            # below and each already carries an explicit
-            # window_npr_invalid_reason.
-            valid_perturbations = pd.to_numeric(window_scores["valid_perturbation_scores"], errors="coerce")
-            window_is_valid = window_scores["window_npr_valid"].astype(bool)
-            valid_window_perturbations = valid_perturbations[window_is_valid]
-            checks.append(
-                check_row(
-                    "valid_windows_have_50_valid_perturbations",
-                    bool(valid_window_perturbations.eq(config.perturbations_per_window).all()) if len(valid_window_perturbations) else True,
-                    int((~valid_window_perturbations.eq(config.perturbations_per_window)).sum()) if len(valid_window_perturbations) else 0,
-                    0,
-                    "Every window contributing to a function_npr must have all its perturbations scored.",
-                )
-            )
-            invalid_window_perturbation_deficits = int(
-                (~valid_perturbations[~window_is_valid].eq(config.perturbations_per_window)).sum()
-            ) if int((~window_is_valid).sum()) else 0
-            checks.append(
-                check_row(
-                    "invalid_window_perturbation_deficit_count",
-                    True,
-                    invalid_window_perturbation_deficits,
-                    None,
-                    "Informational: invalid windows with fewer than the configured valid perturbation scores; excluded from aggregation by design.",
-                )
-            )
-        checks.append(check_row("agc_hwc_body_arithmetic", int(pd.to_numeric(body_scores.get("agc_like"), errors="coerce").sum() + pd.to_numeric(body_scores.get("hwc_like"), errors="coerce").sum()) == len(body_scores), int(pd.to_numeric(body_scores.get("agc_like"), errors="coerce").sum() + pd.to_numeric(body_scores.get("hwc_like"), errors="coerce").sum()), len(body_scores)))
-
-        # --- Partial-body scoring policy checks -------------------------
-        # These audit the simplified policy (see score_one_body() and
-        # PARTIAL_BODY_POLICY): a body succeeds whenever at least one
-        # window is valid, and fails only when every window is invalid.
-        # Position/reason-specific carve-outs no longer exist because
-        # chunk_literal_space() never produces a short trailing window.
         if not body_scores.empty:
-            valid_windows = pd.to_numeric(body_scores.get("n_valid_npr_windows"), errors="coerce")
-            checks.append(
-                check_row(
-                    "all_bodies_have_at_least_one_valid_npr_window",
-                    bool(valid_windows.ge(1).all()),
-                    int((valid_windows.lt(1)).sum()),
-                    0,
-                    "Every successful body must have at least one window with a finite window_npr.",
-                )
-            )
-            function_npr_values = pd.to_numeric(body_scores.get("function_npr"), errors="coerce")
-            checks.append(
-                check_row(
-                    "all_function_npr_values_are_finite",
-                    bool(np.isfinite(function_npr_values.to_numpy(dtype=float)).all()) if len(function_npr_values) else True,
-                    int((~np.isfinite(function_npr_values.to_numpy(dtype=float))).sum()) if len(function_npr_values) else 0,
-                    0,
-                    "A cached success result must never carry a non-finite function_npr.",
-                )
-            )
-            partial_body_score_count = int(pd.to_numeric(body_scores.get("partial_body_score"), errors="coerce").fillna(0).sum())
-            checks.append(
-                check_row(
-                    "partial_body_score_count_reported",
-                    True,
-                    partial_body_score_count,
-                    None,
-                    "Informational: number of successful bodies that excluded at least one invalid window (any position or reason) from aggregation.",
-                )
-            )
+            fnpr = pd.to_numeric(body_scores["function_npr"], errors="coerce").to_numpy(dtype=float)
+            checks.append(check_row("all_function_npr_values_are_finite", bool(np.isfinite(fnpr).all()), int((~np.isfinite(fnpr)).sum()), 0))
+            arithmetic = int(pd.to_numeric(body_scores["agc_like"], errors="coerce").sum() + pd.to_numeric(body_scores["hwc_like"], errors="coerce").sum())
+            checks.append(check_row("agc_hwc_body_arithmetic", arithmetic == len(body_scores), arithmetic, len(body_scores)))
         if not window_scores.empty:
-            # Overlap must only ever occur on the final window of a body --
-            # every earlier window is produced by a plain, non-overlapping
-            # advance in chunk_literal_space(). This is a defensive audit
-            # of that invariant directly from the output table.
-            overlap_flags = window_scores["overlaps_previous_window"].astype(bool)
-            is_last = window_scores["is_last_window"].astype(bool)
-            overlap_not_on_last = window_scores.loc[overlap_flags & ~is_last]
-            checks.append(
-                check_row(
-                    "overlap_only_on_final_window",
-                    overlap_not_on_last.empty,
-                    int(len(overlap_not_on_last)),
-                    0,
-                    "overlaps_previous_window must only be True for a body's final window.",
-                )
-            )
-            # marginal_token_count must sum to the body's total token count
-            # for every body -- no token double-counted or dropped across
-            # windows. Cross-checked against the body-level
-            # function_body_split_space_token_count via body_scores.
-            if not body_scores.empty:
-                marginal_sums = (
-                    window_scores.groupby("function_body_sha256")["marginal_token_count"]
-                    .sum()
-                    .rename("marginal_token_sum")
-                )
-                token_counts = body_scores.set_index("function_body_sha256")[
-                    "function_body_split_space_token_count"
-                ]
-                reconciled = marginal_sums.to_frame().join(token_counts, how="inner")
-                mismatched = reconciled.loc[
-                    reconciled["marginal_token_sum"]
-                    != reconciled["function_body_split_space_token_count"]
-                ]
-                checks.append(
-                    check_row(
-                        "marginal_token_counts_sum_to_body_token_count",
-                        mismatched.empty,
-                        int(len(mismatched)),
-                        0,
-                        "Summing every window's marginal_token_count must equal the body's total literal-space token count.",
-                    )
-                )
-                # aggregation_weight_token_count must reconcile with the
-                # body-level valid_npr_token_count for every body: the
-                # weights ARE the valid-signal token accounting. And
-                # valid + invalid token counts must partition the body's
-                # total token count exactly.
-                weight_sums = (
-                    window_scores.groupby("function_body_sha256")["aggregation_weight_token_count"]
-                    .sum()
-                    .rename("aggregation_weight_sum")
-                )
-                body_token_fields = body_scores.set_index("function_body_sha256")[
-                    [
-                        "valid_npr_token_count",
-                        "invalid_npr_token_count",
-                        "function_body_split_space_token_count",
-                    ]
-                ]
-                weight_reconciled = weight_sums.to_frame().join(body_token_fields, how="inner")
-                weight_mismatched = weight_reconciled.loc[
-                    weight_reconciled["aggregation_weight_sum"]
-                    != weight_reconciled["valid_npr_token_count"]
-                ]
-                checks.append(
-                    check_row(
-                        "aggregation_weights_sum_to_valid_token_count",
-                        weight_mismatched.empty,
-                        int(len(weight_mismatched)),
-                        0,
-                        "Summing every window's aggregation_weight_token_count must equal the body's valid_npr_token_count.",
-                    )
-                )
-                partition_mismatched = weight_reconciled.loc[
-                    weight_reconciled["valid_npr_token_count"]
-                    + weight_reconciled["invalid_npr_token_count"]
-                    != weight_reconciled["function_body_split_space_token_count"]
-                ]
-                checks.append(
-                    check_row(
-                        "valid_plus_invalid_tokens_equal_body_token_count",
-                        partition_mismatched.empty,
-                        int(len(partition_mismatched)),
-                        0,
-                        "valid_npr_token_count + invalid_npr_token_count must partition the body's total literal-space token count.",
-                    )
-                )
-                # An invalid window must never carry a nonzero aggregation
-                # weight -- weight 0 is what excludes it from function_npr.
-                invalid_with_weight = window_scores.loc[
-                    (~window_scores["window_npr_valid"].astype(bool))
-                    & (
-                        pd.to_numeric(
-                            window_scores["aggregation_weight_token_count"], errors="coerce"
-                        ).fillna(0)
-                        > 0
-                    )
-                ]
-                checks.append(
-                    check_row(
-                        "invalid_windows_have_zero_aggregation_weight",
-                        invalid_with_weight.empty,
-                        int(len(invalid_with_weight)),
-                        0,
-                        "Invalid windows must be excluded from aggregation via a zero aggregation_weight_token_count.",
-                    )
-                )
-            # Every null (invalid) window_npr must carry an explicit reason,
-            # so "null" alone never has to be interpreted as "unexplained".
-            is_invalid = ~window_scores["window_npr_valid"].astype(bool)
-            invalid_rows = window_scores.loc[is_invalid]
-            missing_reason = invalid_rows["window_npr_invalid_reason"].isna() | invalid_rows["window_npr_invalid_reason"].astype(str).eq("")
-            checks.append(
-                check_row(
-                    "null_window_npr_values_have_reason",
-                    bool((~missing_reason).all()) if len(invalid_rows) else True,
-                    int(missing_reason.sum()),
-                    0,
-                    "Every window with window_npr_valid == False must record window_npr_invalid_reason.",
-                )
-            )
+            invalid_with_weight = window_scores.loc[(~window_scores["window_npr_valid"].astype(bool)) & (pd.to_numeric(window_scores["aggregation_weight_token_count"], errors="coerce").fillna(0) > 0)]
+            checks.append(check_row("invalid_windows_have_zero_aggregation_weight", invalid_with_weight.empty, len(invalid_with_weight), 0))
+            overlap_not_last = window_scores.loc[window_scores["overlaps_previous_window"].astype(bool) & ~window_scores["is_last_window"].astype(bool)]
+            checks.append(check_row("overlap_only_on_final_window", overlap_not_last.empty, len(overlap_not_last), 0))
         if args.reproducibility_check_per_profile > 0:
-            expected_repro_minimum = (
-                len(manifest["profile_name"].unique())
-                * args.reproducibility_check_per_profile
-            )
-            checks.append(
-                check_row(
-                    "reproducibility_check_minimum_count",
-                    len(reproducibility) >= expected_repro_minimum,
-                    len(reproducibility),
-                    f">={expected_repro_minimum}",
-                    "Additional partial-body cases are included when present.",
-                )
-            )
-            checks.append(check_row("same_seed_reproducibility", bool(reproducibility["passed"].astype(bool).all()) if len(reproducibility) else False, int((~reproducibility["passed"].astype(bool)).sum()) if len(reproducibility) else expected_repro_minimum, 0))
-            if len(reproducibility) and not body_scores.empty:
-                passed_is_boolean = reproducibility["passed"].notna()
-                checks.append(
-                    check_row(
-                        "reproducibility_comparisons_completed",
-                        bool(passed_is_boolean.all()),
-                        int((~passed_is_boolean).sum()),
-                        0,
-                        "Every selected reproducibility case must produce a boolean result.",
-                    )
-                )
-                partial_by_profile = set(
-                    body_scores.loc[
-                        pd.to_numeric(body_scores["partial_body_score"], errors="coerce").eq(1),
-                        "profile_name",
-                    ].astype(str)
-                )
-                reproducibility_with_partial = reproducibility.merge(
-                    body_scores[["function_body_sha256", "partial_body_score"]],
-                    on="function_body_sha256",
-                    how="left",
-                )
-                partial_repro_profiles = set(
-                    reproducibility_with_partial.loc[
-                        pd.to_numeric(
-                            reproducibility_with_partial["partial_body_score"],
-                            errors="coerce",
-                        ).eq(1),
-                        "profile_name",
-                    ].astype(str)
-                )
-                missing_partial_profiles = sorted(partial_by_profile - partial_repro_profiles)
-                checks.append(
-                    check_row(
-                        "partial_body_reproducibility_coverage",
-                        not missing_partial_profiles,
-                        ",".join(missing_partial_profiles),
-                        "none",
-                        "Each profile containing a partial-body success must contribute one partial-body reproducibility case unless it was already selected as a standard case.",
-                    )
-                )
+            checks.append(check_row("same_seed_reproducibility", bool(reproducibility["passed"].astype(bool).all()) if len(reproducibility) else False, int((~reproducibility["passed"].astype(bool)).sum()) if len(reproducibility) else 1, 0))
     return pd.DataFrame(checks, columns=CHECK_COLUMNS)
-
 
 def package_metadata(runtime: RuntimeBundle | None) -> dict[str, Any]:
     if runtime is None:
@@ -2261,14 +1975,14 @@ def write_outputs(
     summary: dict[str, Any],
     metadata: dict[str, Any],
 ) -> None:
-    atomic_csv(manifest, paths.output_dir / "commit_function_npr_pilot_manifest.csv")
-    atomic_csv(profile_support, paths.output_dir / "commit_function_npr_pilot_profile_support.csv")
+    atomic_csv(manifest, paths.output_dir / "commit_function_npr_full_manifest.csv")
+    atomic_csv(profile_support, paths.output_dir / "commit_function_npr_full_spec_support.csv")
     atomic_csv(body_scores, paths.output_dir / "commit_function_npr_body_scores.csv", BODY_SCORE_COLUMNS)
     atomic_csv(window_scores, paths.output_dir / "commit_function_npr_window_scores.csv", WINDOW_SCORE_COLUMNS)
     atomic_csv(failures, paths.output_dir / "commit_function_npr_failures.csv", FAILURE_COLUMNS)
     atomic_csv(checkpoints, paths.output_dir / "commit_function_npr_checkpoint_index.csv")
     atomic_csv(profile_summary, paths.output_dir / "commit_function_npr_runtime_metrics.csv")
-    atomic_csv(estimates, paths.output_dir / "commit_function_npr_full_run_estimates.csv")
+    atomic_csv(estimates, paths.output_dir / "commit_function_npr_full_progress_estimates.csv")
     atomic_csv(artifact_errors, paths.qc_dir / "commit_function_npr_artifact_errors.csv", ARTIFACT_ERROR_COLUMNS)
     atomic_csv(reproducibility, paths.qc_dir / "commit_function_npr_reproducibility_checks.csv", REPRO_COLUMNS)
     atomic_csv(checks, paths.qc_dir / "commit_function_npr_checks.csv", CHECK_COLUMNS)
@@ -2302,12 +2016,10 @@ def run_analysis(args: argparse.Namespace) -> int:
         paths.input_eligibility_specification,
         paths.input_threshold_specification,
     )
-    calibration_spec = find_spec(config, args.calibration_spec_name)
-    long_spec = find_spec(config, args.long_spec_name)
-    if int(calibration_spec["minimum_literal_space_tokens"]) != 100 or int(calibration_spec["maximum_literal_space_tokens"]) != 200:
-        raise ValueError("range100_200 specification does not match 100-200 tokens.")
-    if int(long_spec["minimum_literal_space_tokens"]) != 100 or long_spec.get("maximum_literal_space_tokens") is not None:
-        raise ValueError("min100 specification does not match an open-ended minimum of 100 tokens.")
+    selected_spec = find_spec(config, args.spec_name)
+    if args.spec_name == "range100_200":
+        if int(selected_spec["minimum_literal_space_tokens"]) != 100 or int(selected_spec["maximum_literal_space_tokens"]) != 200:
+            raise ValueError("range100_200 specification does not match 100-200 tokens.")
 
     unique_bodies = pd.read_csv(paths.input_unique_bodies, low_memory=False)
     events = pd.read_csv(paths.input_events, low_memory=False)
@@ -2358,7 +2070,7 @@ def run_analysis(args: argparse.Namespace) -> int:
             "bodies_reused_this_run": 0,
         }
         metadata = {
-            "analysis_stage": "run-1c-dual-profile-npr-pilot",
+            "analysis_stage": "run-1d-full-npr-scoring",
             "script_version": SCRIPT_VERSION,
             "config_fingerprint": fingerprint,
             "detector_configuration": config.fingerprint_payload(profile_definition),
@@ -2394,8 +2106,8 @@ def run_analysis(args: argparse.Namespace) -> int:
     estimates = build_full_run_estimates(
         profile_summary,
         support,
-        args.calibration_profile_name,
-        args.long_profile_name,
+        args.profile_name,
+        args.profile_name,
     )
     checks = build_checks(
         config,
@@ -2427,8 +2139,8 @@ def run_analysis(args: argparse.Namespace) -> int:
         "failed_checks": failed_checks,
         "checks_total": int(len(checks)),
         "selected_unique_bodies": int(len(manifest)),
-        "calibration_profile_selected": int((manifest["profile_name"] == args.calibration_profile_name).sum()),
-        "long_profile_selected": int((manifest["profile_name"] == args.long_profile_name).sum()),
+        "selected_spec_name": args.spec_name,
+        "full_profile_selected": int((manifest["profile_name"] == args.profile_name).sum()),
         "successful_unique_bodies": int(len(body_scores)),
         "failed_unique_bodies": int(len(failures)),
         "expected_windows": int(manifest["n_expected_windows"].sum()),
@@ -2454,7 +2166,8 @@ def run_analysis(args: argparse.Namespace) -> int:
         "algorithm_version": config.algorithm_version,
         "calibration_auroc": config.calibration_auroc,
         "specification_input_primary": config.specification_primary,
-        "pilot_does_not_finalize_primary_specification": True,
+        "selected_specification": args.spec_name,
+        "full_run_uses_selected_specification": True,
     }
     input_hashes = {
         "input_unique_bodies_sha256": sha256_file(paths.input_unique_bodies),
@@ -2466,7 +2179,7 @@ def run_analysis(args: argparse.Namespace) -> int:
     }
     metadata = {
         "status": status,
-        "analysis_stage": "run-1c-dual-profile-npr-pilot",
+        "analysis_stage": "run-1d-full-npr-scoring",
         "script_version": SCRIPT_VERSION,
         "invocation_started_utc": invocation_started_utc,
         "invocation_completed_utc": utc_now(),
@@ -2496,9 +2209,8 @@ def run_analysis(args: argparse.Namespace) -> int:
             ),
         },
         "operational_note": (
-            "This pilot measures computational feasibility for range100_200 and "
-            "the >200-token extension needed by min100. It does not inspect DiD "
-            "results or redefine the scientific primary specification."
+            "This full run scores every unique body in the selected frozen eligibility specification. "
+            "It does not aggregate repository-month outcomes or run DiD."
         ),
     }
     write_outputs(
@@ -2534,9 +2246,9 @@ def run_analysis(args: argparse.Namespace) -> int:
     append_jsonl(history_record, paths.qc_dir / "commit_function_npr_run_history.jsonl")
 
     print("=" * 76)
-    print("Run dual-profile commit-function NPR pilot")
+    print("Run full commit-function NPR scoring")
     print(f"Status:                         {status}")
-    print(f"Selected unique bodies:         {len(manifest)}")
+    print(f"Selected full-run bodies:         {len(manifest)}")
     print(f"Successful unique bodies:       {len(body_scores)}")
     print(f"Failed unique bodies:           {len(failures)}")
     print(f"Expected windows:               {int(manifest['n_expected_windows'].sum())}")
@@ -2556,7 +2268,7 @@ def make_self_test_inputs(root: Path) -> argparse.Namespace:
     run1a = root / "run-1a" / "strict"
     bodies_dir = run1a / "function_bodies"
     run1b = root / "run-1b" / "strict"
-    output = root / "run-1c" / "pilot"
+    output = root / "run-1d" / "full"
     bodies_dir.mkdir(parents=True, exist_ok=True)
     run1b.mkdir(parents=True, exist_ok=True)
 
@@ -2699,14 +2411,8 @@ def make_self_test_inputs(root: Path) -> argparse.Namespace:
         output_dir=output,
         qc_dir=None,
         cache_dir=None,
-        calibration_spec_name="range100_200",
-        long_spec_name="min100",
-        calibration_profile_name="calibration_range_100_200",
-        long_profile_name="long_body_gt200",
-        calibration_profile_size=20,
-        long_profile_size=20,
-        calibration_bands="100:110,111:120,121:130,131:140,141:150,151:160,161:170,171:180,181:190,191:200",
-        long_window_strata="2:2,3:4,5:8,9:16,17:",
+        spec_name="range100_200",
+        profile_name="range100_200_full",
         device="cuda",
         model_cache_dir=Path("~/.cache/huggingface/hub").expanduser(),
         detector_output_name="run1c_self_test",
@@ -3147,7 +2853,7 @@ def run_self_test() -> None:
         summary_path = first.output_dir / "qc" / "commit_function_npr_summary.json"
         with summary_path.open("r", encoding="utf-8") as stream:
             summary = json.load(stream)
-        if summary["status"] != "PASS" or summary["successful_unique_bodies"] != 40:
+        if summary["status"] != "PASS" or summary["successful_unique_bodies"] != 20:
             raise RuntimeError(f"Unexpected first-run self-test summary: {summary}")
 
         second = make_self_test_inputs(root)
@@ -3160,116 +2866,37 @@ def run_self_test() -> None:
             resumed = json.load(stream)
         if not resumed["resume_validation_passed"]:
             raise RuntimeError(f"Resume validation did not pass: {resumed}")
-        if resumed["bodies_scored_this_run"] != 0 or resumed["bodies_reused_this_run"] != 40:
+        if resumed["bodies_scored_this_run"] != 0 or resumed["bodies_reused_this_run"] != 20:
             raise RuntimeError(f"Unexpected resume counts: {resumed}")
         print("Self-test: PASS")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Score a deterministic dual-profile pilot of unique implementation "
-            "bodies with the StarCoder2 perturbation-based NPR detector."
-        )
+        description="Score every unique implementation body in one frozen eligibility specification."
     )
-    parser.add_argument(
-        "--input-unique-bodies",
-        type=Path,
-        default=Path(
-            "output/commit_function/run-1a/strict/"
-            "commit_function_detectcodegpt_unique_bodies.csv"
-        ),
-    )
-    parser.add_argument(
-        "--input-events",
-        type=Path,
-        default=Path(
-            "output/commit_function/run-1a/strict/"
-            "commit_function_detectcodegpt_input_events.csv"
-        ),
-    )
-    parser.add_argument(
-        "--input-panel",
-        type=Path,
-        default=Path(
-            "../ai_code_complexity_study_python/ai-code-complexity-study/"
-            "repo_python/run-py-4a/strict/"
-            "panel_event_monthly_agc_changed_block_py.csv"
-        ),
-    )
-    parser.add_argument(
-        "--input-support",
-        type=Path,
-        default=Path(
-            "output/commit_function/run-1b/strict/"
-            "commit_function_body_eligibility_support.csv"
-        ),
-    )
-    parser.add_argument(
-        "--input-eligibility-specification",
-        type=Path,
-        default=Path(
-            "output/commit_function/run-1b/strict/"
-            "commit_function_detectcodegpt_scoring_spec.json"
-        ),
-        help="Frozen run-1b eligibility and profile specification.",
-    )
-    parser.add_argument(
-        "--input-threshold-specification",
-        type=Path,
-        default=Path(
-            "output/commit_function/run-1c0b/mixedcode-overlap-threshold-v1/"
-            "mixedcode_overlap_threshold_specification.json"
-        ),
-        help="Frozen run-1c0b overlap-window detector and threshold specification.",
-    )
-    parser.add_argument(
-        "--body-artifact-base",
-        type=Path,
-        default=Path("output/commit_function/run-1a/strict"),
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("output/commit_function/run-1c/pilot200-dual-profile-v7"),
-    )
+    parser.add_argument("--input-unique-bodies", type=Path, default=Path("output/commit_function/run-1a/strict/commit_function_detectcodegpt_unique_bodies.csv"))
+    parser.add_argument("--input-events", type=Path, default=Path("output/commit_function/run-1a/strict/commit_function_detectcodegpt_input_events.csv"))
+    parser.add_argument("--input-panel", type=Path, default=Path("../ai_code_complexity_study_python/ai-code-complexity-study/repo_python/run-py-4a/strict/panel_event_monthly_agc_changed_block_py.csv"))
+    parser.add_argument("--input-support", type=Path, default=Path("output/commit_function/run-1b/strict/commit_function_body_eligibility_support.csv"))
+    parser.add_argument("--input-eligibility-specification", type=Path, default=Path("output/commit_function/run-1b/strict/commit_function_detectcodegpt_scoring_spec.json"))
+    parser.add_argument("--input-threshold-specification", type=Path, default=Path("output/commit_function/run-1c0b/mixedcode-overlap-threshold-v1/mixedcode_overlap_threshold_specification.json"))
+    parser.add_argument("--body-artifact-base", type=Path, default=Path("output/commit_function/run-1a/strict"))
+    parser.add_argument("--spec-name", default="range100_200")
+    parser.add_argument("--profile-name", default="range100_200_full")
+    parser.add_argument("--output-dir", type=Path, default=Path("output/commit_function/run-1d/range100_200-overlap-v1"))
     parser.add_argument("--qc-dir", type=Path, default=None)
     parser.add_argument("--cache-dir", type=Path, default=None)
-    parser.add_argument("--calibration-spec-name", default="range100_200")
-    parser.add_argument("--long-spec-name", default="min100")
-    parser.add_argument("--calibration-profile-name", default="calibration_range_100_200")
-    parser.add_argument("--long-profile-name", default="long_body_gt200")
-    parser.add_argument("--calibration-profile-size", type=int, default=100)
-    parser.add_argument("--long-profile-size", type=int, default=100)
-    parser.add_argument(
-        "--calibration-bands",
-        default=(
-            "100:110,111:120,121:130,131:140,141:150,151:160,"
-            "161:170,171:180,181:190,191:200"
-        ),
-    )
-    parser.add_argument(
-        "--long-window-strata",
-        default="2:2,3:4,5:8,9:16,17:",
-    )
     parser.add_argument("--device", default="cuda")
-    parser.add_argument(
-        "--model-cache-dir",
-        type=Path,
-        default=Path("~/.cache/huggingface/hub").expanduser(),
-    )
-    parser.add_argument("--detector-output-name", default="run1c_commit_function_npr_pilot_v7")
+    parser.add_argument("--model-cache-dir", type=Path, default=Path("~/.cache/huggingface/hub").expanduser())
+    parser.add_argument("--detector-output-name", default="run1d_commit_function_npr_full_v1")
     parser.add_argument("--pct-words-masked", type=float, default=0.5)
     parser.add_argument("--span-length", type=int, default=2)
     parser.add_argument("--perturbation-chunk-size", type=int, default=10)
     parser.add_argument("--n-perturbation-rounds", type=int, default=1)
-    parser.add_argument(
-        "--quiet-internal-progress",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-    )
+    parser.add_argument("--quiet-internal-progress", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--detector-log-level", default="WARNING")
-    parser.add_argument("--progress-every-bodies", type=int, default=5)
+    parser.add_argument("--progress-every-bodies", type=int, default=100)
     parser.add_argument("--reproducibility-check-per-profile", type=int, default=1)
     parser.add_argument("--reproducibility-tolerance", type=float, default=1e-12)
     parser.add_argument("--overwrite-output", action="store_true")
@@ -3284,7 +2911,6 @@ def parse_args() -> argparse.Namespace:
         args.cache_dir = args.output_dir / "cache"
     args.model_cache_dir = args.model_cache_dir.expanduser()
     return args
-
 
 def main() -> None:
     args = parse_args()

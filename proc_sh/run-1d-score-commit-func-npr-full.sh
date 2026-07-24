@@ -1,22 +1,19 @@
 #!/usr/bin/env bash
-# Run a deterministic dual-profile StarCoder2 NPR pilot.
+# Run full StarCoder2 NPR scoring for one frozen eligibility specification.
 #
 # Workspace:
 #   ~/project-workspace/detect_code_gpt
 #
 # Versioned delivery file:
-#   proc_sh/run-1c-score-commit-func-npr-v7.sh
+#   proc_sh/run-1d-score-commit-func-npr-full-v1.sh
 #
 # Canonical path:
-#   proc_sh/run-1c-score-commit-func-npr.sh
+#   proc_sh/run-1d-score-commit-func-npr-full.sh
 #
 # Purpose:
-#   Measure scoring correctness, throughput, cache size, GPU memory, resume
-#   behavior, and same-seed reproducibility before full commit-function NPR
-#   scoring. The pilot contains two deterministic profiles:
-#
-#   1. 100 bodies from the benchmark-compatible 100-200 token range.
-#   2. 100 bodies above 200 tokens, stratified by 128-token window count.
+#   Score every unique implementation body admitted by one frozen run-1b
+#   eligibility specification. The default range100_200 run is resumable at
+#   the body level and uses the frozen overlap-window threshold specification.
 #
 # Partial-body policy:
 #   The final short tail is shifted backward into a full overlap window. A body
@@ -39,12 +36,12 @@
 #     repo_python/run-py-4a/strict/panel_event_monthly_agc_changed_block_py.csv
 #
 # Main outputs:
-#   output/commit_function/run-1c/pilot200-dual-profile-v7/
-#     commit_function_npr_pilot_manifest.csv
+#   output/commit_function/run-1d/range100_200-overlap-v1/
+#     commit_function_npr_full_manifest.csv
 #     commit_function_npr_body_scores.csv
 #     commit_function_npr_window_scores.csv
 #     commit_function_npr_runtime_metrics.csv
-#     commit_function_npr_full_run_estimates.csv
+#     commit_function_npr_full_progress_estimates.csv
 #     commit_function_npr_checkpoint_index.csv
 #     commit_function_npr_failures.csv
 #     cache/body_results/
@@ -60,15 +57,15 @@
 #   INPUT_ELIGIBILITY_SPECIFICATION, INPUT_THRESHOLD_SPECIFICATION,
 #   BODY_ARTIFACT_BASE, OUTPUT_DIR, QC_DIR, CACHE_DIR,
 #   LOG_DIR, CUDA_DEVICE, CUDA_VISIBLE_DEVICES, MODEL_CACHE_DIR,
-#   CALIBRATION_PROFILE_SIZE, LONG_PROFILE_SIZE, CALIBRATION_BANDS,
-#   LONG_WINDOW_STRATA, REPRODUCIBILITY_CHECK_PER_PROFILE,
+#   SPEC_NAME, PROFILE_NAME, REPRODUCIBILITY_CHECK_PER_PROFILE,
 #   PROGRESS_EVERY_BODIES, OVERWRITE_OUTPUT, RUN_SELF_TEST,
 #   RUN_RESUME_CHECK, PREPARE_ONLY, ALLOW_CPU
 # 
 # Usage:
-#   PREPARE_ONLY=1 OVERWRITE_OUTPUT=1 PYTHONUNBUFFERED=1 bash proc_sh/run-1c-score-commit-func-npr.sh
-#   PYTHONUNBUFFERED=1 OVERWRITE_OUTPUT=1 CUDA_DEVICE=0 bash proc_sh/run-1c-score-commit-func-npr.sh
-#   
+#  PREPARE_ONLY=1 OVERWRITE_OUTPUT=1 RUN_SELF_TEST=1 PYTHONUNBUFFERED=1 bash proc_sh/run-1d-score-commit-func-npr-full.sh
+#  PYTHONUNBUFFERED=1 OVERWRITE_OUTPUT=1 CUDA_DEVICE=0 bash proc_sh/run-1d-score-commit-func-npr-full.sh
+#  RUN_SELF_TEST=0 PYTHONUNBUFFERED=1 OVERWRITE_OUTPUT=1 CUDA_DEVICE=0 bash proc_sh/run-1d-score-commit-func-npr-full.sh
+# 
 
 set -euo pipefail
 
@@ -77,7 +74,7 @@ PROJECT_ROOT="${PROJECT_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 cd "${PROJECT_ROOT}"
 
 PYTHON_BIN="${PYTHON_BIN:-python}"
-PY_SCRIPT="${PY_SCRIPT:-code-detection/score_commit_function_npr.py}"
+PY_SCRIPT="${PY_SCRIPT:-code-detection/score_commit_function_npr_full.py}"
 
 RUN1A_DIR="${RUN1A_DIR:-output/commit_function/run-1a/strict}"
 RUN1B_DIR="${RUN1B_DIR:-output/commit_function/run-1b/strict}"
@@ -89,17 +86,15 @@ INPUT_ELIGIBILITY_SPECIFICATION="${INPUT_ELIGIBILITY_SPECIFICATION:-${RUN1B_DIR}
 INPUT_THRESHOLD_SPECIFICATION="${INPUT_THRESHOLD_SPECIFICATION:-output/commit_function/run-1c0b/mixedcode-overlap-threshold-v1/mixedcode_overlap_threshold_specification.json}"
 BODY_ARTIFACT_BASE="${BODY_ARTIFACT_BASE:-${RUN1A_DIR}}"
 
-CALIBRATION_PROFILE_SIZE="${CALIBRATION_PROFILE_SIZE:-100}"
-LONG_PROFILE_SIZE="${LONG_PROFILE_SIZE:-100}"
-CALIBRATION_BANDS="${CALIBRATION_BANDS:-100:110,111:120,121:130,131:140,141:150,151:160,161:170,171:180,181:190,191:200}"
-LONG_WINDOW_STRATA="${LONG_WINDOW_STRATA:-2:2,3:4,5:8,9:16,17:}"
+SPEC_NAME="${SPEC_NAME:-range100_200}"
+PROFILE_NAME="${PROFILE_NAME:-range100_200_full}"
 REPRODUCIBILITY_CHECK_PER_PROFILE="${REPRODUCIBILITY_CHECK_PER_PROFILE:-1}"
-PROGRESS_EVERY_BODIES="${PROGRESS_EVERY_BODIES:-5}"
+PROGRESS_EVERY_BODIES="${PROGRESS_EVERY_BODIES:-100}"
 
-OUTPUT_DIR="${OUTPUT_DIR:-output/commit_function/run-1c/pilot200-dual-profile-v7}"
+OUTPUT_DIR="${OUTPUT_DIR:-output/commit_function/run-1d/range100_200-overlap-v1}"
 QC_DIR="${QC_DIR:-${OUTPUT_DIR}/qc}"
 CACHE_DIR="${CACHE_DIR:-${OUTPUT_DIR}/cache}"
-LOG_DIR="${LOG_DIR:-logs/run-1c}"
+LOG_DIR="${LOG_DIR:-logs/run-1d}"
 MODEL_CACHE_DIR="${MODEL_CACHE_DIR:-${HOME}/.cache/huggingface/hub}"
 
 CUDA_DEVICE="${CUDA_DEVICE:-0}"
@@ -113,16 +108,16 @@ PREPARE_ONLY="${PREPARE_ONLY:-0}"
 ALLOW_CPU="${ALLOW_CPU:-0}"
 
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
-LOG_FILE="${LOG_FILE:-${LOG_DIR}/run-1c-score-commit-func-npr-pilot-v7-${TIMESTAMP}.log}"
+LOG_FILE="${LOG_FILE:-${LOG_DIR}/run-1d-score-commit-func-npr-full-v1-${TIMESTAMP}.log}"
 
-MANIFEST_OUTPUT="${OUTPUT_DIR}/commit_function_npr_pilot_manifest.csv"
-PROFILE_SUPPORT_OUTPUT="${OUTPUT_DIR}/commit_function_npr_pilot_profile_support.csv"
+MANIFEST_OUTPUT="${OUTPUT_DIR}/commit_function_npr_full_manifest.csv"
+PROFILE_SUPPORT_OUTPUT="${OUTPUT_DIR}/commit_function_npr_full_spec_support.csv"
 BODY_SCORE_OUTPUT="${OUTPUT_DIR}/commit_function_npr_body_scores.csv"
 WINDOW_SCORE_OUTPUT="${OUTPUT_DIR}/commit_function_npr_window_scores.csv"
 FAILURE_OUTPUT="${OUTPUT_DIR}/commit_function_npr_failures.csv"
 CHECKPOINT_OUTPUT="${OUTPUT_DIR}/commit_function_npr_checkpoint_index.csv"
 RUNTIME_OUTPUT="${OUTPUT_DIR}/commit_function_npr_runtime_metrics.csv"
-ESTIMATE_OUTPUT="${OUTPUT_DIR}/commit_function_npr_full_run_estimates.csv"
+ESTIMATE_OUTPUT="${OUTPUT_DIR}/commit_function_npr_full_progress_estimates.csv"
 CHECK_OUTPUT="${QC_DIR}/commit_function_npr_checks.csv"
 SUMMARY_OUTPUT="${QC_DIR}/commit_function_npr_summary.json"
 METADATA_OUTPUT="${QC_DIR}/commit_function_npr_metadata.json"
@@ -153,7 +148,7 @@ elif ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
     exit 2
 fi
 
-require_file "${PY_SCRIPT}" "run-1c Python script"
+require_file "${PY_SCRIPT}" "run-1d Python script"
 require_file "${INPUT_UNIQUE_BODIES}" "run-1a unique-body manifest"
 require_file "${INPUT_EVENTS}" "run-1a event manifest"
 require_file "${INPUT_PANEL}" "matched repository-month panel"
@@ -187,7 +182,7 @@ finish() {
 
     echo
     echo "============================================================================"
-    echo "run-1c execution summary"
+    echo "run-1d execution summary"
     echo "Started:               ${START_TEXT}"
     echo "Completed:             $(date)"
     printf 'Elapsed:               %02d:%02d:%02d\n' "${hours}" "${minutes}" "${seconds}"
@@ -274,7 +269,7 @@ GPU_NAME_DISPLAY="${GPU_NAME//_/ }"
 for value in "${TORCH_VERSION}" "${TRANSFORMERS_VERSION}" "${SCIPY_VERSION}" "${NUMPY_VERSION}" "${PANDAS_VERSION}"; do
     if [[ "${value}" == ERROR:* ]] || [[ "${value}" == "missing" ]]; then
         echo "ERROR: Required Python dependency is unavailable: ${value}" >&2
-        echo "Use the detectcodegpt Conda environment for run-1c." >&2
+        echo "Use the detectcodegpt Conda environment for run-1d." >&2
         exit 2
     fi
 done
@@ -287,7 +282,7 @@ fi
 
 cat <<INFO
 ============================================================================
-run-1c: deterministic dual-profile overlap-window commit-function NPR pilot
+run-1d: full overlap-window commit-function NPR scoring
 Started:                         ${START_TEXT}
 Workspace:                       ${PROJECT_ROOT}
 Active conda env:                ${CONDA_DEFAULT_ENV:-<none>}
@@ -318,10 +313,8 @@ Input eligibility spec SHA:      ${INPUT_ELIGIBILITY_SPECIFICATION_SHA}
 Input threshold specification:   ${INPUT_THRESHOLD_SPECIFICATION}
 Input threshold spec SHA:        ${INPUT_THRESHOLD_SPECIFICATION_SHA}
 Body artifact base:              ${BODY_ARTIFACT_BASE}
-Calibration profile size:        ${CALIBRATION_PROFILE_SIZE}
-Long-body profile size:          ${LONG_PROFILE_SIZE}
-Calibration bands:               ${CALIBRATION_BANDS}
-Long-body window strata:         ${LONG_WINDOW_STRATA}
+Full specification:              ${SPEC_NAME}
+Full profile name:                ${PROFILE_NAME}
 Repro checks per profile:        ${REPRODUCIBILITY_CHECK_PER_PROFILE}
 Output directory:                ${OUTPUT_DIR}
 Cache directory:                 ${CACHE_DIR}
@@ -353,10 +346,8 @@ COMMAND=(
     --qc-dir "${QC_DIR}"
     --cache-dir "${CACHE_DIR}"
     --model-cache-dir "${MODEL_CACHE_DIR}"
-    --calibration-profile-size "${CALIBRATION_PROFILE_SIZE}"
-    --long-profile-size "${LONG_PROFILE_SIZE}"
-    --calibration-bands "${CALIBRATION_BANDS}"
-    --long-window-strata "${LONG_WINDOW_STRATA}"
+    --spec-name "${SPEC_NAME}"
+    --profile-name "${PROFILE_NAME}"
     --reproducibility-check-per-profile "${REPRODUCIBILITY_CHECK_PER_PROFILE}"
     --progress-every-bodies "${PROGRESS_EVERY_BODIES}"
 )
@@ -416,14 +407,14 @@ print(
 PY
 )
 
-EXPECTED_SELECTED=$((CALIBRATION_PROFILE_SIZE + LONG_PROFILE_SIZE))
+EXPECTED_SELECTED="${SELECTED}"
 EXPECTED_STATUS="PASS"
 if [[ "${PREPARE_ONLY}" == "1" ]]; then
     EXPECTED_STATUS="PREPARED_ONLY"
 fi
 
 if [[ "${STATUS}" != "${EXPECTED_STATUS}" ]] || [[ "${FAILED_CHECKS}" != "0" ]]; then
-    echo "ERROR: run-1c QC failed: status=${STATUS}, failed_checks=${FAILED_CHECKS}" >&2
+    echo "ERROR: run-1d QC failed: status=${STATUS}, failed_checks=${FAILED_CHECKS}" >&2
     exit 4
 fi
 if [[ "${SELECTED}" != "${EXPECTED_SELECTED}" ]]; then
@@ -431,7 +422,7 @@ if [[ "${SELECTED}" != "${EXPECTED_SELECTED}" ]]; then
     exit 4
 fi
 if [[ "${PREPARE_ONLY}" != "1" ]] && { [[ "${SUCCESSFUL}" != "${EXPECTED_SELECTED}" ]] || [[ "${FAILED}" != "0" ]]; }; then
-    echo "ERROR: Pilot scoring was incomplete: successful=${SUCCESSFUL}, failed=${FAILED}" >&2
+    echo "ERROR: Full scoring was incomplete: successful=${SUCCESSFUL}, failed=${FAILED}" >&2
     exit 4
 fi
 
@@ -453,10 +444,8 @@ if [[ "${RUN_RESUME_CHECK}" == "1" ]] && [[ "${PREPARE_ONLY}" != "1" ]]; then
         --qc-dir "${QC_DIR}"
         --cache-dir "${CACHE_DIR}"
         --model-cache-dir "${MODEL_CACHE_DIR}"
-        --calibration-profile-size "${CALIBRATION_PROFILE_SIZE}"
-        --long-profile-size "${LONG_PROFILE_SIZE}"
-        --calibration-bands "${CALIBRATION_BANDS}"
-        --long-window-strata "${LONG_WINDOW_STRATA}"
+        --spec-name "${SPEC_NAME}"
+    --profile-name "${PROFILE_NAME}"
         --reproducibility-check-per-profile "${REPRODUCIBILITY_CHECK_PER_PROFILE}"
         --progress-every-bodies "${PROGRESS_EVERY_BODIES}"
         --require-all-completed
@@ -499,7 +488,7 @@ CHECKPOINT_ROWS=$(( $(wc -l < "${CHECKPOINT_OUTPUT}") - 1 ))
 cat <<INFO
 
 ============================================================================
-run-1c output verification
+run-1d output verification
 Status after validation:         ${STATUS}
 Selected unique bodies:          ${SELECTED}
 Successful unique bodies:        ${SUCCESSFUL}
@@ -517,7 +506,7 @@ Window score rows:               ${WINDOW_SCORE_ROWS}
 Failure rows:                    ${FAILURE_ROWS}
 Checkpoint rows:                 ${CHECKPOINT_ROWS}
 Failed QC checks:                ${FAILED_CHECKS}
-Pilot manifest:                  ${MANIFEST_OUTPUT}
+Full manifest:                  ${MANIFEST_OUTPUT}
 Body scores:                     ${BODY_SCORE_OUTPUT}
 Window scores:                   ${WINDOW_SCORE_OUTPUT}
 Runtime metrics:                 ${RUNTIME_OUTPUT}

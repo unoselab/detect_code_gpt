@@ -5,7 +5,7 @@
 #   ~/project-workspace/detect_code_gpt
 #
 # Versioned delivery file:
-#   proc_sh/run-1c-score-commit-func-npr-v7.sh
+#   proc_sh/run-1c-score-commit-func-npr-v4.sh
 #
 # Canonical path:
 #   proc_sh/run-1c-score-commit-func-npr.sh
@@ -19,9 +19,10 @@
 #   2. 100 bodies above 200 tokens, stratified by 128-token window count.
 #
 # Partial-body policy:
-#   The final short tail is shifted backward into a full overlap window. A body
-#   succeeds whenever at least one window has a valid NPR; invalid windows have
-#   zero aggregation weight. A body fails only when all windows are invalid.
+#   A body may succeed with one excluded window only when that window is a
+#   true incomplete final tail and its original_log_rank is exactly zero.
+#   Invalid non-tail windows, full-size final windows, and other invalid-tail
+#   reasons are recorded as body scoring failures.
 #
 # The wrapper is standalone. It reuses the execution, logging, validation,
 # and output-verification structure of run-1b2 and the CUDA invocation pattern
@@ -39,7 +40,7 @@
 #     repo_python/run-py-4a/strict/panel_event_monthly_agc_changed_block_py.csv
 #
 # Main outputs:
-#   output/commit_function/run-1c/pilot200-dual-profile-v7/
+#   output/commit_function/run-1c/pilot200-dual-profile-v4/
 #     commit_function_npr_pilot_manifest.csv
 #     commit_function_npr_body_scores.csv
 #     commit_function_npr_window_scores.csv
@@ -57,8 +58,7 @@
 # Optional environment variables:
 #   PROJECT_ROOT, PYTHON_BIN, PY_SCRIPT, RUN1A_DIR, RUN1B_DIR,
 #   INPUT_UNIQUE_BODIES, INPUT_EVENTS, INPUT_PANEL, INPUT_SUPPORT,
-#   INPUT_ELIGIBILITY_SPECIFICATION, INPUT_THRESHOLD_SPECIFICATION,
-#   BODY_ARTIFACT_BASE, OUTPUT_DIR, QC_DIR, CACHE_DIR,
+#   INPUT_SPECIFICATION, BODY_ARTIFACT_BASE, OUTPUT_DIR, QC_DIR, CACHE_DIR,
 #   LOG_DIR, CUDA_DEVICE, CUDA_VISIBLE_DEVICES, MODEL_CACHE_DIR,
 #   CALIBRATION_PROFILE_SIZE, LONG_PROFILE_SIZE, CALIBRATION_BANDS,
 #   LONG_WINDOW_STRATA, REPRODUCIBILITY_CHECK_PER_PROFILE,
@@ -66,9 +66,8 @@
 #   RUN_RESUME_CHECK, PREPARE_ONLY, ALLOW_CPU
 # 
 # Usage:
-#   PREPARE_ONLY=1 OVERWRITE_OUTPUT=1 PYTHONUNBUFFERED=1 bash proc_sh/run-1c-score-commit-func-npr.sh
-#   PYTHONUNBUFFERED=1 OVERWRITE_OUTPUT=1 CUDA_DEVICE=0 bash proc_sh/run-1c-score-commit-func-npr.sh
-#   
+#  PYTHONUNBUFFERED=1 OVERWRITE_OUTPUT=1 CUDA_DEVICE=0 bash proc_sh/run-1c-score-commit-func-npr.sh
+# 
 
 set -euo pipefail
 
@@ -85,8 +84,7 @@ INPUT_UNIQUE_BODIES="${INPUT_UNIQUE_BODIES:-${RUN1A_DIR}/commit_function_detectc
 INPUT_EVENTS="${INPUT_EVENTS:-${RUN1A_DIR}/commit_function_detectcodegpt_input_events.csv}"
 INPUT_PANEL="${INPUT_PANEL:-../ai_code_complexity_study_python/ai-code-complexity-study/repo_python/run-py-4a/strict/panel_event_monthly_agc_changed_block_py.csv}"
 INPUT_SUPPORT="${INPUT_SUPPORT:-${RUN1B_DIR}/commit_function_body_eligibility_support.csv}"
-INPUT_ELIGIBILITY_SPECIFICATION="${INPUT_ELIGIBILITY_SPECIFICATION:-${RUN1B_DIR}/commit_function_detectcodegpt_scoring_spec.json}"
-INPUT_THRESHOLD_SPECIFICATION="${INPUT_THRESHOLD_SPECIFICATION:-output/commit_function/run-1c0b/mixedcode-overlap-threshold-v1/mixedcode_overlap_threshold_specification.json}"
+INPUT_SPECIFICATION="${INPUT_SPECIFICATION:-${RUN1B_DIR}/commit_function_detectcodegpt_scoring_spec.json}"
 BODY_ARTIFACT_BASE="${BODY_ARTIFACT_BASE:-${RUN1A_DIR}}"
 
 CALIBRATION_PROFILE_SIZE="${CALIBRATION_PROFILE_SIZE:-100}"
@@ -96,7 +94,7 @@ LONG_WINDOW_STRATA="${LONG_WINDOW_STRATA:-2:2,3:4,5:8,9:16,17:}"
 REPRODUCIBILITY_CHECK_PER_PROFILE="${REPRODUCIBILITY_CHECK_PER_PROFILE:-1}"
 PROGRESS_EVERY_BODIES="${PROGRESS_EVERY_BODIES:-5}"
 
-OUTPUT_DIR="${OUTPUT_DIR:-output/commit_function/run-1c/pilot200-dual-profile-v7}"
+OUTPUT_DIR="${OUTPUT_DIR:-output/commit_function/run-1c/pilot200-dual-profile-v4}"
 QC_DIR="${QC_DIR:-${OUTPUT_DIR}/qc}"
 CACHE_DIR="${CACHE_DIR:-${OUTPUT_DIR}/cache}"
 LOG_DIR="${LOG_DIR:-logs/run-1c}"
@@ -113,7 +111,7 @@ PREPARE_ONLY="${PREPARE_ONLY:-0}"
 ALLOW_CPU="${ALLOW_CPU:-0}"
 
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
-LOG_FILE="${LOG_FILE:-${LOG_DIR}/run-1c-score-commit-func-npr-pilot-v7-${TIMESTAMP}.log}"
+LOG_FILE="${LOG_FILE:-${LOG_DIR}/run-1c-score-commit-func-npr-pilot-v4-${TIMESTAMP}.log}"
 
 MANIFEST_OUTPUT="${OUTPUT_DIR}/commit_function_npr_pilot_manifest.csv"
 PROFILE_SUPPORT_OUTPUT="${OUTPUT_DIR}/commit_function_npr_pilot_profile_support.csv"
@@ -158,8 +156,7 @@ require_file "${INPUT_UNIQUE_BODIES}" "run-1a unique-body manifest"
 require_file "${INPUT_EVENTS}" "run-1a event manifest"
 require_file "${INPUT_PANEL}" "matched repository-month panel"
 require_file "${INPUT_SUPPORT}" "run-1b eligibility support"
-require_file "${INPUT_ELIGIBILITY_SPECIFICATION}" "run-1b frozen eligibility specification"
-require_file "${INPUT_THRESHOLD_SPECIFICATION}" "run-1c0b frozen threshold specification"
+require_file "${INPUT_SPECIFICATION}" "run-1b frozen specification"
 
 read -r PYTHON_MAJOR PYTHON_MINOR PYTHON_MICRO < <(
     "${PYTHON_BIN}" -c 'import sys; print(sys.version_info.major, sys.version_info.minor, sys.version_info.micro)'
@@ -199,8 +196,7 @@ finish() {
     echo "Input events:          ${INPUT_EVENTS}"
     echo "Input panel:           ${INPUT_PANEL}"
     echo "Input support:         ${INPUT_SUPPORT}"
-    echo "Eligibility spec:       ${INPUT_ELIGIBILITY_SPECIFICATION}"
-    echo "Threshold spec:         ${INPUT_THRESHOLD_SPECIFICATION}"
+    echo "Input specification:   ${INPUT_SPECIFICATION}"
     echo "Output directory:      ${OUTPUT_DIR}"
     echo "Cache directory:       ${CACHE_DIR}"
     echo "QC directory:          ${QC_DIR}"
@@ -217,8 +213,7 @@ INPUT_UNIQUE_BODIES_SHA="$(sha256_file "${INPUT_UNIQUE_BODIES}")"
 INPUT_EVENTS_SHA="$(sha256_file "${INPUT_EVENTS}")"
 INPUT_PANEL_SHA="$(sha256_file "${INPUT_PANEL}")"
 INPUT_SUPPORT_SHA="$(sha256_file "${INPUT_SUPPORT}")"
-INPUT_ELIGIBILITY_SPECIFICATION_SHA="$(sha256_file "${INPUT_ELIGIBILITY_SPECIFICATION}")"
-INPUT_THRESHOLD_SPECIFICATION_SHA="$(sha256_file "${INPUT_THRESHOLD_SPECIFICATION}")"
+INPUT_SPECIFICATION_SHA="$(sha256_file "${INPUT_SPECIFICATION}")"
 
 DEPENDENCY_INFO="$("${PYTHON_BIN}" - <<'PY'
 import json
@@ -287,7 +282,7 @@ fi
 
 cat <<INFO
 ============================================================================
-run-1c: deterministic dual-profile overlap-window commit-function NPR pilot
+run-1c: deterministic dual-profile commit-function NPR pilot
 Started:                         ${START_TEXT}
 Workspace:                       ${PROJECT_ROOT}
 Active conda env:                ${CONDA_DEFAULT_ENV:-<none>}
@@ -313,10 +308,8 @@ Input panel:                     ${INPUT_PANEL}
 Input panel SHA:                 ${INPUT_PANEL_SHA}
 Input run-1b support:            ${INPUT_SUPPORT}
 Input run-1b support SHA:        ${INPUT_SUPPORT_SHA}
-Input eligibility specification: ${INPUT_ELIGIBILITY_SPECIFICATION}
-Input eligibility spec SHA:      ${INPUT_ELIGIBILITY_SPECIFICATION_SHA}
-Input threshold specification:   ${INPUT_THRESHOLD_SPECIFICATION}
-Input threshold spec SHA:        ${INPUT_THRESHOLD_SPECIFICATION_SHA}
+Input specification:            ${INPUT_SPECIFICATION}
+Input specification SHA:        ${INPUT_SPECIFICATION_SHA}
 Body artifact base:              ${BODY_ARTIFACT_BASE}
 Calibration profile size:        ${CALIBRATION_PROFILE_SIZE}
 Long-body profile size:          ${LONG_PROFILE_SIZE}
@@ -346,8 +339,7 @@ COMMAND=(
     --input-events "${INPUT_EVENTS}"
     --input-panel "${INPUT_PANEL}"
     --input-support "${INPUT_SUPPORT}"
-    --input-eligibility-specification "${INPUT_ELIGIBILITY_SPECIFICATION}"
-    --input-threshold-specification "${INPUT_THRESHOLD_SPECIFICATION}"
+    --input-specification "${INPUT_SPECIFICATION}"
     --body-artifact-base "${BODY_ARTIFACT_BASE}"
     --output-dir "${OUTPUT_DIR}"
     --qc-dir "${QC_DIR}"
@@ -446,8 +438,7 @@ if [[ "${RUN_RESUME_CHECK}" == "1" ]] && [[ "${PREPARE_ONLY}" != "1" ]]; then
         --input-events "${INPUT_EVENTS}"
         --input-panel "${INPUT_PANEL}"
         --input-support "${INPUT_SUPPORT}"
-        --input-eligibility-specification "${INPUT_ELIGIBILITY_SPECIFICATION}"
-    --input-threshold-specification "${INPUT_THRESHOLD_SPECIFICATION}"
+        --input-specification "${INPUT_SPECIFICATION}"
         --body-artifact-base "${BODY_ARTIFACT_BASE}"
         --output-dir "${OUTPUT_DIR}"
         --qc-dir "${QC_DIR}"

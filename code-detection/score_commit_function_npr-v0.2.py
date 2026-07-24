@@ -47,20 +47,8 @@ import numpy as np
 import pandas as pd
 
 
-SCRIPT_VERSION = "run-1c-v7"
-# Policy label history (embedded in the config fingerprint, so any change
-# here also invalidates prior caches):
-#   incomplete_tail_zero_original_rank_only-v1  (run-1c-v4 and earlier):
-#       only a short trailing window invalid for exactly
-#       "zero_original_log_rank" allowed a partial body success.
-#   any_valid_window_partial_success_full_windows-v2  (run-1c-v5+):
-#       chunk_literal_space() never produces a short trailing window, so a
-#       body succeeds (partial_body_score=1) whenever at least one window
-#       is valid, regardless of the invalid window's position or reason,
-#       and fails only when every window is invalid. run-1c-v5 shipped this
-#       policy but still carried the stale -v1 label; the label is
-#       corrected here.
-PARTIAL_BODY_POLICY = "any_valid_window_partial_success_full_windows-v2"
+SCRIPT_VERSION = "run-1c-v4"
+PARTIAL_BODY_POLICY = "incomplete_tail_zero_original_rank_only-v1"
 
 UNIQUE_BODY_REQUIRED = {
     "function_body_sha256",
@@ -133,23 +121,9 @@ WINDOW_SCORE_COLUMNS = [
     "start_token_body",
     "end_token_body",
     "chunk_token_count",
-    # marginal_token_count is the number of *new* body tokens this window
-    # contributes that no earlier window already covered, as a static
-    # property of the windowing alone (all windows assumed valid). See
-    # compute_marginal_token_counts().
-    "marginal_token_count",
-    # aggregation_weight_token_count is the weight actually used by
-    # aggregate_weighted() for the body's function_npr: the number of body
-    # tokens this window covers that no earlier VALID window covers
-    # (0 for every invalid window). Equal to marginal_token_count whenever
-    # every window in the body is valid. See compute_aggregation_weights().
-    "aggregation_weight_token_count",
     "window_seed",
     "is_last_window",
-    # True only for a final window that was shifted backward to reach a
-    # full window_size (i.e. marginal_token_count < chunk_token_count).
-    # See chunk_literal_space().
-    "overlaps_previous_window",
+    "is_incomplete_tail_window",
     "original_log_rank",
     "mean_perturbed_log_rank",
     "window_npr",
@@ -200,8 +174,7 @@ class Paths:
     input_events: Path
     input_panel: Path
     input_support: Path
-    input_eligibility_specification: Path
-    input_threshold_specification: Path
+    input_specification: Path
     body_artifact_base: Path
     output_dir: Path
     qc_dir: Path
@@ -210,9 +183,8 @@ class Paths:
 
 @dataclass(frozen=True)
 class DetectorConfig:
-    eligibility_status: str
+    specification_status: str
     specification_primary: str
-    threshold_status: str
     scoring_model: str
     window_size: int
     perturbations_per_window: int
@@ -220,23 +192,13 @@ class DetectorConfig:
     function_aggregation: str
     agc_threshold: float
     random_seed: int
-    algorithm_version: str
-    decision_rule: str
-    window_policy: str
-    partial_body_policy: str
-    calibration_dataset: str
-    calibration_bodies: int
-    calibration_auroc: float
-    eligibility_specification_sha256: str
-    threshold_specification_sha256: str
     eligibility_specifications: tuple[dict[str, Any], ...]
 
     def fingerprint_payload(self, profile_definition: dict[str, Any]) -> dict[str, Any]:
         return {
             "script_version": SCRIPT_VERSION,
-            "eligibility_status": self.eligibility_status,
+            "specification_status": self.specification_status,
             "specification_primary": self.specification_primary,
-            "threshold_status": self.threshold_status,
             "scoring_model": self.scoring_model,
             "window_size": self.window_size,
             "perturbations_per_window": self.perturbations_per_window,
@@ -244,15 +206,7 @@ class DetectorConfig:
             "function_aggregation": self.function_aggregation,
             "agc_threshold": self.agc_threshold,
             "random_seed": self.random_seed,
-            "algorithm_version": self.algorithm_version,
-            "decision_rule": self.decision_rule,
-            "window_policy": self.window_policy,
-            "partial_body_policy": self.partial_body_policy,
-            "calibration_dataset": self.calibration_dataset,
-            "calibration_bodies": self.calibration_bodies,
-            "calibration_auroc": self.calibration_auroc,
-            "eligibility_specification_sha256": self.eligibility_specification_sha256,
-            "threshold_specification_sha256": self.threshold_specification_sha256,
+            "partial_body_policy": PARTIAL_BODY_POLICY,
             "profile_definition": profile_definition,
         }
 
@@ -376,27 +330,12 @@ def deterministic_order(frame: pd.DataFrame, seed: int, namespace: str) -> pd.Da
     )
 
 
-def load_detector_config(
-    eligibility_path: Path,
-    threshold_path: Path,
-) -> DetectorConfig:
-    with eligibility_path.open("r", encoding="utf-8") as stream:
-        eligibility = json.load(stream)
-    with threshold_path.open("r", encoding="utf-8") as stream:
-        threshold = json.load(stream)
-
-    eligibility_required = {
+def load_detector_config(path: Path) -> DetectorConfig:
+    with path.open("r", encoding="utf-8") as stream:
+        payload = json.load(stream)
+    required = {
         "status",
         "primary_spec",
-        "scoring_model",
-        "window_size_literal_space_tokens",
-        "perturbations_per_window",
-        "perturbation_type",
-        "random_seed",
-        "eligibility_specifications",
-    }
-    threshold_required = {
-        "status",
         "scoring_model",
         "window_size_literal_space_tokens",
         "perturbations_per_window",
@@ -404,65 +343,22 @@ def load_detector_config(
         "function_aggregation",
         "agc_threshold",
         "random_seed",
-        "algorithm_version",
-        "decision_rule",
-        "window_policy",
-        "partial_body_policy",
-        "threshold_calibration_dataset",
-        "benchmark_bodies",
-        "overall_auroc",
+        "eligibility_specifications",
     }
-    missing_eligibility = sorted(eligibility_required - set(eligibility))
-    missing_threshold = sorted(threshold_required - set(threshold))
-    if missing_eligibility:
-        raise ValueError(
-            f"Eligibility specification JSON is missing keys: {missing_eligibility}"
-        )
-    if missing_threshold:
-        raise ValueError(
-            f"Threshold specification JSON is missing keys: {missing_threshold}"
-        )
-
-    consistency_fields = {
-        "scoring_model": str,
-        "window_size_literal_space_tokens": int,
-        "perturbations_per_window": int,
-        "perturbation_type": str,
-        "random_seed": int,
-    }
-    mismatches = []
-    for field, caster in consistency_fields.items():
-        left = caster(eligibility[field])
-        right = caster(threshold[field])
-        if left != right:
-            mismatches.append(f"{field}: eligibility={left!r}, threshold={right!r}")
-    if mismatches:
-        raise ValueError(
-            "Eligibility and threshold specifications are inconsistent: "
-            + "; ".join(mismatches)
-        )
-
+    missing = sorted(required - set(payload))
+    if missing:
+        raise ValueError(f"Specification JSON is missing keys: {missing}")
     return DetectorConfig(
-        eligibility_status=str(eligibility["status"]),
-        specification_primary=str(eligibility["primary_spec"]),
-        threshold_status=str(threshold["status"]),
-        scoring_model=str(threshold["scoring_model"]),
-        window_size=int(threshold["window_size_literal_space_tokens"]),
-        perturbations_per_window=int(threshold["perturbations_per_window"]),
-        perturbation_type=str(threshold["perturbation_type"]),
-        function_aggregation=str(threshold["function_aggregation"]),
-        agc_threshold=float(threshold["agc_threshold"]),
-        random_seed=int(threshold["random_seed"]),
-        algorithm_version=str(threshold["algorithm_version"]),
-        decision_rule=str(threshold["decision_rule"]),
-        window_policy=str(threshold["window_policy"]),
-        partial_body_policy=str(threshold["partial_body_policy"]),
-        calibration_dataset=str(threshold["threshold_calibration_dataset"]),
-        calibration_bodies=int(threshold["benchmark_bodies"]),
-        calibration_auroc=float(threshold["overall_auroc"]),
-        eligibility_specification_sha256=sha256_file(eligibility_path),
-        threshold_specification_sha256=sha256_file(threshold_path),
-        eligibility_specifications=tuple(eligibility["eligibility_specifications"]),
+        specification_status=str(payload["status"]),
+        specification_primary=str(payload["primary_spec"]),
+        scoring_model=str(payload["scoring_model"]),
+        window_size=int(payload["window_size_literal_space_tokens"]),
+        perturbations_per_window=int(payload["perturbations_per_window"]),
+        perturbation_type=str(payload["perturbation_type"]),
+        function_aggregation=str(payload["function_aggregation"]),
+        agc_threshold=float(payload["agc_threshold"]),
+        random_seed=int(payload["random_seed"]),
+        eligibility_specifications=tuple(payload["eligibility_specifications"]),
     )
 
 
@@ -802,173 +698,12 @@ def verify_selected_artifacts(
 
 
 def chunk_literal_space(text: str, window_size: int) -> list[tuple[str, int, int, int]]:
-    """Partition `text` (already split on literal spaces) into consecutive
-    windows of up to `window_size` tokens, with NO short trailing window.
-
-    Redesign rationale (2026-07-23)
-    ---------------------------------
-    The original implementation produced a final "tail" window containing
-    whatever tokens were left over -- which could be as few as 1-2 tokens
-    when a body's token count was just above a multiple of window_size
-    (e.g. a 129-token body produced a 128-token window plus a 1-token
-    tail). That near-empty tail window was the root cause of an entire
-    class of downstream problems seen in the run-1c v1 and v4 pilots:
-      - the model ranking every token in a 1-2 token window #1, giving
-        original_log_rank == 0 and an undefined (NaN) window_npr ratio
-        (see classify_window_validity's "zero_original_log_rank");
-      - perturbing a 1-token window sometimes producing zero finite
-        perturbation ranks at all ("no_valid_perturbation_scores");
-      - a growing amount of exception-handling machinery (formerly
-        NonTailWindowInvalidNprError / DisallowedTailWindowInvalidNprError
-        / is_incomplete_tail_window) whose only job was to decide, case by
-        case, whether a given short tail window's failure was "benign"
-        enough to still allow a partial body success.
-
-    Rather than continuing to refine that classification, this function
-    removes the underlying condition. If the naive non-overlapping
-    windowing would leave a final window shorter than window_size (and
-    there is more than one window in total), that final window is shifted
-    backward so it ends at the same position but covers exactly
-    window_size tokens, overlapping with the previous window instead of
-    being short. Every window that reaches the scoring model is therefore
-    always exactly window_size tokens, except when the *entire* body has
-    fewer than window_size tokens, in which case there is exactly one
-    window covering the whole body (a short whole body is a real,
-    unavoidable input, not an artifact of windowing).
-
-    Overlap and double-counting
-    -----------------------------
-    Shifting the final window backward means it can share tokens with the
-    previous window. Both windows are still independently perturbed and
-    scored (the model needs the full window_size of context either way),
-    but the token-weighted aggregation must not count an overlapping
-    token's contribution twice. Two related per-window quantities handle
-    this: compute_marginal_token_counts() assigns each window its static
-    coverage (tokens not covered by ANY earlier window; always sums to the
-    body's total token count), and compute_aggregation_weights() assigns
-    the weight actually used by aggregate_weighted() (tokens not covered
-    by any earlier VALID window; identical to the static marginals when
-    every window is valid). Aggregation never uses chunk_token_count, so
-    no token is double-counted or dropped.
-
-    With this construction, only the final window can ever end up
-    overlapping its predecessor (every earlier window always advances by
-    exactly window_size with no shift), so in practice every window's
-    marginal_token_count equals window_size except possibly the last one.
-
-    Returns
-    -------
-    A list of (chunk_text, chunk_token_count, start_token_body,
-    end_token_body) tuples, in left-to-right order. chunk_token_count is
-    always the actual number of tokens fed to the model for that window
-    (== window_size for every window except a single window covering a
-    body shorter than window_size). start_token_body/end_token_body are
-    absolute token offsets into the body and MAY overlap between the final
-    two windows -- callers must weight by compute_aggregation_weights()
-    (or compute_marginal_token_counts() for static coverage accounting),
-    never by chunk_token_count, when aggregating across windows.
-    """
     tokens = text.split(" ")
-    total_tokens = len(tokens)
-
-    if total_tokens <= window_size:
-        # The whole body fits in a single window; there is nothing to
-        # shift and no overlap is possible or needed.
-        return [(text, total_tokens, 0, total_tokens)]
-
     chunks: list[tuple[str, int, int, int]] = []
-    start = 0
-    while start < total_tokens:
-        end = min(start + window_size, total_tokens)
-        if end - start < window_size and chunks:
-            # This would be a short trailing window (only possible for the
-            # final window under this simple non-overlapping advance).
-            # Shift it backward so it still ends at end == total_tokens but
-            # covers exactly window_size tokens.
-            start = end - window_size
-        selected = tokens[start:end]
-        chunks.append((" ".join(selected), len(selected), start, end))
-        if end >= total_tokens:
-            break
-        start = end
+    for start in range(0, len(tokens), window_size):
+        selected = tokens[start : start + window_size]
+        chunks.append((" ".join(selected), len(selected), start, start + len(selected)))
     return chunks
-
-
-def compute_marginal_token_counts(chunks: list[tuple[str, int, int, int]]) -> list[int]:
-    """Compute each window's marginal token count: the number of tokens in
-    that window not already covered by an earlier window in the same body,
-    in left-to-right (chunk_index) order.
-
-    This is a plain advancing-frontier scan: each window contributes
-    max(0, window_end - max(window_start, frontier)) new tokens, and the
-    frontier then advances to window_end. Summing the returned list always
-    equals the body's total token count (the last window's
-    end_token_body), since every token position is counted exactly once,
-    at the first window that reaches it.
-
-    With chunk_literal_space()'s windowing, only the final window can ever
-    overlap with its predecessor, so in practice every returned value
-    equals that window's own token count except possibly the last -- but
-    this function does not assume that, and would remain correct if a
-    future windowing scheme produced overlap elsewhere.
-    """
-    marginal_counts: list[int] = []
-    frontier = 0
-    for _, _, start, end in chunks:
-        marginal_start = max(start, frontier)
-        marginal_counts.append(max(0, end - marginal_start))
-        frontier = max(frontier, end)
-    return marginal_counts
-
-
-def compute_aggregation_weights(chunks: list[dict[str, Any]]) -> list[int]:
-    """Compute each window's aggregation weight for the function-level NPR:
-    the number of body tokens covered by that window that no EARLIER VALID
-    window already covers. Invalid windows always receive weight 0.
-
-    Why this is not the same as marginal_token_count
-    --------------------------------------------------
-    marginal_token_count is a static property of the windowing alone: it
-    attributes every overlapped token to the first window that covers it,
-    assuming all windows contribute. That assumption breaks in a partial
-    body. Concrete production-scale example (window_size=128, 257-token
-    body): windows A=[0,128), B=[128,256), C=[129,257) have static
-    marginals [128, 128, 1]. If B is invalid but A and C are valid,
-    weighting C by its static marginal of 1 discards C's valid signal over
-    tokens 129-255 -- 127 tokens that C actually scored and that no other
-    VALID window covers -- and the body's function_npr collapses to
-    essentially A's value alone. Recomputing the frontier over valid
-    windows only gives C a weight of 128, so the body's estimate uses all
-    the valid signal that exists: (a*128 + c*128) / 256, with exactly one
-    token (index 128, covered only by invalid B) carrying no valid signal.
-
-    Properties
-    ------------
-    - When every window is valid, the returned weights are identical to
-      compute_marginal_token_counts() (the frontier scans are the same),
-      so the ordinary all-valid path is numerically unchanged.
-    - sum(weights) equals the number of body tokens covered by at least
-      one valid window, counted once each; total_tokens - sum(weights) is
-      the number of tokens with no valid signal at all.
-    - Windows are scanned in chunk_index (left-to-right) order, so an
-      overlapped token is attributed to the first valid window covering
-      it, mirroring compute_marginal_token_counts()'s convention.
-
-    Each chunk dict must already carry "start_token_body",
-    "end_token_body", and "window_npr_valid".
-    """
-    weights: list[int] = []
-    frontier = 0
-    for chunk in chunks:
-        if not bool(chunk["window_npr_valid"]):
-            weights.append(0)
-            continue
-        start = int(chunk["start_token_body"])
-        end = int(chunk["end_token_body"])
-        marginal_start = max(start, frontier)
-        weights.append(max(0, end - marginal_start))
-        frontier = max(frontier, end)
-    return weights
 
 
 def derive_window_seed(global_seed: int, body_sha: str, chunk_index: int) -> int:
@@ -986,28 +721,11 @@ def set_all_seeds(seed: int, torch_module: Any | None = None) -> None:
 
 
 def aggregate_weighted(chunks: list[dict[str, Any]]) -> float:
-    """Token-weighted mean of window_npr across a body's windows, weighting
-    each window by its aggregation_weight_token_count -- the number of body
-    tokens it covers that no earlier VALID window covers (see
-    compute_aggregation_weights()). Invalid windows carry weight 0 by
-    construction, and a window can also carry weight 0 when every token it
-    covers is already represented by an earlier valid window (fully
-    shadowed overlap); both are excluded from the mean. With every window
-    valid, the weights equal the static marginal token counts and this
-    reduces to the previous behavior exactly."""
-    valid = [
-        chunk
-        for chunk in chunks
-        if math.isfinite(float(chunk["window_npr"]))
-        and int(chunk["aggregation_weight_token_count"]) > 0
-    ]
+    valid = [chunk for chunk in chunks if math.isfinite(float(chunk["window_npr"]))]
     if not valid:
         return float("nan")
-    numerator = sum(
-        float(chunk["window_npr"]) * int(chunk["aggregation_weight_token_count"])
-        for chunk in valid
-    )
-    denominator = sum(int(chunk["aggregation_weight_token_count"]) for chunk in valid)
+    numerator = sum(float(chunk["window_npr"]) * int(chunk["chunk_token_count"]) for chunk in valid)
+    denominator = sum(int(chunk["chunk_token_count"]) for chunk in valid)
     return float(numerator / denominator) if denominator else float("nan")
 
 
@@ -1120,15 +838,24 @@ class AllWindowsInvalidNprError(RuntimeError):
     scoring failure (error_type == this class name in failures.csv)."""
 
 
-# NonTailWindowInvalidNprError and DisallowedTailWindowInvalidNprError
-# (2026-07-23 removal): these existed only to distinguish a "benign" short
-# trailing-window failure from a "suspicious" full-size-window failure.
-# Now that chunk_literal_space() never produces a short trailing window
-# (see its docstring), that distinction no longer has a basis: every
-# window is always exactly window_size tokens (except a single window
-# covering a whole body shorter than window_size), so an invalid window is
-# equally uninterpretable regardless of its position. See score_one_body()
-# for the simplified policy that replaces the three-way exception split.
+class NonTailWindowInvalidNprError(RuntimeError):
+    """Raised when an invalid window is not a true incomplete final tail.
+
+    This includes any non-final window and a final window whose token count
+    equals the configured window size. A full-size final window is not a
+    tail merely because it is last in the sequence.
+    """
+
+
+class DisallowedTailWindowInvalidNprError(RuntimeError):
+    """Raised when a true incomplete final tail is invalid for a reason other
+    than zero_original_log_rank.
+
+    The pilot allows only the known zero-denominator tail edge case as a
+    partial-body success. Missing perturbation ranks, non-finite original
+    ranks, non-finite perturbed means, and unknown invalid states remain
+    body-level scoring failures.
+    """
 
 
 def classify_window_validity(scored: dict[str, Any]) -> tuple[bool, str | None]:
@@ -1217,14 +944,12 @@ def score_window_real(
     perturbed_ranks = runtime.get_ranks(perturbed, runtime.args, runtime.model_config, log=True)
     valid = [float(value) for value in perturbed_ranks if math.isfinite(float(value))]
     mean_perturbed = float(np.mean(valid)) if valid else float("nan")
-    # original_log_rank can be exactly 0.0 when the model ranks every
-    # token in the window #1. Since chunk_literal_space() no longer
-    # produces near-empty trailing windows, this can now only occur for a
-    # single-window body shorter than window_size, or for a genuinely
-    # degenerate full-size window. Division by zero is deliberately
-    # guarded here and produces NaN rather than raising --
-    # classify_window_validity() records why, and
-    # sanitize_window_for_json() converts it to a JSON-safe null before
+    # original_log_rank can be exactly 0.0 for a very short or highly
+    # predictable window (every token ranked #1 by the model), most often
+    # seen in a near-empty tail window left over just past a window_size
+    # boundary. Division by zero is deliberately guarded here and produces
+    # NaN rather than raising -- classify_window_validity() records why,
+    # and sanitize_window_for_json() converts it to a JSON-safe null before
     # this window's raw dict is ever written to disk.
     npr = mean_perturbed / float(original_log_rank) if original_log_rank else float("nan")
     return {
@@ -1268,47 +993,30 @@ def score_one_body(
     """Score every window of one implementation body and combine them into a
     single function-level result.
 
-    Partial-body scoring policy (simplified 2026-07-23)
-    ------------------------------------------------------
+    Partial-body scoring policy
+    ----------------------------
     A window's window_npr can be non-finite (see classify_window_validity()
     for the possible reasons). aggregate_weighted() always excludes
     non-finite windows from the token-weighted function_npr computation, so
-    a body with at least one finite window still receives a valid, finite
-    function_npr from the remaining window(s).
+    a body with at least one finite window can still receive a valid,
+    finite function_npr. Whether that is treated as an acceptable partial
+    result depends on WHICH window was invalid:
 
-    Earlier revisions of this function tried to decide WHICH invalid window
-    was acceptable to exclude (only a true, short "incomplete tail" window
-    invalid for exactly one specific reason) versus which indicated a
-    likely genuine model-scoring problem (any other window, or any other
-    reason). That distinction existed only because a short trailing window
-    was structurally common and needed to be told apart from a suspicious
-    full-size window. Now that chunk_literal_space() never produces a short
-    trailing window -- every window is always exactly window_size tokens,
-    except a single window covering a whole body shorter than window_size
-    -- an invalid window is equally uninterpretable regardless of its
-    position or reason, so the position/reason-specific carve-out is no
-    longer meaningful and has been removed.
-
-    Current policy: a body succeeds, with partial_body_score=1, whenever at
-    least one window is valid, using aggregate_weighted() over the valid
-    window(s). Each valid window is weighted by the number of body tokens
-    it covers that no earlier valid window covers
-    (compute_aggregation_weights()), so a valid window overlapping an
-    INVALID neighbor represents the shared tokens itself rather than
-    having its weight capped at the static marginal_token_count. A body
-    fails (AllWindowsInvalidNprError) only when every one of its windows
-    is invalid, i.e. there is no scoreable signal left at all.
+    - Partial success is allowed only when the sole invalid window is the
+      final window, that final window contains fewer than window_size tokens,
+      and its invalid reason is exactly zero_original_log_rank. This is the
+      known zero-denominator edge case for a very short tail window.
+    - A non-final invalid window, a full-size final invalid window, an
+      incomplete tail invalid for any other reason, or a body whose every
+      window is invalid is treated as a body scoring failure. See
+      NonTailWindowInvalidNprError, DisallowedTailWindowInvalidNprError, and
+      AllWindowsInvalidNprError.
     """
     body_sha = str(row["function_body_sha256"])
     started = time.perf_counter()
-
-    raw_chunks = chunk_literal_space(text, config.window_size)
-    marginal_counts = compute_marginal_token_counts(raw_chunks)
-    last_chunk_index = len(raw_chunks) - 1
-
     chunks_out: list[dict[str, Any]] = []
-    for chunk_index, ((chunk_text, n_tokens, start, end), marginal_count) in enumerate(
-        zip(raw_chunks, marginal_counts)
+    for chunk_index, (chunk_text, n_tokens, start, end) in enumerate(
+        chunk_literal_space(text, config.window_size)
     ):
         seed = derive_window_seed(config.random_seed, body_sha, chunk_index)
         scored = score_window(chunk_text, seed, config, runtime)
@@ -1319,31 +1027,31 @@ def score_one_body(
                 "start_token_body": int(start),
                 "end_token_body": int(end),
                 "chunk_token_count": int(n_tokens),
-                "marginal_token_count": int(marginal_count),
                 "window_seed": int(seed),
-                "is_last_window": bool(chunk_index == last_chunk_index),
-                # True exactly when chunk_literal_space() shifted this
-                # (necessarily final) window backward to reach a full
-                # window_size, i.e. it shares tokens with the previous
-                # window. See chunk_literal_space()/
-                # compute_marginal_token_counts().
-                "overlaps_previous_window": bool(marginal_count < n_tokens),
                 **scored,
                 "window_npr_valid": bool(window_npr_valid),
                 "window_npr_invalid_reason": window_npr_invalid_reason,
             }
         )
 
-    invalid_chunks = [chunk for chunk in chunks_out if not chunk["window_npr_valid"]]
+    last_chunk_index = len(chunks_out) - 1
+    for chunk in chunks_out:
+        chunk["is_last_window"] = bool(chunk["chunk_index"] == last_chunk_index)
+        chunk["is_incomplete_tail_window"] = bool(
+            chunk["is_last_window"]
+            and int(chunk["chunk_token_count"]) < int(config.window_size)
+        )
 
-    # Aggregation weights can only be assigned after every window's
-    # validity is known: each window's weight is the number of body tokens
-    # it covers that no earlier VALID window covers (invalid windows get
-    # 0). See compute_aggregation_weights() for why the static
-    # marginal_token_count is the wrong weight in a partial body.
-    aggregation_weights = compute_aggregation_weights(chunks_out)
-    for chunk, weight in zip(chunks_out, aggregation_weights):
-        chunk["aggregation_weight_token_count"] = int(weight)
+    invalid_chunks = [chunk for chunk in chunks_out if not chunk["window_npr_valid"]]
+    invalid_non_incomplete_tail_chunks = [
+        chunk for chunk in invalid_chunks if not chunk["is_incomplete_tail_window"]
+    ]
+    invalid_tail_reason_chunks = [
+        chunk
+        for chunk in invalid_chunks
+        if chunk["is_incomplete_tail_window"]
+        and chunk["window_npr_invalid_reason"] != "zero_original_log_rank"
+    ]
 
     # aggregate_weighted() must see the raw (pre-sanitization) window_npr
     # values -- still real Python NaN at this point, not yet sanitized to
@@ -1357,44 +1065,67 @@ def score_one_body(
             f"All {len(chunks_out)} window(s) have a non-finite window_npr; "
             "no valid function-level NPR can be computed."
         )
+    if invalid_non_incomplete_tail_chunks:
+        offending = ", ".join(
+            (
+                f"chunk_index={chunk['chunk_index']} "
+                f"chunk_token_count={chunk['chunk_token_count']} "
+                f"reason={chunk['window_npr_invalid_reason']}"
+            )
+            for chunk in invalid_non_incomplete_tail_chunks
+        )
+        raise NonTailWindowInvalidNprError(
+            f"{len(invalid_non_incomplete_tail_chunks)} invalid window(s) are "
+            f"not true incomplete final tails ({offending}); treated as a "
+            "scoring failure rather than a partial-body success."
+        )
+    if invalid_tail_reason_chunks:
+        offending = ", ".join(
+            (
+                f"chunk_index={chunk['chunk_index']} "
+                f"chunk_token_count={chunk['chunk_token_count']} "
+                f"reason={chunk['window_npr_invalid_reason']}"
+            )
+            for chunk in invalid_tail_reason_chunks
+        )
+        raise DisallowedTailWindowInvalidNprError(
+            f"{len(invalid_tail_reason_chunks)} incomplete tail window(s) are "
+            f"invalid for a disallowed reason ({offending}); only "
+            "zero_original_log_rank is accepted as a partial-body success."
+        )
+    if len(invalid_chunks) > 1:
+        raise RuntimeError(
+            "More than one invalid window remained after partial-body policy "
+            "checks; only one incomplete final tail can be accepted."
+        )
     if not math.isfinite(function_npr):
-        # Defensive: should be unreachable given the check above (at least
-        # one window is finite whenever we reach this line), but kept so an
-        # aggregation bug fails loudly instead of silently caching a
-        # non-finite function-level score.
-        raise RuntimeError("Function NPR is not finite despite at least one valid window.")
+        # Defensive: should be unreachable given the two checks above, but
+        # kept so an aggregation bug fails loudly instead of silently
+        # caching a non-finite function-level score.
+        raise RuntimeError("Function NPR is not finite despite passing window validity checks.")
 
     agc_like = int(function_npr > config.agc_threshold)
 
     n_attempted_windows = len(chunks_out)
     n_invalid_npr_windows = len(invalid_chunks)
     n_valid_npr_windows = n_attempted_windows - n_invalid_npr_windows
-    # Token-count audit fields (semantics revised together with
-    # compute_aggregation_weights()):
-    #   valid_npr_token_count   = body tokens covered by at least one VALID
-    #                             window, each counted exactly once (the sum
-    #                             of the aggregation weights).
-    #   invalid_npr_token_count = body tokens with no valid signal at all,
-    #                             i.e. covered only by invalid window(s).
-    # The two always sum to the body's total literal-space token count.
-    # (The earlier revision summed static marginal_token_count by validity
-    # instead, which attributed a token to an invalid window even when a
-    # later valid overlapping window had scored that same token.)
-    total_body_tokens = int(raw_chunks[-1][3])
-    valid_npr_token_count = int(sum(aggregation_weights))
-    if not 0 <= valid_npr_token_count <= total_body_tokens:
-        raise RuntimeError(
-            "Token accounting invariant violated: aggregation weights sum to "
-            f"{valid_npr_token_count} for a {total_body_tokens}-token body."
-        )
-    invalid_npr_token_count = total_body_tokens - valid_npr_token_count
-    partial_body_score = int(bool(invalid_chunks))
+    valid_npr_token_count = sum(
+        int(chunk["chunk_token_count"]) for chunk in chunks_out if chunk["window_npr_valid"]
+    )
+    invalid_npr_token_count = sum(
+        int(chunk["chunk_token_count"]) for chunk in chunks_out if not chunk["window_npr_valid"]
+    )
+    partial_body_score = int(
+        n_invalid_npr_windows == 1
+        and invalid_chunks[0]["is_incomplete_tail_window"]
+        and invalid_chunks[0]["window_npr_invalid_reason"] == "zero_original_log_rank"
+    ) if invalid_chunks else 0
 
-    # Sanitize NaN-prone per-window fields (e.g. window_npr of an invalid
-    # window) to None/JSON-null *after* aggregation, so the body-level
-    # result -- which already has a valid, finite function_npr -- can be
-    # written with atomic_json(..., allow_nan=False) without the whole body
-    # being discarded.
+    # Sanitize NaN-prone per-window fields (e.g. window_npr of a degenerate
+    # tail window) to None/JSON-null *after* aggregation and the validity
+    # checks above, so the body-level result -- which already has a valid,
+    # finite function_npr -- can be written with atomic_json(...,
+    # allow_nan=False) without the whole body being discarded.
     sanitized_chunks_out = [sanitize_window_for_json(chunk) for chunk in chunks_out]
 
     return {
@@ -1923,16 +1654,11 @@ def build_checks(
 ) -> pd.DataFrame:
     checks: list[dict[str, Any]] = []
     selected_expected = args.calibration_profile_size + args.long_profile_size
-    checks.append(check_row("specification_is_frozen", config.eligibility_status == "frozen", config.eligibility_status, "frozen"))
+    checks.append(check_row("specification_is_frozen", config.specification_status == "frozen", config.specification_status, "frozen"))
     checks.append(check_row("scoring_model_is_starcoder2_7b", config.scoring_model == "bigcode/starcoder2-7b", config.scoring_model, "bigcode/starcoder2-7b"))
     checks.append(check_row("window_size_is_128", config.window_size == 128, config.window_size, 128))
     checks.append(check_row("perturbations_per_window_is_50", config.perturbations_per_window == 50, config.perturbations_per_window, 50))
-    checks.append(check_row("threshold_specification_is_frozen", config.threshold_status == "frozen", config.threshold_status, "frozen"))
-    checks.append(check_row("algorithm_version_is_overlap_v1", config.algorithm_version == "overlap_final_full_window_valid_frontier_weighting-v1", config.algorithm_version, "overlap_final_full_window_valid_frontier_weighting-v1"))
-    checks.append(check_row("function_aggregation_is_valid_frontier", config.function_aggregation == "valid_frontier_weighted_mean", config.function_aggregation, "valid_frontier_weighted_mean"))
-    checks.append(check_row("partial_body_policy_matches", config.partial_body_policy == PARTIAL_BODY_POLICY, config.partial_body_policy, PARTIAL_BODY_POLICY))
-    checks.append(check_row("decision_rule_matches", config.decision_rule == "function_npr > agc_threshold", config.decision_rule, "function_npr > agc_threshold"))
-    checks.append(check_row("agc_threshold_matches_frozen_specification", math.isfinite(config.agc_threshold), config.agc_threshold, "finite threshold loaded from frozen run-1c0b specification"))
+    checks.append(check_row("agc_threshold_is_fixed", abs(config.agc_threshold - 1.5183) < 1e-12, config.agc_threshold, 1.5183))
     checks.append(check_row("selected_body_count", len(manifest) == selected_expected, len(manifest), selected_expected))
     checks.append(check_row("selected_body_hashes_unique", manifest["function_body_sha256"].is_unique, int(manifest["function_body_sha256"].duplicated().sum()), 0))
     reference_counts_match = pd.to_numeric(
@@ -1960,48 +1686,15 @@ def build_checks(
         expected_windows = int(manifest["n_expected_windows"].sum())
         checks.append(check_row("scored_window_count", len(window_scores) == expected_windows, len(window_scores), expected_windows))
         if not window_scores.empty:
-            # The 50-valid-perturbation requirement is a hard check only
-            # for VALID windows -- the signal actually used in
-            # function_npr. Applying it to invalid windows would
-            # contradict the partial-body policy: a body is allowed to
-            # succeed with an invalid window whose valid_perturbation_scores
-            # is deficient (e.g. 0 for "no_valid_perturbation_scores"),
-            # so that same deficiency must not simultaneously fail the
-            # run-level QC. Invalid windows are reported informationally
-            # below and each already carries an explicit
-            # window_npr_invalid_reason.
             valid_perturbations = pd.to_numeric(window_scores["valid_perturbation_scores"], errors="coerce")
-            window_is_valid = window_scores["window_npr_valid"].astype(bool)
-            valid_window_perturbations = valid_perturbations[window_is_valid]
-            checks.append(
-                check_row(
-                    "valid_windows_have_50_valid_perturbations",
-                    bool(valid_window_perturbations.eq(config.perturbations_per_window).all()) if len(valid_window_perturbations) else True,
-                    int((~valid_window_perturbations.eq(config.perturbations_per_window)).sum()) if len(valid_window_perturbations) else 0,
-                    0,
-                    "Every window contributing to a function_npr must have all its perturbations scored.",
-                )
-            )
-            invalid_window_perturbation_deficits = int(
-                (~valid_perturbations[~window_is_valid].eq(config.perturbations_per_window)).sum()
-            ) if int((~window_is_valid).sum()) else 0
-            checks.append(
-                check_row(
-                    "invalid_window_perturbation_deficit_count",
-                    True,
-                    invalid_window_perturbation_deficits,
-                    None,
-                    "Informational: invalid windows with fewer than the configured valid perturbation scores; excluded from aggregation by design.",
-                )
-            )
+            checks.append(check_row("all_windows_have_50_valid_perturbations", bool(valid_perturbations.eq(config.perturbations_per_window).all()), int((~valid_perturbations.eq(config.perturbations_per_window)).sum()), 0))
         checks.append(check_row("agc_hwc_body_arithmetic", int(pd.to_numeric(body_scores.get("agc_like"), errors="coerce").sum() + pd.to_numeric(body_scores.get("hwc_like"), errors="coerce").sum()) == len(body_scores), int(pd.to_numeric(body_scores.get("agc_like"), errors="coerce").sum() + pd.to_numeric(body_scores.get("hwc_like"), errors="coerce").sum()), len(body_scores)))
 
         # --- Partial-body scoring policy checks -------------------------
-        # These audit the simplified policy (see score_one_body() and
-        # PARTIAL_BODY_POLICY): a body succeeds whenever at least one
-        # window is valid, and fails only when every window is invalid.
-        # Position/reason-specific carve-outs no longer exist because
-        # chunk_literal_space() never produces a short trailing window.
+        # These guard the reviewer-requested distinction between the known,
+        # benign tail-window numerical edge case (partial success) and a
+        # genuine model-scoring problem (body failure). See score_one_body()
+        # and classify_window_validity() for the underlying policy.
         if not body_scores.empty:
             valid_windows = pd.to_numeric(body_scores.get("n_valid_npr_windows"), errors="coerce")
             checks.append(
@@ -2030,121 +1723,46 @@ def build_checks(
                     True,
                     partial_body_score_count,
                     None,
-                    "Informational: number of successful bodies that excluded at least one invalid window (any position or reason) from aggregation.",
+                    "Informational: number of successful bodies that excluded at least one invalid tail window from aggregation.",
                 )
             )
         if not window_scores.empty:
-            # Overlap must only ever occur on the final window of a body --
-            # every earlier window is produced by a plain, non-overlapping
-            # advance in chunk_literal_space(). This is a defensive audit
-            # of that invariant directly from the output table.
-            overlap_flags = window_scores["overlaps_previous_window"].astype(bool)
-            is_last = window_scores["is_last_window"].astype(bool)
-            overlap_not_on_last = window_scores.loc[overlap_flags & ~is_last]
+            # A non-tail invalid window should never reach the final window
+            # table for a *successful* body, since score_one_body() raises
+            # NonTailWindowInvalidNprError before returning success in that
+            # case. This check reads the output table directly as an
+            # independent, defensive audit of that policy rather than
+            # trusting the code path alone.
+            is_invalid = ~window_scores["window_npr_valid"].astype(bool)
+            is_incomplete_tail = window_scores["is_incomplete_tail_window"].astype(bool)
+            invalid_non_incomplete_tail = window_scores.loc[is_invalid & ~is_incomplete_tail]
             checks.append(
                 check_row(
-                    "overlap_only_on_final_window",
-                    overlap_not_on_last.empty,
-                    int(len(overlap_not_on_last)),
+                    "invalid_non_incomplete_tail_window_count_is_zero",
+                    invalid_non_incomplete_tail.empty,
+                    int(len(invalid_non_incomplete_tail)),
                     0,
-                    "overlaps_previous_window must only be True for a body's final window.",
+                    "An invalid non-final or full-size final window must fail the body and must not appear in a successful body's window table.",
                 )
             )
-            # marginal_token_count must sum to the body's total token count
-            # for every body -- no token double-counted or dropped across
-            # windows. Cross-checked against the body-level
-            # function_body_split_space_token_count via body_scores.
-            if not body_scores.empty:
-                marginal_sums = (
-                    window_scores.groupby("function_body_sha256")["marginal_token_count"]
-                    .sum()
-                    .rename("marginal_token_sum")
+            invalid_tail_wrong_reason = window_scores.loc[
+                is_invalid
+                & is_incomplete_tail
+                & ~window_scores["window_npr_invalid_reason"].astype(str).eq(
+                    "zero_original_log_rank"
                 )
-                token_counts = body_scores.set_index("function_body_sha256")[
-                    "function_body_split_space_token_count"
-                ]
-                reconciled = marginal_sums.to_frame().join(token_counts, how="inner")
-                mismatched = reconciled.loc[
-                    reconciled["marginal_token_sum"]
-                    != reconciled["function_body_split_space_token_count"]
-                ]
-                checks.append(
-                    check_row(
-                        "marginal_token_counts_sum_to_body_token_count",
-                        mismatched.empty,
-                        int(len(mismatched)),
-                        0,
-                        "Summing every window's marginal_token_count must equal the body's total literal-space token count.",
-                    )
+            ]
+            checks.append(
+                check_row(
+                    "invalid_incomplete_tail_reason_is_allowed",
+                    invalid_tail_wrong_reason.empty,
+                    int(len(invalid_tail_wrong_reason)),
+                    0,
+                    "Only zero_original_log_rank is permitted for an invalid incomplete final tail in a successful body.",
                 )
-                # aggregation_weight_token_count must reconcile with the
-                # body-level valid_npr_token_count for every body: the
-                # weights ARE the valid-signal token accounting. And
-                # valid + invalid token counts must partition the body's
-                # total token count exactly.
-                weight_sums = (
-                    window_scores.groupby("function_body_sha256")["aggregation_weight_token_count"]
-                    .sum()
-                    .rename("aggregation_weight_sum")
-                )
-                body_token_fields = body_scores.set_index("function_body_sha256")[
-                    [
-                        "valid_npr_token_count",
-                        "invalid_npr_token_count",
-                        "function_body_split_space_token_count",
-                    ]
-                ]
-                weight_reconciled = weight_sums.to_frame().join(body_token_fields, how="inner")
-                weight_mismatched = weight_reconciled.loc[
-                    weight_reconciled["aggregation_weight_sum"]
-                    != weight_reconciled["valid_npr_token_count"]
-                ]
-                checks.append(
-                    check_row(
-                        "aggregation_weights_sum_to_valid_token_count",
-                        weight_mismatched.empty,
-                        int(len(weight_mismatched)),
-                        0,
-                        "Summing every window's aggregation_weight_token_count must equal the body's valid_npr_token_count.",
-                    )
-                )
-                partition_mismatched = weight_reconciled.loc[
-                    weight_reconciled["valid_npr_token_count"]
-                    + weight_reconciled["invalid_npr_token_count"]
-                    != weight_reconciled["function_body_split_space_token_count"]
-                ]
-                checks.append(
-                    check_row(
-                        "valid_plus_invalid_tokens_equal_body_token_count",
-                        partition_mismatched.empty,
-                        int(len(partition_mismatched)),
-                        0,
-                        "valid_npr_token_count + invalid_npr_token_count must partition the body's total literal-space token count.",
-                    )
-                )
-                # An invalid window must never carry a nonzero aggregation
-                # weight -- weight 0 is what excludes it from function_npr.
-                invalid_with_weight = window_scores.loc[
-                    (~window_scores["window_npr_valid"].astype(bool))
-                    & (
-                        pd.to_numeric(
-                            window_scores["aggregation_weight_token_count"], errors="coerce"
-                        ).fillna(0)
-                        > 0
-                    )
-                ]
-                checks.append(
-                    check_row(
-                        "invalid_windows_have_zero_aggregation_weight",
-                        invalid_with_weight.empty,
-                        int(len(invalid_with_weight)),
-                        0,
-                        "Invalid windows must be excluded from aggregation via a zero aggregation_weight_token_count.",
-                    )
-                )
+            )
             # Every null (invalid) window_npr must carry an explicit reason,
             # so "null" alone never has to be interpreted as "unexplained".
-            is_invalid = ~window_scores["window_npr_valid"].astype(bool)
             invalid_rows = window_scores.loc[is_invalid]
             missing_reason = invalid_rows["window_npr_invalid_reason"].isna() | invalid_rows["window_npr_invalid_reason"].astype(str).eq("")
             checks.append(
@@ -2284,8 +1902,7 @@ def run_analysis(args: argparse.Namespace) -> int:
         input_events=args.input_events,
         input_panel=args.input_panel,
         input_support=args.input_support,
-        input_eligibility_specification=args.input_eligibility_specification,
-        input_threshold_specification=args.input_threshold_specification,
+        input_specification=args.input_specification,
         body_artifact_base=args.body_artifact_base,
         output_dir=args.output_dir,
         qc_dir=args.qc_dir or args.output_dir / "qc",
@@ -2298,10 +1915,7 @@ def run_analysis(args: argparse.Namespace) -> int:
     paths.qc_dir.mkdir(parents=True, exist_ok=True)
     paths.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    config = load_detector_config(
-        paths.input_eligibility_specification,
-        paths.input_threshold_specification,
-    )
+    config = load_detector_config(paths.input_specification)
     calibration_spec = find_spec(config, args.calibration_spec_name)
     long_spec = find_spec(config, args.long_spec_name)
     if int(calibration_spec["minimum_literal_space_tokens"]) != 100 or int(calibration_spec["maximum_literal_space_tokens"]) != 200:
@@ -2448,11 +2062,7 @@ def run_analysis(args: argparse.Namespace) -> int:
         "require_all_completed": bool(args.require_all_completed),
         "resume_validation_passed": resume_validation_passed,
         "config_fingerprint": fingerprint,
-        "eligibility_specification_status": config.eligibility_status,
-        "threshold_specification_status": config.threshold_status,
-        "agc_threshold": config.agc_threshold,
-        "algorithm_version": config.algorithm_version,
-        "calibration_auroc": config.calibration_auroc,
+        "specification_input_status": config.specification_status,
         "specification_input_primary": config.specification_primary,
         "pilot_does_not_finalize_primary_specification": True,
     }
@@ -2461,8 +2071,7 @@ def run_analysis(args: argparse.Namespace) -> int:
         "input_events_sha256": sha256_file(paths.input_events),
         "input_panel_sha256": sha256_file(paths.input_panel),
         "input_support_sha256": sha256_file(paths.input_support),
-        "input_eligibility_specification_sha256": sha256_file(paths.input_eligibility_specification),
-        "input_threshold_specification_sha256": sha256_file(paths.input_threshold_specification),
+        "input_specification_sha256": sha256_file(paths.input_specification),
     }
     metadata = {
         "status": status,
@@ -2475,8 +2084,7 @@ def run_analysis(args: argparse.Namespace) -> int:
             "input_events": str(paths.input_events.resolve()),
             "input_panel": str(paths.input_panel.resolve()),
             "input_support": str(paths.input_support.resolve()),
-            "input_eligibility_specification": str(paths.input_eligibility_specification.resolve()),
-            "input_threshold_specification": str(paths.input_threshold_specification.resolve()),
+            "input_specification": str(paths.input_specification.resolve()),
             "body_artifact_base": str(paths.body_artifact_base.resolve()),
             "output_dir": str(paths.output_dir.resolve()),
             "qc_dir": str(paths.qc_dir.resolve()),
@@ -2491,8 +2099,8 @@ def run_analysis(args: argparse.Namespace) -> int:
             "n_valid_npr_windows": "Attempted windows that produced a finite NPR value.",
             "n_invalid_npr_windows": "Attempted windows whose NPR value was undefined.",
             "partial_body_score": (
-                "1 when one or more windows were excluded because their NPR was invalid, "
-                "while at least one valid window remained for function-level aggregation."
+                "1 only when a single incomplete final tail window was excluded "
+                "because original_log_rank was exactly zero."
             ),
         },
         "operational_note": (
@@ -2618,8 +2226,7 @@ def make_self_test_inputs(root: Path) -> argparse.Namespace:
     events_path = run1a / "commit_function_detectcodegpt_input_events.csv"
     panel_path = root / "panel.csv"
     support_path = run1b / "commit_function_body_eligibility_support.csv"
-    eligibility_spec_path = run1b / "commit_function_detectcodegpt_scoring_spec.json"
-    threshold_spec_path = run1b / "mixedcode_overlap_threshold_specification.json"
+    spec_path = run1b / "commit_function_detectcodegpt_scoring_spec.json"
     pd.DataFrame(unique_rows).to_csv(unique_path, index=False)
     pd.DataFrame(event_rows).to_csv(events_path, index=False)
     pd.DataFrame(panel_rows).drop_duplicates().to_csv(panel_path, index=False)
@@ -2665,27 +2272,7 @@ def make_self_test_inputs(root: Path) -> argparse.Namespace:
                 },
             ],
         },
-        eligibility_spec_path,
-    )
-    atomic_json(
-        {
-            "status": "frozen",
-            "scoring_model": "bigcode/starcoder2-7b",
-            "window_size_literal_space_tokens": 128,
-            "perturbations_per_window": 50,
-            "perturbation_type": "random-insert-space+newline",
-            "function_aggregation": "valid_frontier_weighted_mean",
-            "agc_threshold": 1.571637,
-            "random_seed": 20260723,
-            "algorithm_version": "overlap_final_full_window_valid_frontier_weighting-v1",
-            "decision_rule": "function_npr > agc_threshold",
-            "window_policy": "full_size_final_window_shifted_backward_with_overlap",
-            "partial_body_policy": PARTIAL_BODY_POLICY,
-            "threshold_calibration_dataset": "table2_mixedcode_50_files_300_bodies",
-            "benchmark_bodies": 300,
-            "overall_auroc": 0.9132888888888889,
-        },
-        threshold_spec_path,
+        spec_path,
     )
 
     return argparse.Namespace(
@@ -2693,8 +2280,7 @@ def make_self_test_inputs(root: Path) -> argparse.Namespace:
         input_events=events_path,
         input_panel=panel_path,
         input_support=support_path,
-        input_eligibility_specification=eligibility_spec_path,
-        input_threshold_specification=threshold_spec_path,
+        input_specification=spec_path,
         body_artifact_base=run1a,
         output_dir=output,
         qc_dir=None,
@@ -2724,91 +2310,6 @@ def make_self_test_inputs(root: Path) -> argparse.Namespace:
         require_all_completed=False,
         mock_scoring=True,
     )
-
-
-def _test_chunk_literal_space_and_marginal_counts() -> None:
-    """Directly verify chunk_literal_space()'s overlap-shifting behavior and
-    compute_marginal_token_counts()'s frontier-tracking arithmetic, using
-    the exact examples worked through with the user: a 3-token body one
-    token past a window_size=2 boundary (produces overlap, analogous to a
-    129-token body with window_size=128), and a 4-token body an exact
-    multiple of window_size=2 (no overlap, analogous to a 256-token body).
-    """
-    # 3 tokens, window_size=2 -> the final window is shifted back to reach
-    # a full 2 tokens, overlapping the first window's second token.
-    chunks = chunk_literal_space("a b c", window_size=2)
-    if len(chunks) != 2:
-        raise AssertionError(f"Expected 2 windows for 3 tokens/window_size=2, got: {chunks}")
-    (_, n0, s0, e0), (_, n1, s1, e1) = chunks
-    if (n0, s0, e0) != (2, 0, 2):
-        raise AssertionError(f"Window 0 should be tokens[0:2], got n={n0} s={s0} e={e0}")
-    if (n1, s1, e1) != (2, 1, 3):
-        raise AssertionError(
-            "Window 1 should be shifted back to tokens[1:3] (full window_size, "
-            f"overlapping window 0), got n={n1} s={s1} e={e1}"
-        )
-    marginals = compute_marginal_token_counts(chunks)
-    if marginals != [2, 1]:
-        raise AssertionError(f"Expected marginal counts [2, 1], got {marginals}")
-    if sum(marginals) != 3:
-        raise AssertionError("Marginal counts must sum to the body's total token count")
-
-    # 4 tokens, window_size=2 -> exact multiple, no overlap or shifting.
-    exact_chunks = chunk_literal_space("a b c d", window_size=2)
-    if exact_chunks != [("a b", 2, 0, 2), ("c d", 2, 2, 4)]:
-        raise AssertionError(f"Exact-multiple body must produce two non-overlapping full windows, got: {exact_chunks}")
-    exact_marginals = compute_marginal_token_counts(exact_chunks)
-    if exact_marginals != [2, 2]:
-        raise AssertionError(f"Exact-multiple body must have no overlap (marginals == window sizes), got {exact_marginals}")
-
-    # Body shorter than window_size -> single, unshifted window (unchanged
-    # from the pre-redesign behavior; a short whole body is not a windowing
-    # artifact).
-    short_chunks = chunk_literal_space("a b", window_size=5)
-    if short_chunks != [("a b", 2, 0, 2)]:
-        raise AssertionError(f"Body shorter than window_size must be a single, unshifted window: {short_chunks}")
-    if compute_marginal_token_counts(short_chunks) != [2]:
-        raise AssertionError("Single-window body's marginal count must equal its own token count")
-
-    # compute_aggregation_weights(): identical to the static marginals when
-    # every window is valid, and reassigns an invalid window's coverage to
-    # a later valid overlapping window when one exists.
-    def _weight_stub(start: int, end: int, valid: bool) -> dict[str, Any]:
-        return {
-            "start_token_body": start,
-            "end_token_body": end,
-            "window_npr_valid": valid,
-        }
-
-    # All valid, with overlap ([0:2] + [1:3]) -> weights equal marginals.
-    all_valid = [_weight_stub(0, 2, True), _weight_stub(1, 3, True)]
-    if compute_aggregation_weights(all_valid) != [2, 1]:
-        raise AssertionError("All-valid weights must equal the static marginal counts")
-
-    # First window invalid, overlapping second valid -> the second window
-    # represents ALL of its own tokens, not just the static marginal 1.
-    first_invalid = [_weight_stub(0, 2, False), _weight_stub(1, 3, True)]
-    if compute_aggregation_weights(first_invalid) != [0, 2]:
-        raise AssertionError("A valid window overlapping an invalid one must carry its full uncovered span")
-
-    # Middle window invalid in a 3-window overlapping body ([0:2],[2:4],
-    # [3:5]): the final valid window expands from static marginal 1 to 2,
-    # and exactly one token (index 2) is left with no valid signal.
-    middle_invalid = [
-        _weight_stub(0, 2, True),
-        _weight_stub(2, 4, False),
-        _weight_stub(3, 5, True),
-    ]
-    if compute_aggregation_weights(middle_invalid) != [2, 0, 2]:
-        raise AssertionError("Middle-invalid weights must be [2, 0, 2]")
-
-    # All invalid -> all-zero weights (score_one_body() raises before
-    # aggregation can matter, but the function must stay well-defined).
-    all_invalid = [_weight_stub(0, 2, False), _weight_stub(1, 3, False)]
-    if compute_aggregation_weights(all_invalid) != [0, 0]:
-        raise AssertionError("All-invalid weights must be all zero")
-
-    print("chunk_literal_space / compute_marginal_token_counts self-test: PASS")
 
 
 def _scripted_score_window(
@@ -2866,9 +2367,7 @@ def _degenerate_window_response(reason: str) -> dict[str, Any]:
     raise ValueError(f"Unsupported test reason: {reason}")
 
 
-def _make_policy_test_row(
-    body_sha: str, n_expected_windows: int, token_count: int = 3
-) -> pd.Series:
+def _make_policy_test_row(body_sha: str, n_expected_windows: int) -> pd.Series:
     return pd.Series(
         {
             "profile_name": "unit_test_profile",
@@ -2876,7 +2375,7 @@ def _make_policy_test_row(
             "sample_rank": 1,
             "function_body_sha256": body_sha,
             "function_body_relative_path": "unused.txt",
-            "function_body_split_space_token_count": token_count,
+            "function_body_split_space_token_count": 3,
             "n_expected_windows": n_expected_windows,
             "referencing_function_event_count": 1,
         }
@@ -2884,107 +2383,68 @@ def _make_policy_test_row(
 
 
 def run_partial_body_policy_self_test() -> None:
-    """Directly unit-test score_one_body()'s simplified partial-body
-    scoring policy (Cases 1-6) and the null-safe reproducibility comparison
-    (Case 7), using a scripted score_window callable instead of real or
-    mock model scoring. See score_one_body(), classify_window_validity(),
-    chunk_literal_space(), and compare_results() for the behavior under
-    test.
+    """Directly unit-test score_one_body()'s partial-body scoring policy
+    (Cases 1-6) and the null-safe reproducibility comparison (Case 7), using
+    a scripted score_window callable instead of real or mock model scoring.
+    These are exactly the edge cases raised in code review; see
+    score_one_body(), classify_window_validity(), and compare_results() for
+    the behavior under test.
     """
-    _test_chunk_literal_space_and_marginal_counts()
-
     config = DetectorConfig(
-        eligibility_status="frozen",
+        specification_status="frozen",
         specification_primary="unit_test",
-        threshold_status="frozen",
         scoring_model="bigcode/starcoder2-7b",
         window_size=2,
         perturbations_per_window=50,
         perturbation_type="random-insert-space+newline",
-        function_aggregation="valid_frontier_weighted_mean",
-        agc_threshold=1.571637,
+        function_aggregation="token_weighted_mean",
+        agc_threshold=1.5183,
         random_seed=20260723,
-        algorithm_version="overlap_final_full_window_valid_frontier_weighting-v1",
-        decision_rule="function_npr > agc_threshold",
-        window_policy="full_size_final_window_shifted_backward_with_overlap",
-        partial_body_policy=PARTIAL_BODY_POLICY,
-        calibration_dataset="table2_mixedcode_50_files_300_bodies",
-        calibration_bodies=300,
-        calibration_auroc=0.9132888888888889,
-        eligibility_specification_sha256="self-test-eligibility",
-        threshold_specification_sha256="self-test-threshold",
         eligibility_specifications=(),
     )
-    # chunk_literal_space("a b c", window_size=2) -> window 0 = tokens[0:2]
-    # ("a b", marginal=2), window 1 = tokens[1:3] ("b c", marginal=1,
-    # overlapping window 0's second token). This is the same shape as a
-    # 129-token body with window_size=128.
-    overlap_text = "a b c"
-    # chunk_literal_space("a b c d", window_size=2) -> two full,
-    # non-overlapping windows (exact multiple of window_size).
-    exact_multiple_text = "a b c d"
+    # chunk_literal_space("a b c", window_size=2) -> window 0 = ["a","b"]
+    # (2 tokens), window 1 = ["c"] (1 token, the tail window).
+    text = "a b c"
 
-    # Case 1: every window valid -> ordinary success, no partial-body flag,
-    # and function_npr is the marginal-weighted mean (2*1.1 + 1*1.7) / 3,
-    # not the naive (2*1.1 + 2*1.7) / 4 that double-counting would give.
+    # Case 1: every window valid -> ordinary success, no partial-body flag.
     row = _make_policy_test_row("case1", 2)
     result = score_one_body(
-        row, overlap_text, config, "fp",
+        row, text, config, "fp",
         _scripted_score_window([_valid_window_response(1.1), _valid_window_response(1.7)]),
         None,
     )
     if result["partial_body_score"] != 0 or result["n_invalid_npr_windows"] != 0:
         raise AssertionError(f"Case 1 (all valid) unexpectedly marked as partial: {result}")
-    expected_npr = (1.1 * 2 + 1.7 * 1) / 3
-    if abs(result["function_npr"] - expected_npr) > 1e-9:
-        raise AssertionError(
-            f"Case 1 function_npr should be the marginal-weighted mean "
-            f"{expected_npr}, got {result['function_npr']}"
-        )
-    if result["chunks"][0]["marginal_token_count"] != 2 or result["chunks"][1]["marginal_token_count"] != 1:
-        raise AssertionError(f"Case 1 marginal_token_count values wrong: {result['chunks']}")
-    if result["chunks"][0]["overlaps_previous_window"] is not False:
-        raise AssertionError("Case 1 window 0 must not be marked as overlapping")
-    if result["chunks"][1]["overlaps_previous_window"] is not True:
-        raise AssertionError("Case 1 window 1 (shifted tail) must be marked as overlapping")
+    if not math.isfinite(result["function_npr"]):
+        raise AssertionError("Case 1 function_npr must be finite")
 
-    # Case 2: the overlapping (shifted) tail window is invalid -> partial
-    # success, function_npr computed from window 0 alone (its own npr,
-    # since it is the only valid window and thus carries the full weight).
+    # Case 2: main window valid, tail window degenerate -> partial success.
     row = _make_policy_test_row("case2", 2)
     result = score_one_body(
-        row, overlap_text, config, "fp",
+        row, text, config, "fp",
         _scripted_score_window(
             [_valid_window_response(1.1), _degenerate_window_response("zero_original_log_rank")]
         ),
         None,
     )
     if result["partial_body_score"] != 1:
-        raise AssertionError(f"Case 2 (overlapping tail invalid) must be a partial success: {result}")
+        raise AssertionError(f"Case 2 (tail-only degenerate) must be a partial success: {result}")
     if result["n_valid_npr_windows"] != 1 or result["n_invalid_npr_windows"] != 1:
         raise AssertionError(f"Case 2 valid/invalid window counts wrong: {result}")
-    if abs(result["function_npr"] - 1.1) > 1e-9:
-        raise AssertionError(f"Case 2 function_npr should equal window 0's own npr (1.1), got {result['function_npr']}")
-    if [chunk["aggregation_weight_token_count"] for chunk in result["chunks"]] != [2, 0]:
-        raise AssertionError(f"Case 2 aggregation weights must be [2, 0]: {result['chunks']}")
-    if result["valid_npr_token_count"] != 2 or result["invalid_npr_token_count"] != 1:
-        raise AssertionError(
-            "Case 2 token accounting must be valid=2 (window 0's coverage), "
-            f"invalid=1 (token 2, covered only by the invalid window): {result}"
-        )
     tail_chunk = result["chunks"][1]
     if tail_chunk["window_npr"] is not None:
         raise AssertionError("Case 2 tail window_npr must be sanitized to None, not left as NaN")
     if tail_chunk["window_npr_valid"] is not False or tail_chunk["window_npr_invalid_reason"] != "zero_original_log_rank":
         raise AssertionError(f"Case 2 tail window validity/reason wrong: {tail_chunk}")
-    case2_result = result  # reused for the Case 7 reproducibility check below
+    if not math.isfinite(result["function_npr"]):
+        raise AssertionError("Case 2 function_npr must still be finite (computed from the valid window only)")
+    case2_result = result  # reused for the Case 5 reproducibility check below
 
-    # Case 3: every window invalid -> body failure (AllWindowsInvalidNprError),
-    # the only remaining failure condition.
+    # Case 3: every window degenerate -> body failure (AllWindowsInvalidNprError).
     row = _make_policy_test_row("case3", 2)
     try:
         score_one_body(
-            row, overlap_text, config, "fp",
+            row, text, config, "fp",
             _scripted_score_window(
                 [
                     _degenerate_window_response("zero_original_log_rank"),
@@ -2997,117 +2457,61 @@ def run_partial_body_policy_self_test() -> None:
     except AllWindowsInvalidNprError:
         pass
 
-    # Case 4 (policy change from the pre-redesign behavior): the *first*,
-    # non-overlapping window is invalid and the overlapping tail window is
-    # valid -> now ALSO a partial success, since position no longer matters
-    # once short trailing windows cannot occur. Previously this raised
-    # NonTailWindowInvalidNprError; that exception no longer exists.
+    # Case 4: the *non-tail* (main) window is degenerate, tail window valid
+    # -> a body failure (NonTailWindowInvalidNprError), not a partial
+    # success, per the policy that a non-tail invalid window is treated as
+    # a likely genuine scoring problem rather than the known tail-window
+    # edge case.
     row = _make_policy_test_row("case4", 2)
-    result = score_one_body(
-        row, overlap_text, config, "fp",
-        _scripted_score_window(
-            [_degenerate_window_response("zero_original_log_rank"), _valid_window_response(1.4)]
-        ),
-        None,
-    )
-    if result["partial_body_score"] != 1:
-        raise AssertionError(f"Case 4 (first window invalid) must be a partial success under the simplified policy: {result}")
-    if abs(result["function_npr"] - 1.4) > 1e-9:
-        raise AssertionError(f"Case 4 function_npr should equal window 1's own npr (1.4), got {result['function_npr']}")
-    # Weight reassignment (compute_aggregation_weights()): the valid
-    # overlapping window represents its FULL uncovered span (2 tokens),
-    # not its static marginal of 1, because the earlier window covering
-    # token 1 is invalid. Token accounting follows: only token 0 has no
-    # valid signal.
-    if [chunk["aggregation_weight_token_count"] for chunk in result["chunks"]] != [0, 2]:
-        raise AssertionError(f"Case 4 aggregation weights must be [0, 2]: {result['chunks']}")
-    if result["valid_npr_token_count"] != 2 or result["invalid_npr_token_count"] != 1:
-        raise AssertionError(f"Case 4 token accounting must be valid=2, invalid=1: {result}")
-
-    # Case 4b (the quantitative reason aggregation weights exist at all):
-    # a 5-token body with window_size=2 produces windows [0:2], [2:4],
-    # [3:5] (static marginals [2, 2, 1]). With the MIDDLE window invalid
-    # and both outer windows valid, static-marginal weighting would give
-    # (1.0*2 + 2.0*1) / 3 = 4/3, treating the final window as worth one
-    # token even though it validly scored tokens 3-4 and no other valid
-    # window covers them. Frontier-over-valid weighting gives the final
-    # window weight 2: (1.0*2 + 2.0*2) / 4 = 1.5, with exactly one token
-    # (index 2) carrying no valid signal. At production scale
-    # (window_size=128, second-to-last window invalid) this same
-    # difference moves function_npr across the calibrated threshold region,
-    # so it is asserted here exactly.
-    row = _make_policy_test_row("case4b", 3, token_count=5)
-    result = score_one_body(
-        row, "a b c d e", config, "fp",
-        _scripted_score_window(
-            [
-                _valid_window_response(1.0),
-                _degenerate_window_response("zero_original_log_rank"),
-                _valid_window_response(2.0),
-            ]
-        ),
-        None,
-    )
-    if result["partial_body_score"] != 1:
-        raise AssertionError(f"Case 4b (middle window invalid) must be a partial success: {result}")
-    if [chunk["aggregation_weight_token_count"] for chunk in result["chunks"]] != [2, 0, 2]:
-        raise AssertionError(f"Case 4b aggregation weights must be [2, 0, 2]: {result['chunks']}")
-    expected_npr_4b = (1.0 * 2 + 2.0 * 2) / 4
-    if abs(result["function_npr"] - expected_npr_4b) > 1e-9:
-        raise AssertionError(
-            f"Case 4b function_npr must be the valid-frontier weighted mean "
-            f"{expected_npr_4b} (NOT the static-marginal 4/3): got {result['function_npr']}"
+    try:
+        score_one_body(
+            row, text, config, "fp",
+            _scripted_score_window(
+                [_degenerate_window_response("zero_original_log_rank"), _valid_window_response(1.2)]
+            ),
+            None,
         )
-    if result["valid_npr_token_count"] != 4 or result["invalid_npr_token_count"] != 1:
-        raise AssertionError(f"Case 4b token accounting must be valid=4, invalid=1: {result}")
-    if [chunk["marginal_token_count"] for chunk in result["chunks"]] != [2, 2, 1]:
-        raise AssertionError(
-            f"Case 4b static marginals must remain [2, 2, 1] (unchanged by validity): {result['chunks']}"
-        )
+        raise AssertionError("Case 4 (non-tail window invalid) should have raised NonTailWindowInvalidNprError")
+    except NonTailWindowInvalidNprError:
+        pass
 
-    # Case 5 (policy change): an exact-multiple body (no overlap at all) has
-    # its final, full-size window invalid -> now ALSO a partial success.
-    # Previously a full-size final window could never be treated as a
-    # benign tail and this raised NonTailWindowInvalidNprError; that
-    # exception no longer exists because full-size-vs-tail is no longer a
-    # distinction the policy makes.
-    row = _make_policy_test_row("case5", 2, token_count=4)
-    result = score_one_body(
-        row, exact_multiple_text, config, "fp",
-        _scripted_score_window(
-            [_valid_window_response(1.1), _degenerate_window_response("zero_original_log_rank")]
-        ),
-        None,
-    )
-    if result["partial_body_score"] != 1:
-        raise AssertionError(f"Case 5 (exact-multiple body, final window invalid) must be a partial success: {result}")
-    if abs(result["function_npr"] - 1.1) > 1e-9:
-        raise AssertionError(f"Case 5 function_npr should equal window 0's own npr (1.1), got {result['function_npr']}")
-    if [chunk["aggregation_weight_token_count"] for chunk in result["chunks"]] != [2, 0]:
-        raise AssertionError(f"Case 5 aggregation weights must be [2, 0]: {result['chunks']}")
-    if result["valid_npr_token_count"] != 2 or result["invalid_npr_token_count"] != 2:
-        raise AssertionError(
-            "Case 5 token accounting must be valid=2, invalid=2 (no overlap, so the "
-            f"invalid window's tokens have no valid signal): {result}"
+    # Case 5: exact-multiple body, so the final window is full-size rather
+    # than an incomplete tail. An invalid final full-size window must fail.
+    exact_multiple_text = "a b c d"  # window_size=2 -> two full windows
+    row = _make_policy_test_row("case5", 2)
+    try:
+        score_one_body(
+            row, exact_multiple_text, config, "fp",
+            _scripted_score_window(
+                [_valid_window_response(1.1), _degenerate_window_response("zero_original_log_rank")]
+            ),
+            None,
         )
+        raise AssertionError(
+            "Case 5 (invalid full-size final window) should have raised "
+            "NonTailWindowInvalidNprError"
+        )
+    except NonTailWindowInvalidNprError:
+        pass
 
-    # Case 6 (policy change): the overlapping tail window is invalid for
-    # "no_valid_perturbation_scores" rather than "zero_original_log_rank"
-    # -> now ALSO a partial success, since the invalid reason is no longer
-    # restricted. Previously this raised DisallowedTailWindowInvalidNprError;
-    # that exception no longer exists.
+    # Case 6: a true incomplete tail is invalid because no perturbed variant
+    # produced a finite rank. This is not the accepted zero-denominator edge
+    # case and must fail conservatively.
     row = _make_policy_test_row("case6", 2)
-    result = score_one_body(
-        row, overlap_text, config, "fp",
-        _scripted_score_window(
-            [_valid_window_response(1.1), _degenerate_window_response("no_valid_perturbation_scores")]
-        ),
-        None,
-    )
-    if result["partial_body_score"] != 1:
-        raise AssertionError(f"Case 6 (disallowed-reason tail invalid) must now be a partial success: {result}")
-    if result["chunks"][1]["window_npr_invalid_reason"] != "no_valid_perturbation_scores":
-        raise AssertionError(f"Case 6 invalid reason not recorded correctly: {result['chunks'][1]}")
+    try:
+        score_one_body(
+            row, text, config, "fp",
+            _scripted_score_window(
+                [_valid_window_response(1.1), _degenerate_window_response("no_valid_perturbation_scores")]
+            ),
+            None,
+        )
+        raise AssertionError(
+            "Case 6 (disallowed invalid-tail reason) should have raised "
+            "DisallowedTailWindowInvalidNprError"
+        )
+    except DisallowedTailWindowInvalidNprError:
+        pass
 
     # Case 7: a cached result containing sanitized None values (from Case 2)
     # must (a) round-trip through JSON without raising -- this alone is an
@@ -3206,22 +2610,12 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--input-eligibility-specification",
+        "--input-specification",
         type=Path,
         default=Path(
             "output/commit_function/run-1b/strict/"
             "commit_function_detectcodegpt_scoring_spec.json"
         ),
-        help="Frozen run-1b eligibility and profile specification.",
-    )
-    parser.add_argument(
-        "--input-threshold-specification",
-        type=Path,
-        default=Path(
-            "output/commit_function/run-1c0b/mixedcode-overlap-threshold-v1/"
-            "mixedcode_overlap_threshold_specification.json"
-        ),
-        help="Frozen run-1c0b overlap-window detector and threshold specification.",
     )
     parser.add_argument(
         "--body-artifact-base",
@@ -3231,7 +2625,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("output/commit_function/run-1c/pilot200-dual-profile-v7"),
+        default=Path("output/commit_function/run-1c/pilot200-dual-profile-v4"),
     )
     parser.add_argument("--qc-dir", type=Path, default=None)
     parser.add_argument("--cache-dir", type=Path, default=None)
@@ -3258,7 +2652,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("~/.cache/huggingface/hub").expanduser(),
     )
-    parser.add_argument("--detector-output-name", default="run1c_commit_function_npr_pilot_v7")
+    parser.add_argument("--detector-output-name", default="run1c_commit_function_npr_pilot_v4")
     parser.add_argument("--pct-words-masked", type=float, default=0.5)
     parser.add_argument("--span-length", type=int, default=2)
     parser.add_argument("--perturbation-chunk-size", type=int, default=10)

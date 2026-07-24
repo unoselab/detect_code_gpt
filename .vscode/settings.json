@@ -3,7 +3,7 @@
     // font
     "markdown.preview.fontSize": 18,
     "editor.fontSize": 12,
-    "terminal.integrated.fontSize": 16,
+    "terminal.integrated.fontSize": 14,
 
     "files.watcherExclude": {
         "**/env*": false,
