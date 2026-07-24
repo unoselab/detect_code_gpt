@@ -1,153 +1,147 @@
-============================================================================
-run-1c: deterministic dual-profile overlap-window commit-function NPR pilot
-Started:                         Fri Jul 24 12:25:30 AM CDT 2026
-Workspace:                       /home/user1-system12/project-workspace/detect_code_gpt
-Active conda env:                detectcodegpt
-Python path:                     /home/user1-system12/miniconda3/envs/detectcodegpt/bin/python
-Python version:                  3.11.15
-Python script:                   code-detection/score_commit_function_npr.py
-Python script SHA:               05080700529321bbb12639c599f44d20cb42e2811bc2f6febd2acad5429c7f69
-PyTorch version:                 2.1.2
-Transformers version:            4.42.4
-SciPy version:                   1.11.4
-NumPy version:                   1.26.3
-Pandas version:                  2.1.4
-CUDA_VISIBLE_DEVICES:            0
-CUDA available:                  1
-GPU name:                        NVIDIA RTX 6000 Ada Generation
-GPU total memory bytes:          51002867712
-Model cache:                     /home/user1-system12/.cache/huggingface/hub
-Input unique bodies:             output/commit_function/run-1a/strict/commit_function_detectcodegpt_unique_bodies.csv
-Input unique bodies SHA:         ad1e451bcf0161e804f57a600648a827e5d4524ece923a1ebaca189541cdabce
-Input events:                    output/commit_function/run-1a/strict/commit_function_detectcodegpt_input_events.csv
-Input events SHA:                d2a46f71f931a703c7b247bf7bf5435926f649ef8b458877e278d3fa6734690d
-Input panel:                     ../ai_code_complexity_study_python/ai-code-complexity-study/repo_python/run-py-4a/strict/panel_event_monthly_agc_changed_block_py.csv
-Input panel SHA:                 532be31521535c5020a0ae5ede4973e5ac78afd8ad9f35bc760df95453df54f2
-Input run-1b support:            output/commit_function/run-1b/strict/commit_function_body_eligibility_support.csv
-Input run-1b support SHA:        bd38752365016a3d00a70964724c7fc7ce52f3a90f36951ad127052c0d616f58
-Input eligibility specification: output/commit_function/run-1b/strict/commit_function_detectcodegpt_scoring_spec.json
-Input eligibility spec SHA:      07dfdfd09dcaa410a1fa61ab5346e7a8a2f972c8d2788e8e774109b0f9d9e21e
-Input threshold specification:   output/commit_function/run-1c0b/mixedcode-overlap-threshold-v1/mixedcode_overlap_threshold_specification.json
-Input threshold spec SHA:        309d17d471ca4e68e628a8ea3f209aa69e11a66ebbc4d8d0284fc4e1cadee321
-Body artifact base:              output/commit_function/run-1a/strict
-Calibration profile size:        100
-Long-body profile size:          100
-Calibration bands:               100:110,111:120,121:130,131:140,141:150,151:160,161:170,171:180,181:190,191:200
-Long-body window strata:         2:2,3:4,5:8,9:16,17:
-Repro checks per profile:        1
-Output directory:                output/commit_function/run-1c/pilot200-dual-profile-v7
-Cache directory:                 output/commit_function/run-1c/pilot200-dual-profile-v7/cache
-QC directory:                    output/commit_function/run-1c/pilot200-dual-profile-v7/qc
-Log file:                        logs/run-1c/run-1c-score-commit-func-npr-pilot-v7-20260724-002529.log
-Overwrite output:                1
-Run self-test:                   1
-Run resume check:                1
-Prepare only:                    1
-============================================================================
-chunk_literal_space / compute_marginal_token_counts self-test: PASS
-Partial-body scoring policy self-test: PASS
-Progress: 1/40 pending bodies processed; success_total=1, failures_this_run=0
-Progress: 10/40 pending bodies processed; success_total=10, failures_this_run=0
-Progress: 20/40 pending bodies processed; success_total=20, failures_this_run=0
-Progress: 30/40 pending bodies processed; success_total=30, failures_this_run=0
-Progress: 40/40 pending bodies processed; success_total=40, failures_this_run=0
-============================================================================
-Run dual-profile commit-function NPR pilot
-Status:                         PASS
-Selected unique bodies:         40
-Successful unique bodies:       40
-Failed unique bodies:           0
-Expected windows:               392
-Scored windows:                 392
-Bodies scored this run:         40
-Bodies reused this run:         0
-Model loaded this run:          0
-Resume validation passed:       0
-Failed checks:                  0
-Output directory:               /tmp/run1c-self-test-9mifs_li/run-1c/pilot
-QC directory:                   /tmp/run1c-self-test-9mifs_li/run-1c/pilot/qc
-============================================================================
-============================================================================
-Run dual-profile commit-function NPR pilot
-Status:                         PASS
-Selected unique bodies:         40
-Successful unique bodies:       40
-Failed unique bodies:           0
-Expected windows:               392
-Scored windows:                 392
-Bodies scored this run:         0
-Bodies reused this run:         40
-Model loaded this run:          0
-Resume validation passed:       1
-Failed checks:                  0
-Output directory:               /tmp/run1c-self-test-9mifs_li/run-1c/pilot
-QC directory:                   /tmp/run1c-self-test-9mifs_li/run-1c/pilot/qc
-============================================================================
-Self-test: PASS
-============================================================================
-Run dual-profile commit-function NPR pilot
-Status:                         PREPARED_ONLY
-Selected unique bodies:         200
-Successful unique bodies:       0
-Failed unique bodies:           0
-Expected windows:               1359
-Scored windows:                 0
-Bodies scored this run:         0
-Bodies reused this run:         0
-Model loaded this run:          0
-Resume validation passed:       0
-Failed checks:                  0
-Output directory:               output/commit_function/run-1c/pilot200-dual-profile-v7
-QC directory:                   output/commit_function/run-1c/pilot200-dual-profile-v7/qc
-============================================================================
+check below.
 
-============================================================================
-run-1c output verification
-Status after validation:         PREPARED_ONLY
-Selected unique bodies:          200
-Successful unique bodies:        0
-Failed unique bodies:            0
-Expected windows:                1359
-Scored windows:                  0
-Partial-body scores:             0
-Invalid NPR windows:             0
-Invalid NPR tokens:              0
-First invocation scored bodies:  0
-First invocation reused bodies:  0
-First invocation model loaded:   0
-Body score rows:                 0
-Window score rows:               0
-Failure rows:                    0
-Checkpoint rows:                 200
-Failed QC checks:                0
-Pilot manifest:                  output/commit_function/run-1c/pilot200-dual-profile-v7/commit_function_npr_pilot_manifest.csv
-Body scores:                     output/commit_function/run-1c/pilot200-dual-profile-v7/commit_function_npr_body_scores.csv
-Window scores:                   output/commit_function/run-1c/pilot200-dual-profile-v7/commit_function_npr_window_scores.csv
-Runtime metrics:                 output/commit_function/run-1c/pilot200-dual-profile-v7/commit_function_npr_runtime_metrics.csv
-Full-run estimates:              output/commit_function/run-1c/pilot200-dual-profile-v7/commit_function_npr_full_run_estimates.csv
-Checks:                          output/commit_function/run-1c/pilot200-dual-profile-v7/qc/commit_function_npr_checks.csv
-Summary:                         output/commit_function/run-1c/pilot200-dual-profile-v7/qc/commit_function_npr_summary.json
-Metadata:                        output/commit_function/run-1c/pilot200-dual-profile-v7/qc/commit_function_npr_metadata.json
-Log file:                        logs/run-1c/run-1c-score-commit-func-npr-pilot-v7-20260724-002529.log
-============================================================================
+(detectcodegpt) detect_code_gpt $ pwd
+/home/user1-system11/project-workspace/detect_code_gpt
+(detectcodegpt) detect_code_gpt $ 
 
-============================================================================
-run-1c execution summary
-Started:               Fri Jul 24 12:25:30 AM CDT 2026
-Completed:             Fri Jul 24 12:25:38 AM CDT 2026
-Elapsed:               00:00:08
-Exit code:             0
-Python path:           /home/user1-system12/miniconda3/envs/detectcodegpt/bin/python
-Python version:        3.11.15
-Script path:           code-detection/score_commit_function_npr.py
-Input unique bodies:   output/commit_function/run-1a/strict/commit_function_detectcodegpt_unique_bodies.csv
-Input events:          output/commit_function/run-1a/strict/commit_function_detectcodegpt_input_events.csv
-Input panel:           ../ai_code_complexity_study_python/ai-code-complexity-study/repo_python/run-py-4a/strict/panel_event_monthly_agc_changed_block_py.csv
-Input support:         output/commit_function/run-1b/strict/commit_function_body_eligibility_support.csv
-Eligibility spec:       output/commit_function/run-1b/strict/commit_function_detectcodegpt_scoring_spec.json
-Threshold spec:         output/commit_function/run-1c0b/mixedcode-overlap-threshold-v1/mixedcode_overlap_threshold_specification.json
-Output directory:      output/commit_function/run-1c/pilot200-dual-profile-v7
-Cache directory:       output/commit_function/run-1c/pilot200-dual-profile-v7/cache
-QC directory:          output/commit_function/run-1c/pilot200-dual-profile-v7/qc
-Log file:              logs/run-1c/run-1c-score-commit-func-npr-pilot-v7-20260724-002529.log
-============================================================================
+(detectcodegpt) detect_code_gpt $ (we ran the provided script)
+/home/user1-system11/project-workspace/detect_code_gpt
+ M xrun.sh
+?? workspace-structure-detect-code-gpt-workspace-jul24-r158.txt
+c3b899569750c012c3b7450b80aa879446394954
+bd69e2e40ffff7b921bfc7ebcc1fd991df5f4532bdd84e17e55fa36e456fb553  proc_sh/run-1d-score-commit-func-npr-full.sh
+9f433bcf313292df71b517c66d2a6f75cd4878aea3e4e993ef7a3cd66e8f5e04  code-detection/score_commit_function_npr_full.py
+05080700529321bbb12639c599f44d20cb42e2811bc2f6febd2acad5429c7f69  code-detection/score_commit_function_npr.py
+840ce91b873065e1dd30e3763c9ff64dd332fdb384c993918ef533c533faaba2  code-detection/npr_overlap_core.py
+ba494ede5a1fd18cdec7221062a34d510441d4a02483bf70f5ce3ef61b23512b  code-detection/baselines/utils/loadmodel.py
+proc_sh/run-1d-score-commit-func-npr-full.sh:15:#   eligibility specification. The default range100_200 run is resumable at
+proc_sh/run-1d-score-commit-func-npr-full.sh:39:#   output/commit_function/run-1d/range100_200-overlap-v1/
+proc_sh/run-1d-score-commit-func-npr-full.sh:57:#   INPUT_ELIGIBILITY_SPECIFICATION, INPUT_THRESHOLD_SPECIFICATION,
+proc_sh/run-1d-score-commit-func-npr-full.sh:58:#   BODY_ARTIFACT_BASE, OUTPUT_DIR, QC_DIR, CACHE_DIR,
+proc_sh/run-1d-score-commit-func-npr-full.sh:60:#   SPEC_NAME, PROFILE_NAME, REPRODUCIBILITY_CHECK_PER_PROFILE,
+proc_sh/run-1d-score-commit-func-npr-full.sh:85:INPUT_ELIGIBILITY_SPECIFICATION="${INPUT_ELIGIBILITY_SPECIFICATION:-${RUN1B_DIR}/commit_function_detectcodegpt_scoring_spec.json}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:86:INPUT_THRESHOLD_SPECIFICATION="${INPUT_THRESHOLD_SPECIFICATION:-output/commit_function/run-1c0b/mixedcode-overlap-threshold-v1/mixedcode_overlap_threshold_specification.json}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:89:SPEC_NAME="${SPEC_NAME:-range100_200}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:90:PROFILE_NAME="${PROFILE_NAME:-range100_200_full}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:94:OUTPUT_DIR="${OUTPUT_DIR:-output/commit_function/run-1d/range100_200-overlap-v1}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:95:QC_DIR="${QC_DIR:-${OUTPUT_DIR}/qc}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:96:CACHE_DIR="${CACHE_DIR:-${OUTPUT_DIR}/cache}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:102:export TOKENIZERS_PARALLELISM="false"
+proc_sh/run-1d-score-commit-func-npr-full.sh:113:MANIFEST_OUTPUT="${OUTPUT_DIR}/commit_function_npr_full_manifest.csv"
+proc_sh/run-1d-score-commit-func-npr-full.sh:114:PROFILE_SUPPORT_OUTPUT="${OUTPUT_DIR}/commit_function_npr_full_spec_support.csv"
+proc_sh/run-1d-score-commit-func-npr-full.sh:115:BODY_SCORE_OUTPUT="${OUTPUT_DIR}/commit_function_npr_body_scores.csv"
+proc_sh/run-1d-score-commit-func-npr-full.sh:116:WINDOW_SCORE_OUTPUT="${OUTPUT_DIR}/commit_function_npr_window_scores.csv"
+proc_sh/run-1d-score-commit-func-npr-full.sh:117:FAILURE_OUTPUT="${OUTPUT_DIR}/commit_function_npr_failures.csv"
+proc_sh/run-1d-score-commit-func-npr-full.sh:118:CHECKPOINT_OUTPUT="${OUTPUT_DIR}/commit_function_npr_checkpoint_index.csv"
+proc_sh/run-1d-score-commit-func-npr-full.sh:119:RUNTIME_OUTPUT="${OUTPUT_DIR}/commit_function_npr_runtime_metrics.csv"
+proc_sh/run-1d-score-commit-func-npr-full.sh:120:ESTIMATE_OUTPUT="${OUTPUT_DIR}/commit_function_npr_full_progress_estimates.csv"
+proc_sh/run-1d-score-commit-func-npr-full.sh:156:require_file "${INPUT_ELIGIBILITY_SPECIFICATION}" "run-1b frozen eligibility specification"
+proc_sh/run-1d-score-commit-func-npr-full.sh:157:require_file "${INPUT_THRESHOLD_SPECIFICATION}" "run-1c0b frozen threshold specification"
+proc_sh/run-1d-score-commit-func-npr-full.sh:159:read -r PYTHON_MAJOR PYTHON_MINOR PYTHON_MICRO < <(
+proc_sh/run-1d-score-commit-func-npr-full.sh:162:PYTHON_VERSION="${PYTHON_MAJOR}.${PYTHON_MINOR}.${PYTHON_MICRO}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:163:if (( PYTHON_MAJOR < 3 || (PYTHON_MAJOR == 3 && PYTHON_MINOR < 10) )); then
+proc_sh/run-1d-score-commit-func-npr-full.sh:197:    echo "Eligibility spec:       ${INPUT_ELIGIBILITY_SPECIFICATION}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:198:    echo "Threshold spec:         ${INPUT_THRESHOLD_SPECIFICATION}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:199:    echo "Output directory:      ${OUTPUT_DIR}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:215:INPUT_ELIGIBILITY_SPECIFICATION_SHA="$(sha256_file "${INPUT_ELIGIBILITY_SPECIFICATION}")"
+proc_sh/run-1d-score-commit-func-npr-full.sh:216:INPUT_THRESHOLD_SPECIFICATION_SHA="$(sha256_file "${INPUT_THRESHOLD_SPECIFICATION}")"
+proc_sh/run-1d-score-commit-func-npr-full.sh:311:Input eligibility specification: ${INPUT_ELIGIBILITY_SPECIFICATION}
+proc_sh/run-1d-score-commit-func-npr-full.sh:312:Input eligibility spec SHA:      ${INPUT_ELIGIBILITY_SPECIFICATION_SHA}
+proc_sh/run-1d-score-commit-func-npr-full.sh:313:Input threshold specification:   ${INPUT_THRESHOLD_SPECIFICATION}
+proc_sh/run-1d-score-commit-func-npr-full.sh:314:Input threshold spec SHA:        ${INPUT_THRESHOLD_SPECIFICATION_SHA}
+proc_sh/run-1d-score-commit-func-npr-full.sh:316:Full specification:              ${SPEC_NAME}
+proc_sh/run-1d-score-commit-func-npr-full.sh:319:Output directory:                ${OUTPUT_DIR}
+proc_sh/run-1d-score-commit-func-npr-full.sh:342:    --input-eligibility-specification "${INPUT_ELIGIBILITY_SPECIFICATION}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:343:    --input-threshold-specification "${INPUT_THRESHOLD_SPECIFICATION}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:345:    --output-dir "${OUTPUT_DIR}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:349:    --spec-name "${SPEC_NAME}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:384:read -r STATUS FAILED_CHECKS SELECTED SUCCESSFUL FAILED EXPECTED_WINDOWS SCORED_WINDOWS PARTIAL_BODIES INVALID_WINDOWS INVALID_TOKENS SCORED_THIS_RUN REUSED_THIS_RUN MODEL_LOADED < <(
+proc_sh/run-1d-score-commit-func-npr-full.sh:440:        --input-eligibility-specification "${INPUT_ELIGIBILITY_SPECIFICATION}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:441:    --input-threshold-specification "${INPUT_THRESHOLD_SPECIFICATION}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:443:        --output-dir "${OUTPUT_DIR}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:447:        --spec-name "${SPEC_NAME}"
+proc_sh/run-1d-score-commit-func-npr-full.sh:500:Invalid NPR tokens:              ${INVALID_TOKENS}
+code-detection/score_commit_function_npr_full.py:45:os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+code-detection/score_commit_function_npr_full.py:313:    frame.to_csv(tmp, index=False, quoting=csv.QUOTE_MINIMAL)
+code-detection/score_commit_function_npr_full.py:341:            raise ValueError(f"Range must use MIN:MAX syntax: {raw!r}")
+code-detection/score_commit_function_npr_full.py:2020:    if args.spec_name == "range100_200":
+code-detection/score_commit_function_npr_full.py:2022:            raise ValueError("range100_200 specification does not match 100-200 tokens.")
+code-detection/score_commit_function_npr_full.py:2341:                "spec_name": "range100_200",
+code-detection/score_commit_function_npr_full.py:2347:                "spec_name": "min100",
+code-detection/score_commit_function_npr_full.py:2357:            "primary_spec": "range100_200",
+code-detection/score_commit_function_npr_full.py:2367:                    "name": "range100_200",
+code-detection/score_commit_function_npr_full.py:2373:                    "name": "min100",
+code-detection/score_commit_function_npr_full.py:2414:        spec_name="range100_200",
+code-detection/score_commit_function_npr_full.py:2415:        profile_name="range100_200_full",
+code-detection/score_commit_function_npr_full.py:2885:    parser.add_argument("--spec-name", default="range100_200")
+code-detection/score_commit_function_npr_full.py:2886:    parser.add_argument("--profile-name", default="range100_200_full")
+code-detection/score_commit_function_npr_full.py:2887:    parser.add_argument("--output-dir", type=Path, default=Path("output/commit_function/run-1d/range100_200-overlap-v1"))
+MISSING: output/commit_function/run-1a/strict/commit_function_detectcodegpt_unique_bodies.csv
+MISSING: output/commit_function/run-1a/strict/commit_function_detectcodegpt_input_events.csv
+MISSING: output/commit_function/run-1a/strict/function_bodies
+MISSING: output/commit_function/run-1b/strict/commit_function_body_eligibility_support.csv
+MISSING: output/commit_function/run-1b/strict/commit_function_detectcodegpt_scoring_spec.json
+MISSING: output/commit_function/run-1c0b/mixedcode-overlap-threshold-v1/mixedcode_overlap_threshold_specification.json
+PASS: ../ai_code_complexity_study_python/ai-code-complexity-study/repo_python/run-py-4a/strict/panel_event_monthly_agc_changed_block_py.csv
+# conda environments:
+#
+base                     /home/user1-system11/miniconda3
+BigCloneBench_python3_11     /home/user1-system11/miniconda3/envs/BigCloneBench_python3_11
+aicomplexity             /home/user1-system11/miniconda3/envs/aicomplexity
+aidetector               /home/user1-system11/miniconda3/envs/aidetector
+aidetector-gen           /home/user1-system11/miniconda3/envs/aidetector-gen
+aidetector_apillm        /home/user1-system11/miniconda3/envs/aidetector_apillm
+ast-analysis             /home/user1-system11/miniconda3/envs/ast-analysis
+clone_research_dream     /home/user1-system11/miniconda3/envs/clone_research_dream
+codellama                /home/user1-system11/miniconda3/envs/codellama
+deckard_py2              /home/user1-system11/miniconda3/envs/deckard_py2
+detectcodegpt         *  /home/user1-system11/miniconda3/envs/detectcodegpt
+detectcodegpt-gptoss     /home/user1-system11/miniconda3/envs/detectcodegpt-gptoss
+detectcodegpt_starcoder     /home/user1-system11/miniconda3/envs/detectcodegpt_starcoder
+llm4code-project         /home/user1-system11/miniconda3/envs/llm4code-project
+myenv_python3_11         /home/user1-system11/miniconda3/envs/myenv_python3_11
+nicad6                   /home/user1-system11/miniconda3/envs/nicad6
+sourcerercc              /home/user1-system11/miniconda3/envs/sourcerercc
+summary                  /home/user1-system11/miniconda3/envs/summary
+trees-sitter             /home/user1-system11/miniconda3/envs/trees-sitter
+
+Python 3.11.15
+torch 2.1.2
+transformers 4.42.4
+CUDA True
+GPUs 3
+Fri Jul 24 12:27:47 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.173.02             Driver Version: 580.173.02     CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA RTX A6000               Off |   00000000:16:00.0 Off |                  Off |
+| 30%   31C    P8             20W /  300W |      15MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   1  NVIDIA RTX A6000               Off |   00000000:AC:00.0 Off |                  Off |
+| 30%   35C    P8             17W /  300W |      35MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+|   2  NVIDIA RTX A6000               Off |   00000000:CA:00.0 Off |                  Off |
+| 30%   33C    P8             15W /  300W |      15MiB /  49140MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|    0   N/A  N/A            2354      G   /usr/lib/xorg/Xorg                        4MiB |
+|    1   N/A  N/A            2354      G   /usr/lib/xorg/Xorg                        9MiB |
+|    1   N/A  N/A            2445      G   /usr/bin/gnome-shell                      5MiB |
+|    2   N/A  N/A            2354      G   /usr/lib/xorg/Xorg                        4MiB |
++-----------------------------------------------------------------------------------------+
+PASS: StarCoder2-7B cache
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/nvme0n1p3  3.7T  1.7T  1.9T  48% /
+(detectcodegpt) detect_code_gpt $ 

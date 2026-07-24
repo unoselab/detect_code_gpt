@@ -1,0 +1,1023 @@
+.
+├── 0-install.txt
+├── analysis_results
+│   ├── bak
+│   │   └── plot_mixedcode_results_v0.1.py
+│   ├── cl7b-mean
+│   │   ├── fig_auroc_by_length.pdf
+│   │   ├── fig_auroc_by_length.png
+│   │   ├── table_appendix_chunk_by_length.tex
+│   │   └── table_main_auroc_by_length.tex
+│   ├── cl7b-sc7b-go120b-mean
+│   │   ├── fig_auroc_by_length.pdf
+│   │   ├── fig_auroc_by_length.png
+│   │   ├── table_appendix_chunk_by_length.tex
+│   │   └── table_main_auroc_by_length.tex
+│   ├── cl7b-sc7b-sc15b-go120b-gm31b-mean
+│   │   ├── fig_auroc_by_length.pdf
+│   │   ├── fig_auroc_by_length.png
+│   │   ├── table_appendix_chunk_by_length.tex
+│   │   └── table_main_auroc_by_length.tex
+│   ├── cl7b-sc7b-sc15b-go120b-mean
+│   │   ├── fig_auroc_by_length.pdf
+│   │   ├── fig_auroc_by_length.png
+│   │   ├── table_appendix_chunk_by_length.tex
+│   │   └── table_main_auroc_by_length.tex
+│   ├── gm31b-mean
+│   │   ├── fig_auroc_by_length.pdf
+│   │   ├── fig_auroc_by_length.png
+│   │   ├── table_appendix_chunk_by_length.tex
+│   │   └── table_main_auroc_by_length.tex
+│   ├── go120b-mean
+│   │   ├── fig_auroc_by_length.pdf
+│   │   ├── fig_auroc_by_length.png
+│   │   ├── table_appendix_chunk_by_length.tex
+│   │   └── table_main_auroc_by_length.tex
+│   ├── make_paper_artifacts.py
+│   ├── mixedcode
+│   │   ├── fig_mixedcode_auc_by_bucket.pdf
+│   │   ├── fig_mixedcode_auc_by_bucket.png
+│   │   ├── fig_mixedcode_npr_gap_by_bucket.pdf
+│   │   ├── fig_mixedcode_npr_gap_by_bucket.png
+│   │   ├── fig_mixedcode_overall_auc.pdf
+│   │   ├── fig_mixedcode_overall_auc.png
+│   │   ├── mixedcode_bucket_summary_combined.csv
+│   │   ├── mixedcode_overall_summary.csv
+│   │   ├── table_mixedcode_auc_by_bucket.tex
+│   │   └── table_mixedcode_overall.tex
+│   ├── plot_mixedcode_results.py
+│   ├── sc15b-mean
+│   │   ├── fig_auroc_by_length.pdf
+│   │   ├── fig_auroc_by_length.png
+│   │   ├── table_appendix_chunk_by_length.tex
+│   │   └── table_main_auroc_by_length.tex
+│   ├── sc7b-mean
+│   │   ├── fig_auroc_by_length.pdf
+│   │   ├── fig_auroc_by_length.png
+│   │   ├── table_appendix_chunk_by_length.tex
+│   │   └── table_main_auroc_by_length.tex
+│   └── table_mixedcode_auc_by_bucket_updated.tex
+├── code-analysis
+│   ├── analyze_law_and_frequency.py
+│   ├── analyze_length.py
+│   ├── analyze_naturalness.py
+│   ├── analyze_proportion.py
+│   ├── baselines
+│   │   ├── all_baselines.py
+│   │   ├── detectGPT.py
+│   │   ├── entropy.py
+│   │   ├── loss.py
+│   │   ├── rank.py
+│   │   ├── sample_generate
+│   │   │   ├── custom_datasets.py
+│   │   │   └── generate.py
+│   │   ├── supervised.py
+│   │   └── utils
+│   │       ├── likelihood.py
+│   │       ├── loadmodel.py
+│   │       ├── preprocessing.py
+│   │       └── run_baseline.py
+│   └── token_tagging.py
+├── code-detection
+│   ├── analyze_by_length.py
+│   ├── analyze_commit_function_input_support_by_repo.py
+│   ├── analyze_commit_function_input_support.py
+│   ├── bak
+│   │   ├── identifier_tagging.py.org
+│   │   ├── main_adapter_v0.1a.py
+│   │   ├── main_adapter_v0.1.py
+│   │   ├── main_adapter_v0.2.py
+│   │   ├── main_adapter_v0.3.py
+│   │   ├── main_adapter_v0.4.py
+│   │   ├── main_adapter_v05.py
+│   │   ├── main_mixedcode_benchmark_v0.1.py
+│   │   ├── main.py.bak_cuda_visible_devices
+│   │   ├── main.py.org
+│   │   ├── main.py.org.may13
+│   │   ├── main.py.org.may14
+│   │   ├── results-2026-0512-0420pm.pdf
+│   │   ├── results-2026-0513-0003am.pdf
+│   │   └── results-2026-0513.pdf
+│   ├── baselines
+│   │   ├── all_baselines.py
+│   │   ├── detectGPT.py
+│   │   ├── entropy.py
+│   │   ├── loss.py
+│   │   ├── __pycache__
+│   │   │   ├── all_baselines.cpython-311.pyc
+│   │   │   ├── detectGPT.cpython-311.pyc
+│   │   │   ├── entropy.cpython-311.pyc
+│   │   │   ├── loss.cpython-311.pyc
+│   │   │   ├── rank.cpython-311.pyc
+│   │   │   └── supervised.cpython-311.pyc
+│   │   ├── rank.py
+│   │   ├── sample_generate
+│   │   │   ├── custom_datasets.py
+│   │   │   └── generate.py
+│   │   ├── supervised.py
+│   │   └── utils
+│   │       ├── likelihood.py
+│   │       ├── loadmodel.py
+│   │       ├── loadmodel.py.bak-gemma-oom
+│   │       ├── loadmodel.py.bak_gptoss
+│   │       ├── loadmodel.py.org
+│   │       ├── preprocessing.py
+│   │       ├── __pycache__
+│   │       │   ├── loadmodel.cpython-311.pyc
+│   │       │   ├── preprocessing.cpython-311.pyc
+│   │       │   ├── run_baseline.cpython-311.pyc
+│   │       │   └── run_baseline.cpython-312.pyc
+│   │       └── run_baseline.py
+│   ├── calibrate_mixedcode_overlap_threshold.py
+│   ├── check_prompt_match.py
+│   ├── evaluate_benchmark.py
+│   ├── identifier_tagging.py
+│   ├── main_adapter.py
+│   ├── main_mixedcode_benchmark_overlap.py
+│   ├── main_mixedcode_benchmark.py
+│   ├── main.py
+│   ├── npr_overlap_core.py
+│   ├── plot_threshold_multi_llms.py
+│   ├── plot_threshold_sweep.py
+│   ├── prepare_input_commit_func.py
+│   ├── __pycache__
+│   │   ├── evaluate_benchmark.cpython-311.pyc
+│   │   ├── identifier_tagging.cpython-311.pyc
+│   │   └── main.cpython-311.pyc
+│   ├── recalc_auc_from_npr_csv_v1.py
+│   ├── recalc_auc_from_npr_csv_v2.py
+│   ├── results.pdf
+│   ├── score_commit_function_npr_full.py
+│   ├── score_commit_function_npr.py
+│   ├── score_commit_function_npr-v0.1.py
+│   ├── score_commit_function_npr-v0.2.py
+│   └── view_benchmark_record.py
+├── code_detection -> code-detection
+├── code-download-rawdata
+│   └── download_codesearchnet.py
+├── code-generation
+│   ├── find_validsyntax_mgc.py
+│   ├── generate.py
+│   └── testing
+│       └── test_truncate.py
+├── code-selection
+│   ├── analyze_func_size.py
+│   ├── bak
+│   │   └── generate_mixedcode_benchmark_v0.1.py
+│   ├── create_filtered_outputs.py
+│   ├── generate_benchmark.py
+│   ├── generate_mixedcode_benchmark.py
+│   ├── mixedcode_benchmarks
+│   │   ├── codellama-7b
+│   │   │   ├── manifest.csv
+│   │   │   ├── manifest_only_160_new1.csv
+│   │   │   ├── manifest_only_170_new1.csv
+│   │   │   ├── manifest_only_200_new1.csv
+│   │   │   ├── manifest_only_200_new2.csv
+│   │   │   ├── type01_110
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type02_120
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type03_130
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type04_140
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type05_150
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type06_160
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type07_170
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type08_180
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type09_190
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   └── type10_200
+│   │   │       ├── mixed_code_001.json
+│   │   │       ├── mixed_code_001.py
+│   │   │       ├── mixed_code_002.json
+│   │   │       ├── mixed_code_002.py
+│   │   │       ├── mixed_code_003.json
+│   │   │       ├── mixed_code_003.py
+│   │   │       ├── mixed_code_004.json
+│   │   │       ├── mixed_code_004.py
+│   │   │       ├── mixed_code_005.json
+│   │   │       └── mixed_code_005.py
+│   │   ├── gpt-oss
+│   │   │   ├── manifest.csv
+│   │   │   ├── type01_110
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type02_120
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type03_130
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type04_140
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type05_150
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type06_160
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type07_170
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type08_180
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type09_190
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   └── type10_200
+│   │   │       ├── mixed_code_001.json
+│   │   │       ├── mixed_code_001.py
+│   │   │       ├── mixed_code_002.json
+│   │   │       ├── mixed_code_002.py
+│   │   │       ├── mixed_code_003.json
+│   │   │       ├── mixed_code_003.py
+│   │   │       ├── mixed_code_004.json
+│   │   │       ├── mixed_code_004.py
+│   │   │       ├── mixed_code_005.json
+│   │   │       └── mixed_code_005.py
+│   │   ├── starcoder2-15b-instruct-v0.1
+│   │   │   ├── manifest.csv
+│   │   │   ├── manifest_only_190_new1.csv
+│   │   │   ├── type01_110
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type02_120
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type03_130
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type04_140
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type05_150
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type06_160
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type07_170
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type08_180
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   ├── type09_190
+│   │   │   │   ├── mixed_code_001.json
+│   │   │   │   ├── mixed_code_001.py
+│   │   │   │   ├── mixed_code_002.json
+│   │   │   │   ├── mixed_code_002.py
+│   │   │   │   ├── mixed_code_003.json
+│   │   │   │   ├── mixed_code_003.py
+│   │   │   │   ├── mixed_code_004.json
+│   │   │   │   ├── mixed_code_004.py
+│   │   │   │   ├── mixed_code_005.json
+│   │   │   │   └── mixed_code_005.py
+│   │   │   └── type10_200
+│   │   │       ├── mixed_code_001.json
+│   │   │       ├── mixed_code_001.py
+│   │   │       ├── mixed_code_002.json
+│   │   │       ├── mixed_code_002.py
+│   │   │       ├── mixed_code_003.json
+│   │   │       ├── mixed_code_003.py
+│   │   │       ├── mixed_code_004.json
+│   │   │       ├── mixed_code_004.py
+│   │   │       ├── mixed_code_005.json
+│   │   │       └── mixed_code_005.py
+│   │   └── starcoder2-7b
+│   │       ├── manifest.csv
+│   │       ├── type01_110
+│   │       │   ├── mixed_code_001.json
+│   │       │   ├── mixed_code_001.py
+│   │       │   ├── mixed_code_002.json
+│   │       │   ├── mixed_code_002.py
+│   │       │   ├── mixed_code_003.json
+│   │       │   ├── mixed_code_003.py
+│   │       │   ├── mixed_code_004.json
+│   │       │   ├── mixed_code_004.py
+│   │       │   ├── mixed_code_005.json
+│   │       │   └── mixed_code_005.py
+│   │       ├── type02_120
+│   │       │   ├── mixed_code_001.json
+│   │       │   ├── mixed_code_001.py
+│   │       │   ├── mixed_code_002.json
+│   │       │   ├── mixed_code_002.py
+│   │       │   ├── mixed_code_003.json
+│   │       │   ├── mixed_code_003.py
+│   │       │   ├── mixed_code_004.json
+│   │       │   ├── mixed_code_004.py
+│   │       │   ├── mixed_code_005.json
+│   │       │   └── mixed_code_005.py
+│   │       ├── type03_130
+│   │       │   ├── mixed_code_001.json
+│   │       │   ├── mixed_code_001.py
+│   │       │   ├── mixed_code_002.json
+│   │       │   ├── mixed_code_002.py
+│   │       │   ├── mixed_code_003.json
+│   │       │   ├── mixed_code_003.py
+│   │       │   ├── mixed_code_004.json
+│   │       │   ├── mixed_code_004.py
+│   │       │   ├── mixed_code_005.json
+│   │       │   └── mixed_code_005.py
+│   │       ├── type04_140
+│   │       │   ├── mixed_code_001.json
+│   │       │   ├── mixed_code_001.py
+│   │       │   ├── mixed_code_002.json
+│   │       │   ├── mixed_code_002.py
+│   │       │   ├── mixed_code_003.json
+│   │       │   ├── mixed_code_003.py
+│   │       │   ├── mixed_code_004.json
+│   │       │   ├── mixed_code_004.py
+│   │       │   ├── mixed_code_005.json
+│   │       │   └── mixed_code_005.py
+│   │       ├── type05_150
+│   │       │   ├── mixed_code_001.json
+│   │       │   ├── mixed_code_001.py
+│   │       │   ├── mixed_code_002.json
+│   │       │   ├── mixed_code_002.py
+│   │       │   ├── mixed_code_003.json
+│   │       │   ├── mixed_code_003.py
+│   │       │   ├── mixed_code_004.json
+│   │       │   ├── mixed_code_004.py
+│   │       │   ├── mixed_code_005.json
+│   │       │   └── mixed_code_005.py
+│   │       ├── type06_160
+│   │       │   ├── mixed_code_001.json
+│   │       │   ├── mixed_code_001.py
+│   │       │   ├── mixed_code_002.json
+│   │       │   ├── mixed_code_002.py
+│   │       │   ├── mixed_code_003.json
+│   │       │   ├── mixed_code_003.py
+│   │       │   ├── mixed_code_004.json
+│   │       │   ├── mixed_code_004.py
+│   │       │   ├── mixed_code_005.json
+│   │       │   └── mixed_code_005.py
+│   │       ├── type07_170
+│   │       │   ├── mixed_code_001.json
+│   │       │   ├── mixed_code_001.py
+│   │       │   ├── mixed_code_002.json
+│   │       │   ├── mixed_code_002.py
+│   │       │   ├── mixed_code_003.json
+│   │       │   ├── mixed_code_003.py
+│   │       │   ├── mixed_code_004.json
+│   │       │   ├── mixed_code_004.py
+│   │       │   ├── mixed_code_005.json
+│   │       │   └── mixed_code_005.py
+│   │       ├── type08_180
+│   │       │   ├── mixed_code_001.json
+│   │       │   ├── mixed_code_001.py
+│   │       │   ├── mixed_code_002.json
+│   │       │   ├── mixed_code_002.py
+│   │       │   ├── mixed_code_003.json
+│   │       │   ├── mixed_code_003.py
+│   │       │   ├── mixed_code_004.json
+│   │       │   ├── mixed_code_004.py
+│   │       │   ├── mixed_code_005.json
+│   │       │   └── mixed_code_005.py
+│   │       ├── type09_190
+│   │       │   ├── mixed_code_001.json
+│   │       │   ├── mixed_code_001.py
+│   │       │   ├── mixed_code_002.json
+│   │       │   ├── mixed_code_002.py
+│   │       │   ├── mixed_code_003.json
+│   │       │   ├── mixed_code_003.py
+│   │       │   ├── mixed_code_004.json
+│   │       │   ├── mixed_code_004.py
+│   │       │   ├── mixed_code_005.json
+│   │       │   └── mixed_code_005.py
+│   │       └── type10_200
+│   │           ├── mixed_code_001.json
+│   │           ├── mixed_code_001.py
+│   │           ├── mixed_code_002.json
+│   │           ├── mixed_code_002.py
+│   │           ├── mixed_code_003.json
+│   │           ├── mixed_code_003.py
+│   │           ├── mixed_code_004.json
+│   │           ├── mixed_code_004.py
+│   │           ├── mixed_code_005.json
+│   │           └── mixed_code_005.py
+│   └── size_analysis
+│       └── starcoder2-7b
+│           ├── func_size_bucket_counts.csv
+│           ├── func_size_pairs.csv
+│           ├── func_size_rows.csv
+│           └── func_size_summary.txt
+├── conda_env_settings
+│   ├── detectcodegpt_conda_explicit.txt
+│   ├── detectcodegpt_conda_list.txt
+│   ├── detectcodegpt_environment.yml
+│   └── detectcodegpt_pip_freeze.txt
+├── data
+│   └── CodeSearchNet
+│       └── python
+│           └── train.jsonl
+├── detect_code_gpt.code-workspace
+├── error-selab2.txt
+├── etc2
+│   ├── 2025 ICSE Between Lines of Code- Unraveling the Distinct Patterns of Machine and Human Programmers.pdf
+│   ├── detectcodegpt_env_snapshot.yml
+│   ├── detectcodegpt_pip_snapshot.txt
+│   ├── err_saved.txt
+│   ├── LICENSE
+│   ├── README-org.md
+│   ├── requirements_org.txt
+│   ├── run2a-detect-dryrun.sh
+│   ├── run2b-detect-dryrun.sh
+│   ├── summary-0608-1530pm.md
+│   ├── summary-all-may12-14.md
+│   ├── summary-may12-0100am.md
+│   ├── summary-may12-1309pm.md
+│   ├── summary-may12-1600pm.md
+│   ├── summary-may12-1615pm.md
+│   ├── summary-may13-0100am.md
+│   ├── summary-may13-1430pm.md
+│   ├── summary-may14-0030am.md
+│   ├── summary-may14-0100am.md
+│   ├── summary-may14-1150pm.md
+│   ├── summary-may15-0100am.md
+│   ├── summary-may15-1100am.md
+│   └── summary-may15-1630pm.md
+├── event_ids_treatment_stress.csv
+├── git-proc.sh
+├── logs
+│   ├── 2026
+│   │   ├── 05-13
+│   │   │   ├── detection_codellama-7b-hf_csn_t02_n500_run_05-13_01:08.log
+│   │   │   └── detection_codellama-7b-hf_csn_t02_n500_run_05-13_01:09.log
+│   │   ├── 05-15
+│   │   │   └── 2321pm
+│   │   │       └── benchmark_results_benchmark_level1_codellama-7b-hf.csv
+│   │   ├── 05-16
+│   │   │   ├── detection_starcoder2-7b_csn_t02_n10_smoke_05-16_21:12.log
+│   │   │   ├── detection_starcoder2-7b_csn_t02_n2000_run_05-16_21:33.log
+│   │   │   ├── detection_starcoder2-7b_csn_t02_n50_smoke_05-16_21:24.log
+│   │   │   ├── detection_starcoder2-7b_csn_t02_n50_smoke_05-16_21:26.log
+│   │   │   └── generate_starcoder2-7b_csn_t02_n2000.log
+│   │   ├── 05-17
+│   │   │   ├── benchmark_level1_starcoder2-7b_05-17_23:13.log
+│   │   │   ├── detection_starcoder2-7b_csn_t02_n2000_run_05-17_09:50.log
+│   │   │   ├── detection_starcoder2-7b_csn_t02_n3000_run_05-17_09:53.log
+│   │   │   ├── detection_starcoder2-7b_csn_t02_n3000_run_05-17_11:01.log
+│   │   │   └── generate_benchmark_level1_05-17_16:36.log
+│   │   ├── 05-18
+│   │   │   └── fig1_threshold_per_llm.png
+│   │   ├── 05-20
+│   │   │   └── generate_starcoder2-7b_csn_t02_n3000.log
+│   │   ├── 06-03
+│   │   │   ├── main_adapter_06-03_19:35.log
+│   │   │   ├── main_adapter_06-03_19:37.log
+│   │   │   ├── main_adapter_06-03_19:40.log
+│   │   │   └── main_adapter_06-03_19:47.log
+│   │   ├── 06-04
+│   │   │   ├── main_adapter_06-04_23:05.log
+│   │   │   ├── main_adapter_06-04_23:20.log
+│   │   │   └── main_adapter_06-04_23:22.log
+│   │   └── 06-05
+│   │       ├── main_adapter_06-05_00:04.log
+│   │       ├── main_adapter_06-05_00:09.log
+│   │       ├── main_adapter_06-05_00:13.log
+│   │       ├── main_adapter_06-05_00:15.log
+│   │       ├── main_adapter_06-05_00:29.log
+│   │       ├── main_adapter_06-05_00:31.log
+│   │       ├── main_adapter_06-05_00:37.log
+│   │       └── main_adapter_06-05_01:02.log
+│   ├── bak
+│   │   ├── may13-16pm-npr_scores_codellama-7b-hf_csn_t02_n2000_run
+│   │   │   └── npr_scores_codellama-7b-hf_csn_t02_n2000_run.csv
+│   │   ├── npr_chunks_main_adapter_codellama-7b_4500_n5.csv
+│   │   ├── npr_chunks_main_adapter_gpt-oss_4500_refreshed_n50.csv
+│   │   ├── npr_chunks_main_adapter_gpt-oss_4500_refreshed_n5.csv
+│   │   ├── npr_chunks_main_adapter_starcoder2-15b-instruct-v0.1_4500_n5.csv
+│   │   ├── npr_chunks_main_adapter_starcoder2-7b_4500_n100.csv
+│   │   ├── npr_chunks_main_adapter_starcoder2-7b_4500_n5.csv
+│   │   ├── npr_chunks_main_adapter_starcoder2-7b_4500_refreshed_n200.csv
+│   │   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_codellama-7b_smoke.csv
+│   │   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_gpt-oss_smoke.csv
+│   │   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_smoke.csv
+│   │   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-7b_smoke.csv
+│   │   ├── npr_scores_codellama-7b-hf_csn_t02_n2000_run.csv
+│   │   ├── npr_scores_main_adapter_codellama-7b_4500_n5.csv
+│   │   ├── npr_scores_main_adapter_gpt-oss_4500_refreshed_n50.csv
+│   │   ├── npr_scores_main_adapter_gpt-oss_4500_refreshed_n5.csv
+│   │   ├── npr_scores_main_adapter_starcoder2-15b-instruct-v0.1_4500_n5.csv
+│   │   ├── npr_scores_main_adapter_starcoder2-7b_4500_n100.csv
+│   │   ├── npr_scores_main_adapter_starcoder2-7b_4500_n5.csv
+│   │   ├── npr_scores_main_adapter_starcoder2-7b_4500_refreshed_n200.csv
+│   │   ├── npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_smoke_bucket_summary.csv
+│   │   ├── npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_smoke.csv
+│   │   ├── npr_scores_main_mixedcode_benchmark_mixedcode_gpt-oss_smoke_bucket_summary.csv
+│   │   ├── npr_scores_main_mixedcode_benchmark_mixedcode_gpt-oss_smoke.csv
+│   │   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_smoke_bucket_summary.csv
+│   │   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_smoke.csv
+│   │   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_smoke_bucket_summary.csv
+│   │   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_smoke.csv
+│   │   ├── npr_scores_main_v2_codellama-7b_4500_n3.csv
+│   │   ├── npr_scores_main_v2_starcoder2_4500_n100.csv
+│   │   └── npr_scores_starcoder2-7b_csn_t02_n50_smoke.csv
+│   ├── benchmark_results_benchmark_level1_codellama-7b-hf.csv
+│   ├── benchmark_results_benchmark_level1_starcoder2-7b.csv
+│   ├── benchmark_results_benchmark_level1_starcoder2-7b.pkl
+│   ├── csv
+│   │   ├── npr_chunks_main_adapter_gpt-oss_4500_refreshed_n50.csv
+│   │   ├── npr_chunks_main_adapter_gpt-oss_4500_refreshed_n5.csv
+│   │   ├── npr_chunks_main_adapter_starcoder2-7b_4500_n100.csv
+│   │   ├── npr_chunks_main_adapter_starcoder2-7b_4500_n5.csv
+│   │   ├── npr_chunks_main_adapter_starcoder2-7b_4500_refreshed_n200.csv
+│   │   ├── npr_scores_main_adapter_gpt-oss_4500_refreshed_n50.csv
+│   │   ├── npr_scores_main_adapter_gpt-oss_4500_refreshed_n5.csv
+│   │   ├── npr_scores_main_adapter_starcoder2-7b_4500_n100.csv
+│   │   ├── npr_scores_main_adapter_starcoder2-7b_4500_n5.csv
+│   │   ├── npr_scores_main_adapter_starcoder2-7b_4500_refreshed_n200.csv
+│   │   ├── npr_scores_main_v2_codellama-7b_4500_n3.csv
+│   │   └── npr_scores_main_v2_starcoder2_4500_n100.csv
+│   ├── detection_codellama_csn_t02_scaled
+│   │   └── log-2026-0512-1640pm.txt
+│   ├── fig
+│   │   ├── preci_recall.png
+│   │   ├── threshold_f1.png
+│   │   ├── threshold_preci.png
+│   │   ├── threshold_recall.png
+│   │   ├── threshold_sweep_codellama-7b-hf.png
+│   │   ├── threshold_sweep.png
+│   │   └── threshold_sweep_starcoder2-7b.png
+│   ├── fig1
+│   │   ├── preci_recall.png
+│   │   ├── threshold_f1.png
+│   │   ├── threshold_preci.png
+│   │   └── threshold_recall.png
+│   ├── generate_mixedcode_starcoder2-15b-instruct-v0.1_06-07_14-48.log
+│   ├── generate_mixedcode_starcoder2-7b_06-06_23-30.log
+│   ├── generate_mixedcode_starcoder2-7b_06-06_23-35.log
+│   ├── generate_mixedcode_starcoder2-7b_06-06_23-43.log
+│   ├── generate_mixedcode_starcoder2-7b_06-06_23-44.log
+│   ├── generate_mixedcode_starcoder2-7b_06-06_23-48.log
+│   ├── main_adapter_06-05_01:04.log
+│   ├── main_adapter_gemma_4500_complexity_refreshed_06-08_1459.log
+│   ├── main_adapter_gemma_4500_complexity_refreshed_06-08_1529.log
+│   ├── main_adapter_gemma_4500_complexity_refreshed_06-08_1532.log
+│   ├── mixedcode_gpt-oss_06-07_12-48.log
+│   ├── mixedcode_gpt-oss_count_only_06-07_12-37.log
+│   ├── mixedcode_gpt-oss_count_only_06-07_12-38.log
+│   ├── mixedcode_gpt-oss_count_only_06-07_12-45.log
+│   ├── mixedcode_starcoder2-15b-instruct-v0.1_06-07_14-53.log
+│   ├── mixedcode_starcoder2-15b-instruct-v0.1_06-07_14-54.log
+│   ├── mixedcode_starcoder2-15b-instruct-v0.1_06-07_14-56.log
+│   ├── mixedcode_starcoder2-7b_count_only_06-06_23:56.log
+│   ├── mixedcode_starcoder2-7b_count_only_06-06_23:58.log
+│   ├── mixedcode_starcoder2-7b_count_only_06-07_00-02.log
+│   ├── npr_chunks_main_adapter_codellama-7b_4500.csv
+│   ├── npr_chunks_main_adapter_gemma_4500_complexity_refreshed.csv
+│   ├── npr_chunks_main_adapter_gpt-oss_4500_refreshed.csv
+│   ├── npr_chunks_main_adapter_main_adapter.csv
+│   ├── npr_chunks_main_adapter_starcoder2-15b-instruct-v0.1_4500.csv
+│   ├── npr_chunks_main_adapter_starcoder2-7b_4500.csv
+│   ├── npr_chunks_main_adapter_starcoder2-7b_4500_refreshed.csv
+│   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_benchmark.csv
+│   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_codellama-7b_50files.csv
+│   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_codellama-7b_type10_200_merged.csv
+│   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_gpt-oss_50files.csv
+│   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-bak1.csv
+│   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files.csv
+│   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-new1.csv
+│   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files.csv
+│   ├── npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files-recheck-v1.csv
+│   ├── npr_scores_main_adapter_codellama-7b_4500.csv
+│   ├── npr_scores_main_adapter_gemma_4500_complexity_refreshed.csv
+│   ├── npr_scores_main_adapter_gpt-oss_4500_refreshed.csv
+│   ├── npr_scores_main_adapter_main_adapter.csv
+│   ├── npr_scores_main_adapter_starcoder2-15b-instruct-v0.1_4500.csv
+│   ├── npr_scores_main_adapter_starcoder2-7b_4500.csv
+│   ├── npr_scores_main_adapter_starcoder2-7b_4500_refreshed.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_benchmark_bucket_summary.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_benchmark.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_50files_bucket_summary.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_50files.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_type10_200_merged_bucket_summary.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_type10_200_merged.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_gpt-oss_50files_bucket_summary.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_gpt-oss_50files.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-bak1.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files_bucket_summary-bak1.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files_bucket_summary.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-new1_bucket_summary.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-new1.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files_bucket_summary.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files-recheck-v1_bucket_summary.csv
+│   ├── npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files-recheck-v1.csv
+│   ├── npr_scores_main_v2_codellama-7b_4500.csv
+│   ├── npr_scores_main_v2_starcoder2-7b_4500.csv
+│   ├── npr_scores_starcoder2-7b_csn_t02_n3000_run.csv
+│   ├── results_cache_main_adapter_gemma_4500_complexity_refreshed.pkl
+│   ├── results_cache_main_adapter_gpt-oss_4500_refreshed.pkl
+│   ├── results_cache_main_mixedcode_benchmark_mixedcode_gpt-oss_50files.pkl
+│   ├── results_cache_main_mixedcode_benchmark_mixedcode_gpt-oss_smoke.pkl
+│   ├── results_cache_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files.pkl
+│   ├── results_cache_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_smoke.pkl
+│   ├── results_cache_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files.pkl
+│   ├── results_cache_main_mixedcode_benchmark_mixedcode_starcoder2-7b_smoke.pkl
+│   ├── results_cache_main_v2_codellama-7b_4500.pkl
+│   ├── results_cache_starcoder2-7b_csn_t02_n3000_run.pkl
+│   ├── threshold_sweep_codellama-7b-hf.png
+│   └── threshold_sweep_starcoder2-7b.png
+├── output
+│   └── CodeSearchNet
+│       ├── CodeLlama-7b-hf-2000-tp0.2
+│       │   ├── outputs_530_benchmark_level1.jsonl
+│       │   ├── outputs_530_filter.jsonl
+│       │   ├── outputs.txt
+│       │   └── outputs_v2.txt
+│       ├── CodeLlama-7b-hf-500-tp0.2
+│       │   ├── outputs.txt
+│       │   └── outputs_v2.txt
+│       ├── starcoder2-7b-2000-tp0.2
+│       │   ├── outputs-10samples.txt
+│       │   ├── outputs-50samples.txt
+│       │   ├── outputs.txt
+│       │   └── outputs_v2.txt
+│       └── starcoder2-7b-3000-tp0.2
+│           ├── invalid_mgc.jsonl
+│           ├── invalid_mgc_salvaged.jsonl
+│           ├── outputs-512token.txt
+│           ├── outputs_638_benchmark_level1.jsonl
+│           ├── outputs_638_filter.jsonl
+│           ├── outputs.txt
+│           ├── outputs_v2-512token.txt
+│           ├── outputs_v2.txt
+│           ├── syntax_checker.py
+│           ├── valid_mgc.jsonl
+│           └── valid_mgc_salvaged.jsonl
+├── proc_sh
+│   ├── run-1a-prepare-input-commit-func.sh
+│   ├── run-1b2-analyze-commit-func-input-support-by-repo.sh
+│   ├── run-1b-analyze-commit-func-input-support.sh
+│   ├── run-1c0a-score-mixedcode-overlap-benchmark.sh
+│   ├── run-1c0b-calibrate-mixedcode-overlap-threshold.sh
+│   ├── run-1c-score-commit-func-npr.sh
+│   ├── run-1c-score-commit-func-npr-v0.1.sh
+│   ├── run-1c-score-commit-func-npr-v0.2.sh
+│   └── run-1d-score-commit-func-npr-full.sh
+├── README.md
+├── requirements.txt
+├── run1-generate.sh
+├── run2a-recalc-auc-npr-csv.sh
+├── run2-detect.sh
+├── run3-interactive-mac.sh
+├── run3-interactive.sh
+├── run3-interactive-simple.sh
+├── run4-selection.sh
+├── run5b-gen-benchmark2.sh
+├── run5b-gen-benchmark3.sh
+├── run5b-gen-benchmark4.sh
+├── run5b-gen-benchmark.sh
+├── run5-gen-benchmark.sh
+├── run6-batch-benchmark.sh
+├── run6b-batch-benchmark2.sh
+├── run6b-batch-benchmark3.sh
+├── run6b-batch-benchmark4.sh
+├── run6b-batch-benchmark.sh
+├── run7a-plot-threshold-multi-llms.sh
+├── run7c-plot-mixedcode-result.sh
+├── run7-plot-threshold-sweep.sh
+├── runmain_adapter_1.sh
+├── runmain_adapter_2.sh
+├── runmain_adapter_3.sh
+├── runmain_adapter_4.sh
+├── runmain_adapter_5.sh
+├── runmain-adapter-all-1.sh
+├── runmain-adapter-all-2.sh
+├── run-view-record.sh
+├── sample-inter.txt
+├── tmp01
+│   ├── type06_160_bck1
+│   │   ├── mixed_code_001.json
+│   │   ├── mixed_code_001.py
+│   │   ├── mixed_code_002.json
+│   │   ├── mixed_code_002.py
+│   │   ├── mixed_code_003.json
+│   │   ├── mixed_code_003.py
+│   │   ├── mixed_code_004.json
+│   │   ├── mixed_code_004.py
+│   │   ├── mixed_code_005.json
+│   │   └── mixed_code_005.py
+│   ├── type07_170-bak1
+│   │   ├── mixed_code_001.json
+│   │   ├── mixed_code_001.py
+│   │   ├── mixed_code_002.json
+│   │   ├── mixed_code_002.py
+│   │   ├── mixed_code_003.json
+│   │   ├── mixed_code_003.py
+│   │   ├── mixed_code_004.json
+│   │   ├── mixed_code_004.py
+│   │   ├── mixed_code_005.json
+│   │   └── mixed_code_005.py
+│   ├── type09_190-bak1
+│   │   ├── mixed_code_001.json
+│   │   ├── mixed_code_001.py
+│   │   ├── mixed_code_002.json
+│   │   ├── mixed_code_002.py
+│   │   ├── mixed_code_003.json
+│   │   ├── mixed_code_003.py
+│   │   ├── mixed_code_004.json
+│   │   ├── mixed_code_004.py
+│   │   ├── mixed_code_005.json
+│   │   └── mixed_code_005.py
+│   ├── type09_190-bak2
+│   │   ├── mixed_code_001.json
+│   │   ├── mixed_code_001.py
+│   │   ├── mixed_code_002.json
+│   │   ├── mixed_code_002.py
+│   │   ├── mixed_code_003.json
+│   │   ├── mixed_code_003.py
+│   │   ├── mixed_code_004.json
+│   │   ├── mixed_code_004.py
+│   │   ├── mixed_code_005.json
+│   │   └── mixed_code_005.py
+│   ├── type09_190-bak3
+│   │   ├── mixed_code_001.json
+│   │   ├── mixed_code_001.py
+│   │   ├── mixed_code_002.json
+│   │   ├── mixed_code_002.py
+│   │   ├── mixed_code_003.json
+│   │   ├── mixed_code_003.py
+│   │   ├── mixed_code_004.json
+│   │   ├── mixed_code_004.py
+│   │   ├── mixed_code_005.json
+│   │   └── mixed_code_005.py
+│   ├── type09_190-bak4
+│   │   ├── mixed_code_001.json
+│   │   ├── mixed_code_001.py
+│   │   ├── mixed_code_002.json
+│   │   ├── mixed_code_002.py
+│   │   ├── mixed_code_003.json
+│   │   ├── mixed_code_003.py
+│   │   ├── mixed_code_004.json
+│   │   ├── mixed_code_004.py
+│   │   ├── mixed_code_005.json
+│   │   └── mixed_code_005.py
+│   ├── type09_190_new1
+│   │   ├── mixed_code_001.json
+│   │   ├── mixed_code_001.py
+│   │   ├── mixed_code_002.json
+│   │   ├── mixed_code_002.py
+│   │   ├── mixed_code_003.json
+│   │   ├── mixed_code_003.py
+│   │   ├── mixed_code_004.json
+│   │   ├── mixed_code_004.py
+│   │   ├── mixed_code_005.json
+│   │   └── mixed_code_005.py
+│   ├── type10_200
+│   │   ├── mixed_code_001.json
+│   │   ├── mixed_code_001.py
+│   │   ├── mixed_code_002.json
+│   │   ├── mixed_code_002.py
+│   │   ├── mixed_code_003.json
+│   │   ├── mixed_code_003.py
+│   │   ├── mixed_code_004.json
+│   │   ├── mixed_code_004.py
+│   │   ├── mixed_code_005.json
+│   │   └── mixed_code_005.py
+│   └── type10_200_bak1
+│       ├── mixed_code_001.json
+│       ├── mixed_code_001.py
+│       ├── mixed_code_002.json
+│       ├── mixed_code_002.py
+│       ├── mixed_code_003.json
+│       ├── mixed_code_003.py
+│       ├── mixed_code_004.json
+│       ├── mixed_code_004.py
+│       ├── mixed_code_005.json
+│       └── mixed_code_005.py
+├── workspace-structure-detect-code-gpt-workspace-jul24-r158.txt
+├── workspace-structure-detect-code-gpt-workspace-jul24.txt
+├── xrun.sh
+├── ya-note.log
+└── ylog.txt
+
+116 directories, 904 files
