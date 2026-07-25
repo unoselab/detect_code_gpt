@@ -16,5 +16,5 @@ else
     echo "Nothing to commit."
 fi
 
-git pull --rebase origin main
+git pull
 git push
