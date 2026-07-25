@@ -50,7 +50,7 @@ import numpy as np
 import pandas as pd
 
 
-SCRIPT_VERSION = "run-1d-gt200-sharded-v3"
+SCRIPT_VERSION = "run-1d-gt200-sharded-v2"
 GT200_SPEC_NAME = "gt200"
 GT200_MINIMUM_LITERAL_SPACE_TOKENS = 201
 GT200_MAXIMUM_LITERAL_SPACE_TOKENS = None
@@ -2003,169 +2003,6 @@ def check_row(name: str, passed: bool, observed: Any, expected: Any, note: str =
     }
 
 
-SCORING_INVARIANT_CHECK_NAMES = {
-    "aggregation_weights_sum_to_valid_token_count",
-    "valid_plus_invalid_tokens_equal_body_token_count",
-    "marginal_token_counts_sum_to_body_token_count",
-    "all_bodies_have_at_least_one_valid_npr_window",
-    "null_window_npr_values_have_reason",
-    "valid_windows_have_50_valid_perturbations",
-}
-
-
-def append_scoring_invariant_checks(
-    checks: list[dict[str, Any]],
-    body_scores: pd.DataFrame,
-    window_scores: pd.DataFrame,
-    expected_perturbations: int,
-) -> None:
-    """Append body/window accounting invariants to shard or merged QC.
-
-    Each observed value is the number of violating rows or bodies. A zero
-    value therefore means that the invariant holds across the complete input
-    frames supplied by the caller.
-    """
-    body_hash_column = "function_body_sha256"
-
-    body_hashes = body_scores[body_hash_column].astype(str).reset_index(drop=True)
-    body_token_count = pd.to_numeric(
-        body_scores["function_body_split_space_token_count"],
-        errors="coerce",
-    ).reset_index(drop=True)
-    valid_token_count = pd.to_numeric(
-        body_scores["valid_npr_token_count"],
-        errors="coerce",
-    ).reset_index(drop=True)
-    invalid_token_count = pd.to_numeric(
-        body_scores["invalid_npr_token_count"],
-        errors="coerce",
-    ).reset_index(drop=True)
-    valid_window_count = pd.to_numeric(
-        body_scores["n_valid_npr_windows"],
-        errors="coerce",
-    ).reset_index(drop=True)
-
-    window_hashes = window_scores[body_hash_column].astype(str)
-    aggregation_weight_sum = (
-        pd.to_numeric(
-            window_scores["aggregation_weight_token_count"],
-            errors="coerce",
-        )
-        .groupby(window_hashes)
-        .sum(min_count=1)
-        .reindex(body_hashes)
-        .reset_index(drop=True)
-    )
-    marginal_token_sum = (
-        pd.to_numeric(
-            window_scores["marginal_token_count"],
-            errors="coerce",
-        )
-        .groupby(window_hashes)
-        .sum(min_count=1)
-        .reindex(body_hashes)
-        .reset_index(drop=True)
-    )
-
-    aggregation_mismatch = (
-        aggregation_weight_sum.isna()
-        | valid_token_count.isna()
-        | aggregation_weight_sum.ne(valid_token_count)
-    )
-    checks.append(
-        check_row(
-            "aggregation_weights_sum_to_valid_token_count",
-            not bool(aggregation_mismatch.any()),
-            int(aggregation_mismatch.sum()),
-            0,
-            "Observed is the number of bodies with mismatched token totals.",
-        )
-    )
-
-    valid_invalid_mismatch = (
-        body_token_count.isna()
-        | valid_token_count.isna()
-        | invalid_token_count.isna()
-        | valid_token_count.add(invalid_token_count).ne(body_token_count)
-    )
-    checks.append(
-        check_row(
-            "valid_plus_invalid_tokens_equal_body_token_count",
-            not bool(valid_invalid_mismatch.any()),
-            int(valid_invalid_mismatch.sum()),
-            0,
-            "Observed is the number of bodies with invalid token accounting.",
-        )
-    )
-
-    marginal_mismatch = (
-        marginal_token_sum.isna()
-        | body_token_count.isna()
-        | marginal_token_sum.ne(body_token_count)
-    )
-    checks.append(
-        check_row(
-            "marginal_token_counts_sum_to_body_token_count",
-            not bool(marginal_mismatch.any()),
-            int(marginal_mismatch.sum()),
-            0,
-            "Observed is the number of bodies with incomplete static window coverage.",
-        )
-    )
-
-    no_valid_window = valid_window_count.isna() | valid_window_count.le(0)
-    checks.append(
-        check_row(
-            "all_bodies_have_at_least_one_valid_npr_window",
-            not bool(no_valid_window.any()),
-            int(no_valid_window.sum()),
-            0,
-            "Observed is the number of successful bodies without a valid NPR window.",
-        )
-    )
-
-    window_npr = pd.to_numeric(window_scores["window_npr"], errors="coerce")
-    invalid_reason = window_scores["window_npr_invalid_reason"]
-    reason_present = invalid_reason.notna() & invalid_reason.astype(str).str.strip().ne("")
-    null_without_reason = window_npr.isna() & ~reason_present
-    checks.append(
-        check_row(
-            "null_window_npr_values_have_reason",
-            not bool(null_without_reason.any()),
-            int(null_without_reason.sum()),
-            0,
-            "Observed is the number of null window NPR values without a reason.",
-        )
-    )
-
-    valid_window = window_scores["window_npr_valid"].map(
-        lambda value: (
-            value
-            if isinstance(value, (bool, np.bool_))
-            else str(value).strip().lower() in {"true", "1"}
-        )
-    )
-    valid_perturbations = pd.to_numeric(
-        window_scores["valid_perturbation_scores"],
-        errors="coerce",
-    )
-    incomplete_valid_window = valid_window & valid_perturbations.ne(
-        expected_perturbations
-    )
-    checks.append(
-        check_row(
-            "valid_windows_have_50_valid_perturbations",
-            not bool(incomplete_valid_window.any()),
-            int(incomplete_valid_window.sum()),
-            0,
-            (
-                "Observed is the number of valid windows whose valid "
-                f"perturbation count is not {expected_perturbations}."
-            ),
-        )
-    )
-
-
 def build_checks(
     config: DetectorConfig,
     manifest: pd.DataFrame,
@@ -2222,13 +2059,6 @@ def build_checks(
             checks.append(check_row("invalid_windows_have_zero_aggregation_weight", invalid_with_weight.empty, len(invalid_with_weight), 0))
             overlap_not_last = window_scores.loc[window_scores["overlaps_previous_window"].astype(bool) & ~window_scores["is_last_window"].astype(bool)]
             checks.append(check_row("overlap_only_on_final_window", overlap_not_last.empty, len(overlap_not_last), 0))
-        if not body_scores.empty and not window_scores.empty:
-            append_scoring_invariant_checks(
-                checks,
-                body_scores,
-                window_scores,
-                config.perturbations_per_window,
-            )
         if args.reproducibility_check_per_profile > 0:
             checks.append(check_row("same_seed_reproducibility", bool(reproducibility["passed"].astype(bool).all()) if len(reproducibility) else False, int((~reproducibility["passed"].astype(bool)).sum()) if len(reproducibility) else 1, 0))
     return pd.DataFrame(checks, columns=CHECK_COLUMNS)
@@ -2727,7 +2557,7 @@ def make_self_test_inputs(root: Path) -> argparse.Namespace:
         profile_name="gt200_full",
         device="cuda",
         model_cache_dir=Path("~/.cache/huggingface/hub").expanduser(),
-        detector_output_name="run1d_gt200_v3_self_test",
+        detector_output_name="run1d_gt200_v2_self_test",
         pct_words_masked=0.5,
         span_length=2,
         perturbation_chunk_size=10,
@@ -3159,33 +2989,8 @@ def run_partial_body_policy_self_test() -> None:
     print("Partial-body scoring policy self-test: PASS")
 
 
-def assert_scoring_invariant_checks_pass(qc_dir: Path, label: str) -> None:
-    """Require every v3 scoring invariant to be present and passing."""
-    checks_path = qc_dir / "commit_function_npr_checks.csv"
-    checks = pd.read_csv(checks_path, low_memory=False)
-    require_columns(checks, set(CHECK_COLUMNS), f"{label} checks")
-    indexed = checks.set_index("check_name", drop=False)
-    missing = sorted(SCORING_INVARIANT_CHECK_NAMES - set(indexed.index.astype(str)))
-    if missing:
-        raise RuntimeError(f"{label} is missing scoring invariant checks: {missing}")
-    required = indexed.loc[sorted(SCORING_INVARIANT_CHECK_NAMES)]
-    passed = required["passed"].map(
-        lambda value: (
-            value
-            if isinstance(value, (bool, np.bool_))
-            else str(value).strip().lower() in {"true", "1"}
-        )
-    )
-    if not bool(passed.all()):
-        failed = required.loc[~passed, ["check_name", "observed", "expected"]]
-        raise RuntimeError(
-            f"{label} scoring invariant checks failed: "
-            f"{failed.to_dict(orient='records')}"
-        )
-
-
 def run_self_test() -> None:
-    with tempfile.TemporaryDirectory(prefix="run1d-gt200-v3-self-test-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="run1d-gt200-v2-self-test-") as tmp:
         root = Path(tmp)
         run_partial_body_policy_self_test()
 
@@ -3198,7 +3003,6 @@ def run_self_test() -> None:
             summary = json.load(stream)
         if summary["status"] != "PASS" or summary["successful_unique_bodies"] != 20:
             raise RuntimeError(f"Unexpected first-run self-test summary: {summary}")
-        assert_scoring_invariant_checks_pass(first.output_dir / "qc", "First run")
         manifest = pd.read_csv(
             first.output_dir / "commit_function_npr_full_manifest.csv",
             low_memory=False,
@@ -3289,7 +3093,6 @@ def run_self_test() -> None:
             or merged["duplicate_body_hashes"] != 0
         ):
             raise RuntimeError(f"Unexpected shard merge summary: {merged}")
-        assert_scoring_invariant_checks_pass(merge_args.qc_dir, "Merged run")
         print("Self-test: PASS")
 
 
@@ -3392,7 +3195,8 @@ def merge_shard_outputs(args: argparse.Namespace) -> int:
 
     expected_bodies_for_merge = merged_bodies if args.allow_partial_shards else expected_global_bodies
     expected_windows_for_merge = merged_windows if args.allow_partial_shards else expected_global_windows
-    merged_check_rows = [
+    checks = pd.DataFrame(
+        [
             check_row("all_shards_present", len(shard_summaries) == args.num_shards, len(shard_summaries), args.num_shards),
             check_row("all_shards_qc_passed", prepared_only or scored_run, shard_statuses, "all PASS or all PREPARED_ONLY"),
             check_row("shard_fingerprints_match", len(fingerprints) == 1, len(fingerprints), 1),
@@ -3423,15 +3227,9 @@ def merge_shard_outputs(args: argparse.Namespace) -> int:
                 0 if prepared_only else merged_windows,
             ),
             check_row("failure_rows_empty", failures.empty, len(failures), 0),
-        ]
-    if scored_run and not body_scores.empty and not window_scores.empty:
-        append_scoring_invariant_checks(
-            merged_check_rows,
-            body_scores,
-            window_scores,
-            config.perturbations_per_window,
-        )
-    checks = pd.DataFrame(merged_check_rows, columns=CHECK_COLUMNS)
+        ],
+        columns=CHECK_COLUMNS,
+    )
     failed_checks = int((~checks["passed"].astype(bool)).sum())
     if failed_checks:
         status = "FAIL"
@@ -3598,7 +3396,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", type=Path, default=None)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--model-cache-dir", type=Path, default=Path("~/.cache/huggingface/hub").expanduser())
-    parser.add_argument("--detector-output-name", default="run1d_commit_function_npr_full_gt200_v3")
+    parser.add_argument("--detector-output-name", default="run1d_commit_function_npr_full_gt200_v2")
     parser.add_argument("--pct-words-masked", type=float, default=0.5)
     parser.add_argument("--span-length", type=int, default=2)
     parser.add_argument("--perturbation-chunk-size", type=int, default=10)

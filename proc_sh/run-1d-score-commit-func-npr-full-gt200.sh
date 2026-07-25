@@ -70,8 +70,8 @@
 # PREPARE_ONLY=1 OVERWRITE_OUTPUT=1 RUN_SELF_TEST=1 RUN_RESUME_CHECK=0 bash proc_sh/run-1d-score-commit-func-npr-full-gt200.sh
 # MAX_BODIES_PER_SHARD=1 OVERWRITE_OUTPUT=1 RUN_SELF_TEST=0 RUN_RESUME_CHECK=0 bash proc_sh/run-1d-score-commit-func-npr-full-gt200.sh
 # MAX_BODIES_PER_SHARD=20 OVERWRITE_OUTPUT=1 RUN_SELF_TEST=0 RUN_RESUME_CHECK=0 bash proc_sh/run-1d-score-commit-func-npr-full-gt200.sh
-# 
-# 
+# MAX_BODIES_PER_SHARD=20 OVERWRITE_OUTPUT=0 RUN_SELF_TEST=0 RUN_RESUME_CHECK=1 bash proc_sh/run-1d-score-commit-func-npr-full-gt200.sh
+# OVERWRITE_OUTPUT=1 RUN_SELF_TEST=0 RUN_RESUME_CHECK=1 bash proc_sh/run-1d-score-commit-func-npr-full-gt200.sh
 # 
 
 set -euo pipefail
