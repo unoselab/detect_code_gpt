@@ -3,12 +3,12 @@
 set -euo pipefail
 
 # ============================================================
-# run-x-a01 v1: Prepare raw Python snapshot inputs for NPR
+# run-x-a01 v2: Prepare raw Python snapshot inputs for NPR
 # ============================================================
 #
 # Delivery naming:
-#   proc_sh/run-x-a01-prepare-snapshot-npr-inputs-v1.sh
-#   code-detection/prepare_snapshot_npr_inputs-v1.py
+#   proc_sh/run-x-a01-prepare-snapshot-npr-inputs-v2.sh
+#   code-detection/prepare_snapshot_npr_inputs-v2.py
 #
 # Canonical server naming after removing the version suffix:
 #   proc_sh/run-x-a01-prepare-snapshot-npr-inputs.sh
@@ -30,6 +30,8 @@ set -euo pipefail
 #     line endings within every selected raw-source slice.
 #   - Remove leading module/class/function docstrings from implementation input.
 #   - Keep overlapping nested definitions only as diagnostic_overlap records.
+#   - Propagate diagnostic ancestry through classes nested in compound statements
+#     so descendant methods cannot become primary and double-count source.
 #   - Do not calculate NPR or AGC/HWC labels in A01.
 #
 # Inputs:
@@ -81,7 +83,7 @@ cd "${PROJECT_ROOT}"
 export PROJECT_ROOT
 
 RUN_PREFIX="run-x-a01"
-IMPLEMENTATION_VERSION="v1"
+IMPLEMENTATION_VERSION="v2"
 RUN_LABEL="${RUN_PREFIX}-${IMPLEMENTATION_VERSION}"
 RUN_TS="${RUN_TS:-$(date +%Y%m%d-%H%M%S)}"
 

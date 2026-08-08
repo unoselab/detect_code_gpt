@@ -41,7 +41,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Iterator, Sequence
 
 
-IMPLEMENTATION_VERSION = "v1"
+IMPLEMENTATION_VERSION = "v2"
 FULL_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 DEFINITION_TYPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
 
@@ -568,11 +568,14 @@ def index_source(
                         node=statement,
                     )
                 )
+                # Preserve diagnostic ancestry for classes nested inside compound
+                # statements. A class inside an outer primary module/class block is
+                # diagnostic_overlap, and its methods must not become primary again.
                 walk(
                     statement.body,
                     [*scope_names, statement.name],
                     [*scope_kinds, "class"],
-                    inside_compound=False,
+                    inside_compound=inside_compound,
                 )
             else:
                 for child_body in statement_child_bodies(statement):
@@ -1480,6 +1483,48 @@ def run_self_test() -> None:
     assert any(unit.qualified_name == "f.nested" for unit in diagnostic)
     assert any(unit.qualified_name == "conditional" for unit in diagnostic)
 
+    # Regression test for the production overlap bug found in A05 v1.
+    # The outer if statement is represented by a primary module_block. The class
+    # inside that compound statement and every descendant method must therefore
+    # remain diagnostic_overlap so their source is not weighted twice.
+    compound_class_source = (
+        "FLAG = True\n"
+        "if FLAG:\n"
+        "    class ConditionalClass:\n"
+        "        value = 1\n"
+        "        def method(self):\n"
+        "            return self.value\n"
+    )
+    compound_units, _ = analyze_source(compound_class_source, "compound_class.py")
+    compound_primary = [
+        unit for unit in compound_units if unit.aggregation_role == "primary"
+    ]
+    compound_diagnostic = [
+        unit for unit in compound_units if unit.aggregation_role == "diagnostic_overlap"
+    ]
+    assert any(unit.code_unit_type == "module_block" for unit in compound_primary)
+    assert any(
+        unit.scope_qualified_name == "ConditionalClass"
+        and unit.code_unit_type == "class_block"
+        for unit in compound_diagnostic
+    )
+    assert any(
+        unit.qualified_name == "ConditionalClass.method"
+        and unit.code_unit_type == "method_body"
+        for unit in compound_diagnostic
+    )
+    assert not any(
+        unit.qualified_name == "ConditionalClass.method"
+        for unit in compound_primary
+    )
+    compound_primary_spans = sorted(
+        (unit.start_offset, unit.end_offset) for unit in compound_primary
+    )
+    compound_previous_end = -1
+    for start, end in compound_primary_spans:
+        assert start >= compound_previous_end, (start, end, compound_previous_end)
+        compound_previous_end = end
+
     primary_spans = sorted((unit.start_offset, unit.end_offset) for unit in primary)
     previous_end = -1
     for start, end in primary_spans:
@@ -1759,6 +1804,10 @@ def run_pipeline(args: argparse.Namespace) -> int:
             "comments_blank_lines_repeated_spaces_preserved_within_slices": True,
             "primary_function_policy": "direct module/class functions only",
             "nested_overlap_policy": "diagnostic_overlap",
+            "diagnostic_ancestor_policy": (
+                "descendants of a class nested inside a compound statement remain "
+                "diagnostic_overlap and cannot become primary again"
+            ),
             "module_class_block_policy": "contiguous direct statements outside named definitions",
             "space_by_token_definition": "text.split(' ')",
             "scoring_windows_created": False,

@@ -3,12 +3,12 @@
 set -euo pipefail
 
 # ============================================================
-# run-x-a05 v1: Prepare full historical snapshot NPR inputs
+# run-x-a05 v2: Prepare full historical snapshot NPR inputs
 # ============================================================
 #
 # Delivery naming:
-#   proc_sh/run-x-a05-prepare-full-snapshot-npr-inputs-v1.sh
-#   code-detection/prepare_full_snapshot_npr_inputs-v1.py
+#   proc_sh/run-x-a05-prepare-full-snapshot-npr-inputs-v2.sh
+#   code-detection/prepare_full_snapshot_npr_inputs-v2.py
 #
 # Canonical server naming after removing -v<num>:
 #   proc_sh/run-x-a05-prepare-full-snapshot-npr-inputs.sh
@@ -34,8 +34,10 @@ set -euo pipefail
 #   - A05 does not score NPR and does not create 128-token windows.
 #   - A05 does not classify AGC/HWC.
 #   - Main treatment/control clone checkouts are never changed.
-#   - Tracked .py symlinks are not followed; such snapshots are unresolved for
-#     manual review rather than reading outside the temporary worktree.
+#   - Tracked .py symlinks are never followed. Their paths are counted for frozen
+#     manifest reconciliation and A01 records them as explicit file exclusions.
+#   - The exact validated A05/A01 v1 successful chunks can be reused after v2
+#     independently verifies zero hard QC failures and zero primary overlaps.
 #
 # Required existing server files:
 #   code-detection/prepare_snapshot_npr_inputs.py
@@ -75,8 +77,8 @@ set -euo pipefail
 # Small real smoke run:
 #   LIMIT=2 bash proc_sh/run-x-a05-prepare-full-snapshot-npr-inputs.sh
 #
-# Full run / resume:
-#   bash proc_sh/run-x-a05-prepare-full-snapshot-npr-inputs.sh
+# Full run / compatible v1 resume:
+#   FAIL_ON_UNRESOLVED=1 bash proc_sh/run-x-a05-prepare-full-snapshot-npr-inputs.sh
 #
 # Optional environment overrides:
 #   PROJECT_ROOT
@@ -99,6 +101,7 @@ set -euo pipefail
 #   FAIL_ON_UNRESOLVED=0|1
 #   STRICT_EXPECTED_COUNTS=0|1
 #   REQUIRE_PYTHON_FILE_COUNT_MATCH=0|1
+#   ALLOW_COMPATIBLE_V1_RESUME=0|1
 #   SKIP_SELF_TEST=0|1
 #   GIT_TIMEOUT_SECONDS
 #   A01_TIMEOUT_SECONDS
@@ -107,6 +110,10 @@ set -euo pipefail
 #   MIN_FREE_GB
 #   EXPECTED_INPUT_SHA256
 #   LOG_LEVEL
+# 
+# Usage:
+# FAIL_ON_UNRESOLVED=1 bash proc_sh/run-x-a05-prepare-full-snapshot-npr-inputs.sh
+# 
 # ============================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -115,7 +122,7 @@ cd "${PROJECT_ROOT}"
 export PROJECT_ROOT
 
 RUN_PREFIX="run-x-a05"
-IMPLEMENTATION_VERSION="v1"
+IMPLEMENTATION_VERSION="v2"
 RUN_LABEL="${RUN_PREFIX}-${IMPLEMENTATION_VERSION}"
 RUN_TS="${RUN_TS:-$(date +%Y%m%d-%H%M%S)}"
 
@@ -148,6 +155,7 @@ DRY_RUN="${DRY_RUN:-0}"
 FAIL_ON_UNRESOLVED="${FAIL_ON_UNRESOLVED:-0}"
 STRICT_EXPECTED_COUNTS="${STRICT_EXPECTED_COUNTS:-1}"
 REQUIRE_PYTHON_FILE_COUNT_MATCH="${REQUIRE_PYTHON_FILE_COUNT_MATCH:-1}"
+ALLOW_COMPATIBLE_V1_RESUME="${ALLOW_COMPATIBLE_V1_RESUME:-1}"
 SKIP_SELF_TEST="${SKIP_SELF_TEST:-0}"
 GIT_TIMEOUT_SECONDS="${GIT_TIMEOUT_SECONDS:-300}"
 A01_TIMEOUT_SECONDS="${A01_TIMEOUT_SECONDS:-3600}"
@@ -225,7 +233,7 @@ if [[ "${START_ORDER}" -lt 1 ]]; then
 fi
 
 for boolean in ANALYSIS_AGAIN OVERWRITE_OUTPUT DRY_RUN FAIL_ON_UNRESOLVED \
-    STRICT_EXPECTED_COUNTS REQUIRE_PYTHON_FILE_COUNT_MATCH SKIP_SELF_TEST; do
+    STRICT_EXPECTED_COUNTS REQUIRE_PYTHON_FILE_COUNT_MATCH ALLOW_COMPATIBLE_V1_RESUME SKIP_SELF_TEST; do
     validate_bool01 "${!boolean}" "${boolean}"
 done
 
@@ -312,6 +320,7 @@ Dry run:                         ${DRY_RUN}
 Fail on unresolved:              ${FAIL_ON_UNRESOLVED}
 Strict expected counts:          ${STRICT_EXPECTED_COUNTS}
 Require Python file count match: ${REQUIRE_PYTHON_FILE_COUNT_MATCH}
+Allow compatible v1 resume:     ${ALLOW_COMPATIBLE_V1_RESUME}
 Minimum free GB:                 ${MIN_FREE_GB}
 Expected snapshots:              ${EXPECTED_SNAPSHOTS}
 Expected treatment/control:      ${EXPECTED_TREATMENT_SNAPSHOTS}/${EXPECTED_CONTROL_SNAPSHOTS}
@@ -400,6 +409,9 @@ if [[ "${STRICT_EXPECTED_COUNTS}" == "1" ]]; then
 fi
 if [[ "${REQUIRE_PYTHON_FILE_COUNT_MATCH}" == "1" ]]; then
     COMMAND+=(--require-python-file-count-match)
+fi
+if [[ "${ALLOW_COMPATIBLE_V1_RESUME}" == "1" ]]; then
+    COMMAND+=(--allow-compatible-v1-resume)
 fi
 
 printf '\n** Step 2: Full-snapshot A01 preparation\n'

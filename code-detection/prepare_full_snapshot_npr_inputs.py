@@ -20,6 +20,11 @@ filenames:
 
 Resume behavior is snapshot-granular. Per-snapshot A01 manifests and QC records
 are retained under snapshot_chunks/, while full source trees are never retained.
+A05 v2 can safely migrate the exact validated A05/A01 v1 production state: prior
+success chunks with zero hard QC failures and zero primary-source overlaps are
+reused, while unresolved snapshots are retried with A01 v2. Tracked .py symlinks
+are counted as tracked Python paths but are explicitly excluded by A01 without
+following their targets.
 """
 
 from __future__ import annotations
@@ -42,12 +47,21 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator, Sequence
 
 
-IMPLEMENTATION_VERSION = "v1"
+IMPLEMENTATION_VERSION = "v2"
 RUN_NAME = "run-x-a05"
 EXPECTED_DATASET_SOURCES = {"treatment", "control"}
 FULL_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 REGULAR_GIT_MODES = {"100644", "100755"}
 SYMLINK_GIT_MODE = "120000"
+
+# Exact A01 v1 script used by the completed A05 v1 production run. A05 v2 may
+# reuse already-successful v1 chunks only when this hash and the frozen source
+# manifest match, and every reused chunk independently reports zero hard QC
+# failures and zero primary-source overlaps.
+LEGACY_COMPATIBLE_A01_SHA256 = (
+    "3389be6161a95397a367e6fc23f4229636d4643e7cb3fa2add0a97e18a0acfcd"
+)
+COMPATIBLE_RESUME_MIGRATION_FILENAME = "compatible_resume_migration_v1_to_v2.json"
 
 REQUIRED_MANIFEST_COLUMNS = {
     "dataset_source",
@@ -80,8 +94,10 @@ STATUS_COLUMNS = [
     "git_precheck_status",
     "python_file_count_manifest",
     "python_file_count_git_regular",
+    "python_file_count_git_tracked",
     "python_file_count_matches_manifest",
     "python_symlink_count_git",
+    "python_symlinks_excluded_by_a01",
     "python_files_discovered",
     "python_files_prepared",
     "python_files_excluded",
@@ -431,6 +447,24 @@ def git_python_inventory(target: SnapshotTarget, timeout: int) -> GitPythonInven
     return inventory
 
 
+def tracked_python_path_count(inventory: GitPythonInventory) -> int:
+    """Return tracked Python paths represented by regular files or symlinks."""
+    return inventory.regular_count + inventory.symlink_count
+
+
+def count_a01_symlink_exclusions(chunk_dir: Path) -> int:
+    """Count A01 file rows that safely excluded symbolic-link Python paths."""
+    manifest_path = chunk_dir / "python_file_manifest.csv"
+    count = 0
+    for row in read_csv(manifest_path):
+        if row.get("parse_status", "") == "prepared":
+            continue
+        message = row.get("parse_error_message", "").lower()
+        if "symbolic link" in message and "not followed" in message:
+            count += 1
+    return count
+
+
 def remove_worktree(clone_path: Path, worktree_path: Path, timeout: int) -> None:
     try:
         run_command(
@@ -629,8 +663,10 @@ def default_status_row(target: SnapshotTarget, attempt: int) -> dict[str, Any]:
         "git_precheck_status": "pending",
         "python_file_count_manifest": target.python_file_count_manifest,
         "python_file_count_git_regular": "",
+        "python_file_count_git_tracked": "",
         "python_file_count_matches_manifest": "",
         "python_symlink_count_git": "",
+        "python_symlinks_excluded_by_a01": "",
         "python_files_discovered": "",
         "python_files_prepared": "",
         "python_files_excluded": "",
@@ -984,6 +1020,17 @@ def consolidate_outputs(
     }
     write_json_atomic(summary, args.qc_dir / "python_snapshot_input_summary.json")
 
+    chunk_a01_versions: Counter[str] = Counter()
+    for target in successful_targets:
+        chunk_metadata_path = (
+            chunk_root / target.snapshot_key / "qc" / "python_snapshot_input_metadata.json"
+        )
+        if chunk_metadata_path.is_file():
+            chunk_metadata = read_one_json(chunk_metadata_path)
+            chunk_a01_versions[str(chunk_metadata.get("implementation_version", "unknown"))] += 1
+        else:
+            chunk_a01_versions["missing"] += 1
+
     metadata = {
         "implementation_version": IMPLEMENTATION_VERSION,
         "driver_run_name": RUN_NAME,
@@ -996,7 +1043,9 @@ def consolidate_outputs(
         "worktrees_persisted": False,
         "snapshot_id_policy": "quality_pipeline_snapshot_key",
         "upstream_a01_script": str(args.a01_script.resolve()),
-        "upstream_a01_script_sha256": provenance["a01_script_sha256"],
+        "upstream_a01_script_sha256_current": provenance["a01_script_sha256"],
+        "chunk_a01_implementation_versions": dict(sorted(chunk_a01_versions.items())),
+        "compatible_resume_migration": provenance.get("compatible_resume_migration"),
         "source_manifest_sha256": provenance["input_manifest_sha256"],
         "materialization_policy": {
             "method": "detached_temporary_git_worktree_one_snapshot_at_a_time",
@@ -1007,6 +1056,7 @@ def consolidate_outputs(
         },
         "source_policy": {
             "a01_reused_without_reimplementation": True,
+            "compatible_legacy_success_chunks_may_be_reused": True,
             "ast_python_required": "3.12+",
             "raw_source_slicing": True,
             "space_by_token_definition": "text.split(' ')",
@@ -1036,7 +1086,91 @@ def consolidate_outputs(
     }
 
 
-def prepare_output_root(args: argparse.Namespace, provenance: dict[str, Any]) -> None:
+def validate_compatible_v1_success_chunks(
+    args: argparse.Namespace,
+    previous_fingerprint: dict[str, Any],
+    provenance: dict[str, Any],
+) -> dict[str, Any]:
+    """Validate that existing A05 v1 success chunks are safe to reuse in v2.
+
+    A01 v2 only fixes diagnostic-role propagation for descendants of classes
+    nested inside compound statements. Any v1 chunk affected by that bug failed
+    the hard primary-source-overlap check and therefore was never marked success.
+    We still verify every reused success chunk before accepting the migration.
+    """
+    if not args.allow_compatible_v1_resume:
+        raise RuntimeError(
+            "Existing A05 output uses a different preparation fingerprint. "
+            "Set ALLOW_COMPATIBLE_V1_RESUME=1 via the v2 wrapper only for the "
+            "validated A05 v1 production output, or use a new output directory."
+        )
+    if previous_fingerprint.get("implementation_version") != "v1":
+        raise RuntimeError(
+            "Compatible resume is restricted to the known A05 v1 production output."
+        )
+    if previous_fingerprint.get("input_manifest_sha256") != provenance["input_manifest_sha256"]:
+        raise RuntimeError("Compatible resume refused: frozen input manifest SHA256 differs.")
+    if previous_fingerprint.get("a01_script_sha256") != LEGACY_COMPATIBLE_A01_SHA256:
+        raise RuntimeError(
+            "Compatible resume refused: legacy A01 script SHA256 is not the validated v1 hash."
+        )
+
+    status_map = load_status_map(args.status_output)
+    reused_success_keys: list[str] = []
+    version_counts: Counter[str] = Counter()
+    for key, row in status_map.items():
+        if str(row.get("status", "")) != "success":
+            continue
+        chunk_dir = args.output_dir / "snapshot_chunks" / key
+        summary_path = chunk_dir / "qc" / "python_snapshot_input_summary.json"
+        metadata_path = chunk_dir / "qc" / "python_snapshot_input_metadata.json"
+        if not summary_path.is_file() or not metadata_path.is_file():
+            raise RuntimeError(
+                f"Compatible resume refused: successful legacy chunk is incomplete: {key}"
+            )
+        summary = read_one_json(summary_path)
+        metadata = read_one_json(metadata_path)
+        if int(summary.get("failed_checks", 0)) != 0:
+            raise RuntimeError(
+                f"Compatible resume refused: legacy success has hard QC failures: {key}"
+            )
+        if int(summary.get("primary_source_overlap_count", 0)) != 0:
+            raise RuntimeError(
+                f"Compatible resume refused: legacy success has primary overlap: {key}"
+            )
+        if str(summary.get("status", "")) not in {"PASS", "PASS_WITH_EXCLUSIONS"}:
+            raise RuntimeError(
+                f"Compatible resume refused: unexpected legacy A01 status for {key}: "
+                f"{summary.get('status')}"
+            )
+        version = str(metadata.get("implementation_version", "unknown"))
+        version_counts[version] += 1
+        reused_success_keys.append(key)
+
+    return {
+        "migration": "A05_v1_to_A05_v2_compatible_resume",
+        "accepted_at": utc_now(),
+        "legacy_a01_script_sha256": LEGACY_COMPATIBLE_A01_SHA256,
+        "current_a01_script_sha256": provenance["a01_script_sha256"],
+        "input_manifest_sha256": provenance["input_manifest_sha256"],
+        "reused_success_snapshots": len(reused_success_keys),
+        "reused_chunk_a01_versions": dict(sorted(version_counts.items())),
+        "validation_policy": (
+            "reuse only prior status=success chunks with complete QC metadata, "
+            "failed_checks=0, primary_source_overlap_count=0, and PASS/PASS_WITH_EXCLUSIONS"
+        ),
+        "semantic_compatibility_reason": (
+            "A01 v2 only prevents methods beneath compound-nested diagnostic classes "
+            "from becoming primary; any v1 chunk affected by that bug failed the hard "
+            "primary-source-overlap check and was not a reusable success"
+        ),
+        "reused_snapshot_keys": reused_success_keys,
+    }
+
+
+def prepare_output_root(
+    args: argparse.Namespace, provenance: dict[str, Any]
+) -> dict[str, Any] | None:
     metadata_path = args.qc_dir / "python_full_snapshot_driver_metadata.json"
     fingerprint_path = args.output_dir / "provenance" / "preparation_fingerprint.json"
     if args.overwrite_output and args.output_dir.exists():
@@ -1048,21 +1182,23 @@ def prepare_output_root(args: argparse.Namespace, provenance: dict[str, Any]) ->
     provenance_dir = args.output_dir / "provenance"
     provenance_dir.mkdir(parents=True, exist_ok=True)
 
+    migration: dict[str, Any] | None = None
     if fingerprint_path.is_file():
         previous = read_one_json(fingerprint_path)
         previous_fingerprint = previous.get("preparation_fingerprint", "")
         if previous_fingerprint != provenance["preparation_fingerprint"]:
-            raise RuntimeError(
-                "Existing A05 output was created with a different preparation fingerprint. "
-                "Use a new output directory or OVERWRITE_OUTPUT=1."
-            )
+            migration = validate_compatible_v1_success_chunks(args, previous, provenance)
+        else:
+            existing_migration_path = provenance_dir / COMPATIBLE_RESUME_MIGRATION_FILENAME
+            if existing_migration_path.is_file():
+                migration = read_one_json(existing_migration_path)
     elif metadata_path.is_file():
         previous = read_one_json(metadata_path)
         previous_fingerprint = previous.get("preparation_fingerprint", "")
         if previous_fingerprint and previous_fingerprint != provenance["preparation_fingerprint"]:
             raise RuntimeError(
-                "Existing A05 output was created with a different preparation fingerprint. "
-                "Use a new output directory or OVERWRITE_OUTPUT=1."
+                "Existing A05 output predates the fingerprint file and is not eligible "
+                "for automatic compatible migration. Use a new output directory."
             )
 
     frozen_manifest = provenance_dir / "velocity_did_model_c_snapshot_manifest.csv"
@@ -1088,6 +1224,12 @@ def prepare_output_root(args: argparse.Namespace, provenance: dict[str, Any]) ->
         },
         fingerprint_path,
     )
+    if migration is not None:
+        write_json_atomic(
+            migration,
+            provenance_dir / COMPATIBLE_RESUME_MIGRATION_FILENAME,
+        )
+    return migration
 
 
 def run_self_test() -> None:
@@ -1100,6 +1242,8 @@ def run_self_test() -> None:
     assert sanitize_key("a/b c") == "a_b_c"
     assert parse_positive_int("14", "x") == 14
     assert parse_nonnegative_int("0", "x") == 0
+    inventory = GitPythonInventory(regular_count=7, symlink_count=2, other_count=0)
+    assert tracked_python_path_count(inventory) == 9
     print("Self-test: PASS")
 
 
@@ -1132,6 +1276,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fail-on-unresolved", action="store_true")
     parser.add_argument("--strict-expected-counts", action="store_true")
     parser.add_argument("--require-python-file-count-match", action="store_true")
+    parser.add_argument(
+        "--allow-compatible-v1-resume",
+        action="store_true",
+        help=(
+            "Allow exact A05/A01 v1 production successes to be reused after "
+            "independent zero-overlap QC validation."
+        ),
+    )
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--expected-input-sha256", default="")
     parser.add_argument("--min-free-gb", type=float, default=20.0)
@@ -1214,7 +1366,8 @@ def main() -> int:
     if not selected:
         raise RuntimeError("No snapshots were selected by the requested filters.")
 
-    prepare_output_root(args, provenance)
+    migration = prepare_output_root(args, provenance)
+    provenance["compatible_resume_migration"] = migration
     status_map = load_status_map(args.status_output)
     unresolved: list[dict[str, Any]] = []
     if args.unresolved_output.is_file() and args.unresolved_output.stat().st_size > 0:
@@ -1319,20 +1472,25 @@ def main() -> int:
             inventory = git_python_inventory(target, args.git_timeout_seconds)
             status_row["python_file_count_git_regular"] = inventory.regular_count
             status_row["python_symlink_count_git"] = inventory.symlink_count
-            count_matches = inventory.regular_count == target.python_file_count_manifest
+            tracked_count = tracked_python_path_count(inventory)
+            status_row["python_file_count_git_tracked"] = tracked_count
+            count_matches = tracked_count == target.python_file_count_manifest
             status_row["python_file_count_matches_manifest"] = count_matches
-            if inventory.symlink_count:
-                raise RuntimeError(
-                    f"Tracked .py symlinks detected ({inventory.symlink_count}); refusing to let A01 follow them."
-                )
             if inventory.other_count:
                 raise RuntimeError(
-                    f"Unexpected non-regular tracked .py objects detected ({inventory.other_count})."
+                    f"Unexpected tracked .py Git object modes detected ({inventory.other_count})."
                 )
             if args.require_python_file_count_match and not count_matches:
                 raise RuntimeError(
-                    "Git regular Python file count does not match the frozen manifest: "
-                    f"git={inventory.regular_count}, manifest={target.python_file_count_manifest}"
+                    "Git tracked Python path count does not match the frozen manifest: "
+                    f"regular={inventory.regular_count}, symlink={inventory.symlink_count}, "
+                    f"tracked_total={tracked_count}, manifest={target.python_file_count_manifest}"
+                )
+            if inventory.symlink_count:
+                logging.info(
+                    "Tracked .py symlinks detected (%d); A01 will record each path as an "
+                    "explicit exclusion without following the target.",
+                    inventory.symlink_count,
                 )
 
             stage = "free_space_check"
@@ -1363,6 +1521,17 @@ def main() -> int:
 
             stage = "a01_validate"
             summary = validate_chunk(target, chunk_dir)
+            if inventory.symlink_count:
+                symlink_exclusions = count_a01_symlink_exclusions(chunk_dir)
+                status_row["python_symlinks_excluded_by_a01"] = symlink_exclusions
+                if symlink_exclusions != inventory.symlink_count:
+                    raise RuntimeError(
+                        "A01 symbolic-link exclusion reconciliation failed: "
+                        f"git_symlinks={inventory.symlink_count}, "
+                        f"a01_symlink_exclusions={symlink_exclusions}"
+                    )
+            else:
+                status_row["python_symlinks_excluded_by_a01"] = 0
             status_row["a01_status"] = str(summary.get("status", ""))
             status_row["python_files_discovered"] = int(summary.get("python_files_discovered", 0))
             status_row["python_files_prepared"] = int(summary.get("python_files_prepared", 0))
@@ -1487,6 +1656,22 @@ def main() -> int:
     )
     current_unresolved = len(unresolved)
 
+    successful_symlinks_git = 0
+    successful_symlinks_excluded = 0
+    for target in targets:
+        row = status_map.get(target.snapshot_key, {})
+        if str(row.get("status", "")) != "success":
+            continue
+        try:
+            successful_symlinks_git += int(float(row.get("python_symlink_count_git", 0) or 0))
+            successful_symlinks_excluded += int(
+                float(row.get("python_symlinks_excluded_by_a01", 0) or 0)
+            )
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError(
+                f"Invalid symlink reconciliation count in status row: {target.snapshot_key}"
+            ) from exc
+
     driver_checks = list(input_checks)
     add_check(
         driver_checks,
@@ -1520,6 +1705,15 @@ def main() -> int:
         current_unresolved == 0,
         current_unresolved,
         0,
+    )
+    add_check(
+        driver_checks,
+        "successful_tracked_python_symlinks_excluded_without_following",
+        "hard",
+        successful_symlinks_git == successful_symlinks_excluded,
+        successful_symlinks_excluded,
+        successful_symlinks_git,
+        "Every tracked .py symlink in successful snapshots must be an explicit A01 exclusion.",
     )
     add_check(
         driver_checks,
@@ -1558,6 +1752,12 @@ def main() -> int:
         "processed_this_run": processed_this_run,
         "skipped_existing_success": skipped_success,
         "failed_this_run": failed_this_run,
+        "compatible_v1_resume_used": migration is not None,
+        "compatible_v1_reused_success_snapshots": (
+            int(migration.get("reused_success_snapshots", 0)) if migration else 0
+        ),
+        "successful_tracked_python_symlinks": successful_symlinks_git,
+        "successful_a01_symlink_exclusions": successful_symlinks_excluded,
         "current_unresolved_snapshots": current_unresolved,
         "full_run_requested": full_run_requested,
         "consolidated_snapshots": consolidation["snapshot_count"],
@@ -1584,6 +1784,7 @@ def main() -> int:
         "a01_script": str(args.a01_script.resolve()),
         "a01_script_sha256": a01_sha,
         "preparation_fingerprint": provenance["preparation_fingerprint"],
+        "compatible_resume_migration": migration,
         "output_dir": str(args.output_dir.resolve()),
         "worktree_root": str(args.worktree_root.resolve()),
         "worktrees_persisted": False,
@@ -1598,7 +1799,10 @@ def main() -> int:
         },
         "safety": {
             "tracked_python_symlinks_followed": False,
-            "tracked_python_symlink_policy": "fail_snapshot_for_manual_review",
+            "tracked_python_symlink_policy": (
+                "include tracked symlink paths in manifest-count reconciliation, then "
+                "let A01 exclude each symlink path without following its target"
+            ),
             "minimum_free_gb": args.min_free_gb,
             "require_python_file_count_match": args.require_python_file_count_match,
         },
