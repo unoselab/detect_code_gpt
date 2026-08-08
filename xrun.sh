@@ -31,3 +31,43 @@ git diff --cached --summary
 git commit -m "Add gt200 three-GPU NPR scoring pipeline"
 git push -u origin run-1d-gt200-3gpu
 
+path = "output/snapshot_npr/run-x-a05/snapshot_chunks/control__GispoCoding_qgis-venv-creator__af2c34bcade1__773c29831a026f6d/python_code_unit_manifest.csv"
+
+df = pd.read_csv(path)
+
+primary = df[df["aggregation_role"] == "primary"].copy()
+
+for relpath, group in primary.groupby("relative_path"):
+    group = group.sort_values(
+        ["start_char_offset", "end_char_offset"],
+        kind="mergesort"
+    )
+    rows = list(group.to_dict("records"))
+
+    for i in range(len(rows)):
+        for j in range(i + 1, len(rows)):
+            left = rows[i]
+            right = rows[j]
+
+            if int(right["start_char_offset"]) >= int(left["end_char_offset"]):
+                break
+
+            print("=" * 80)
+            print("OVERLAP")
+            print("file:", relpath)
+            print()
+            print(
+                "left :",
+                left["code_unit_type"],
+                left["qualified_name"],
+                f'lines={left["start_line"]}-{left["end_line"]}',
+                f'chars={left["start_char_offset"]}-{left["end_char_offset"]}',
+            )
+            print(
+                "right:",
+                right["code_unit_type"],
+                right["qualified_name"],
+                f'lines={right["start_line"]}-{right["end_line"]}',
+                f'chars={right["start_char_offset"]}-{right["end_char_offset"]}',
+            )
+PY

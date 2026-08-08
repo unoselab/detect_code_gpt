@@ -145,3 +145,123 @@ PASS: StarCoder2-7B cache
 Filesystem      Size  Used Avail Use% Mounted on
 /dev/nvme0n1p3  3.7T  1.7T  1.9T  48% /
 (detectcodegpt) detect_code_gpt $ 
+
+(detectcodegpt) OISSE-IST173C01:detect_code_gpt$ bash proc_sh/run-x-a02-score-snapshot-npr.sh
+============================================================================
+run-x-a02: snapshot-level continuous NPR scoring
+Started:                         Fri Aug  7 11:44:09 PM CDT 2026
+Workspace:                       /home/user1-system12/project-workspace/detect_code_gpt
+Active conda env:                detectcodegpt
+Python path:                     /home/user1-system12/miniconda3/envs/detectcodegpt/bin/python
+Python version:                  3.11.15
+Python script:                   code-detection/score_snapshot_npr.py
+Python script SHA:               57e0781a406d992fb045335a79b1cb97e5c0557de9582603401f6d402ef528a0
+A01 code-unit manifest:          output/snapshot_npr/run-x-a01/python_code_unit_manifest.csv
+A01 manifest SHA:                896487a8e2ac8e0c14414e858566ac9b3a3f8f1fa44cba458bfc4a5321faefe9
+Artifact base:                   output/snapshot_npr/run-x-a01
+Scoring model:                   bigcode/starcoder2-7b
+Window size (space-by tokens):   128
+Perturbations per window:        50
+Perturbation type:               random-insert-space+newline
+Random seed:                     20260723
+LLM-token truncation:            none added by A02
+Classification:                  disabled
+Dependency versions JSON:          {"cuda_available": true, "gpu_name": "NVIDIA RTX 6000 Ada Generation", "gpu_total_memory_bytes": 51002867712, "modules": {"loguru": "0.7.2", "numpy": "1.26.3", "pandas": "2.1.4", "scipy": "1.11.4", "torch": "2.1.2", "transformers": "4.42.4"}}
+CUDA_VISIBLE_DEVICES:            0
+CUDA available:                  1
+GPU name:                        NVIDIA RTX 6000 Ada Generation
+GPU total memory bytes:          51002867712
+Model cache:                     /home/user1-system12/.cache/huggingface/hub
+Output directory:                output/snapshot_npr/run-x-a02
+Cache directory:                 output/snapshot_npr/run-x-a02/cache
+QC directory:                    output/snapshot_npr/run-x-a02/qc
+Reproducibility units:           1
+Overwrite output:                0
+Clear cache:                     0
+Run self-test:                   1
+Run resume check:                1
+Require all completed:           0
+Mock scoring:                    0
+Log file:                        logs/run-x-a02/run-x-a02-v3-score-snapshot-npr-20260807-234409.log
+============================================================================
+score_snapshot_npr self-test: PASS
+==============================================================================
+run-x-a02 snapshot NPR scoring
+Status:                         PASS
+Primary code-unit occurrences:  50
+Unique primary code units:      21
+Successful unique code units:   21
+Failed unique code units:       0
+Window score rows:              30
+Invalid NPR windows:            0
+Partial code-unit scores:       0
+Newly scored units:             0
+Cache-reused units:             21
+Model loaded this run:          0
+Failed QC checks:               0
+Config fingerprint:             78655715edc8699710a27f593cac5a8360067e803eac8c50a0765084edfa5fb2
+Output directory:               output/snapshot_npr/run-x-a02
+==============================================================================
+==============================================================================
+run-x-a02 snapshot NPR scoring
+Status:                         PASS
+Primary code-unit occurrences:  50
+Unique primary code units:      21
+Successful unique code units:   21
+Failed unique code units:       0
+Window score rows:              30
+Invalid NPR windows:            0
+Partial code-unit scores:       0
+Newly scored units:             0
+Cache-reused units:             21
+Model loaded this run:          0
+Failed QC checks:               0
+Config fingerprint:             78655715edc8699710a27f593cac5a8360067e803eac8c50a0765084edfa5fb2
+Output directory:               /tmp/run-x-a02-resume-check.20NzpC/output
+==============================================================================
+
+============================================================================
+run-x-a02 output verification
+First-run status:                PASS
+Resume validation QC:            output/snapshot_npr/run-x-a02/qc/python_snapshot_npr_resume_check.json
+Primary code-unit occurrences:   50
+Unique primary code units:       21
+Successful unique code units:    21
+Failed unique code units:        0
+Window score rows:               30
+Invalid NPR windows:             0
+Partial code-unit scores:        0
+First invocation scored units:   0
+First invocation reused units:   21
+First invocation model loaded:   0
+Unique-score CSV rows:           21
+Occurrence-score CSV rows:       50
+Window-score CSV rows:           30
+Failure CSV rows:                0
+Failed QC checks:                0
+Unique scores:                   output/snapshot_npr/run-x-a02/python_unique_code_unit_npr_scores.csv
+Occurrence scores:               output/snapshot_npr/run-x-a02/python_code_unit_npr_scores.csv
+Window scores:                   output/snapshot_npr/run-x-a02/python_window_npr_scores.csv
+Checks:                          output/snapshot_npr/run-x-a02/qc/python_snapshot_npr_checks.csv
+Summary:                         output/snapshot_npr/run-x-a02/qc/python_snapshot_npr_summary.json
+Metadata:                        output/snapshot_npr/run-x-a02/qc/python_snapshot_npr_metadata.json
+Log file:                        logs/run-x-a02/run-x-a02-v3-score-snapshot-npr-20260807-234409.log
+============================================================================
+
+============================================================================
+run-x-a02 execution summary
+Started:                    Fri Aug  7 11:44:09 PM CDT 2026
+Completed:                  Fri Aug  7 11:44:11 PM CDT 2026
+Elapsed:                    00:00:02
+Exit code:                  0
+Python path:                /home/user1-system12/miniconda3/envs/detectcodegpt/bin/python
+Python version:             3.11.15
+Python script:              code-detection/score_snapshot_npr.py
+A01 code-unit manifest:     output/snapshot_npr/run-x-a01/python_code_unit_manifest.csv
+Artifact base:              output/snapshot_npr/run-x-a01
+Output directory:           output/snapshot_npr/run-x-a02
+Cache directory:            output/snapshot_npr/run-x-a02/cache
+QC directory:               output/snapshot_npr/run-x-a02/qc
+Log file:                   logs/run-x-a02/run-x-a02-v3-score-snapshot-npr-20260807-234409.log
+============================================================================
+(detectcodegpt) OISSE-IST173C01:detect_code_gpt$ 
