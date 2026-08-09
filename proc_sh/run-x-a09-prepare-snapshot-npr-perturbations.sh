@@ -222,7 +222,7 @@ finish() {
     elapsed=$((end_epoch - START_EPOCH))
     echo
     echo "============================================================================"
-    echo "run-x-a09-v2 execution summary"
+    echo "run-x-a09-v3 execution summary"
     echo "Mode:             ${MODE}"
     echo "Worker label:     ${WORKER_LABEL}"
     echo "Worker index:     ${WORKER_INDEX}"
@@ -266,7 +266,7 @@ fi
 
 cat <<INFO
 ============================================================================
-run-x-a09-v2: deterministic two-server NPR perturbation preparation
+run-x-a09-v3: deterministic two-server NPR perturbation preparation
 Started:                         ${START_TEXT}
 Mode:                            ${MODE}
 Project root:                    ${PROJECT_ROOT}
@@ -347,4 +347,4 @@ fi
 
 "${COMMAND[@]}"
 
-echo "run-x-a09-v2 verification: PASS"
+echo "run-x-a09-v3 verification: PASS"
