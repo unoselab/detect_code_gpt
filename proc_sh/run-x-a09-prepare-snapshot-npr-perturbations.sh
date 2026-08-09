@@ -86,6 +86,14 @@
 #      Do NOT set MAX_UNITS_PER_SHARD for the full run.
 #      Do NOT set OVERWRITE_OUTPUT=1 when resuming completed logical shards.
 #
+
+#      On Server 173:
+#        MODE=prepare WORKER_LABEL=s173 WORKER_INDEX=0 OVERWRITE_OUTPUT=1 bash proc_sh/run-x-a09-prepare-snapshot-npr-perturbations.sh
+#      On R158:
+#        MODE=prepare WORKER_LABEL=r158 WORKER_INDEX=1 OVERWRITE_OUTPUT=1 bash proc_sh/run-x-a09-prepare-snapshot-npr-perturbations.sh
+
+
+
 # Optional environment variables:
 #   PROJECT_ROOT, PYTHON_BIN, PY_SCRIPT, MODE,
 #   INPUT_MANIFEST, ARTIFACT_BASE, OUTPUT_ROOT,
