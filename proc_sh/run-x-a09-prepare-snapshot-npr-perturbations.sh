@@ -2,8 +2,8 @@
 # Prepare deterministic NPR perturbation shards before homogeneous GPU scoring.
 #
 # Versioned delivery files:
-#   code-detection/prepare_snapshot_npr_perturbations-v1.py
-#   proc_sh/run-x-a09-prepare-snapshot-npr-perturbations-v1.sh
+#   code-detection/prepare_snapshot_npr_perturbations.py
+#   proc_sh/run-x-a09-prepare-snapshot-npr-perturbations.sh
 #
 # Canonical server paths after validation/deployment:
 #   code-detection/prepare_snapshot_npr_perturbations.py
@@ -140,7 +140,7 @@ SCORING_MODEL_REVISION="${SCORING_MODEL_REVISION:-bb9afde76d7945da5745592525db12
 
 LOG_DIR="${LOG_DIR:-logs/run-x-a09}"
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
-LOG_FILE="${LOG_FILE:-${LOG_DIR}/${RUN_PREFIX}-v1-${MODE}-${WORKER_LABEL}-${TIMESTAMP}.log}"
+LOG_FILE="${LOG_FILE:-${LOG_DIR}/${RUN_PREFIX}-v3-${MODE}-${WORKER_LABEL}-${TIMESTAMP}.log}"
 
 if [[ "${MODE}" != "plan" && "${MODE}" != "verify" && "${MODE}" != "prepare" ]]; then
     echo "ERROR: MODE must be plan, verify, or prepare; got ${MODE}" >&2
