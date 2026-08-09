@@ -71,7 +71,7 @@ import scipy
 import scipy.stats
 
 
-SCRIPT_VERSION = "run-x-a09-v2"
+SCRIPT_VERSION = "run-x-a09-v3"
 WINDOW_POLICY = "128_space_by_tokens_final_full_window_shifted_backward_with_overlap"
 PERTURBATION_POLICY = "detectcodegpt_random_insert_space_plus_newline_reference_compatible_v1"
 PRIMARY_ROLE = "primary"
@@ -1225,7 +1225,7 @@ def main() -> int:
     config_fingerprint = stable_json_hash(config_payload)
 
     print("=" * 80)
-    print("run-x-a09-v2: deterministic two-server NPR perturbation preparation")
+    print("run-x-a09-v3: deterministic two-server NPR perturbation preparation")
     print(f"Mode:                            {args.mode}")
     print(f"Project root:                    {args.project_root}")
     print(f"Input manifest:                  {args.input_manifest}")
