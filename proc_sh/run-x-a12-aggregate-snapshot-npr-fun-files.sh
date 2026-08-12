@@ -5,8 +5,8 @@
 # adapted for the CPU-only A12 aggregation stage; it does not call any prior shell wrapper.
 #
 # Versioned delivery files:
-#   code-detection/aggregate_snapshot_npr_fun_files-v1.py
-#   proc_sh/run-x-a12-aggregate-snapshot-npr-fun-files-v1.sh
+#   code-detection/aggregate_snapshot_npr_fun_files-v2.py
+#   proc_sh/run-x-a12-aggregate-snapshot-npr-fun-files-v2.sh
 #
 # Canonical server paths after deployment:
 #   code-detection/aggregate_snapshot_npr_fun_files.py
@@ -38,6 +38,11 @@
 #   summary.json
 #   metadata.json
 #
+# A12 v2 compatibility fix:
+#   A11 v3 normalizes the <=1-token / no-valid-perturbation condition to the
+#   exported exclusion class ``insufficient_llm_tokens_for_npr``. A12 v2 consumes
+#   that normalized class exactly while keeping all other exclusion checks strict.
+#
 # Runtime:
 #   Python 3.11.x in the detectcodegpt environment. No GPU/model loading is performed.
 
@@ -51,14 +56,14 @@ PYTHON_BIN="${PYTHON_BIN:-python}"
 PY_SCRIPT="${PY_SCRIPT:-code-detection/aggregate_snapshot_npr_fun_files.py}"
 A05_ROOT="${A05_ROOT:-output/snapshot_npr/run-x-a05}"
 A11_RESULTS_ROOT="${A11_RESULTS_ROOT:-output/snapshot_npr/run-x-a11/results}"
-REPO_MONTH_PANEL_FILE="${REPO_MONTH_PANEL_FILE:-repo_x01/run-x-a05/velocity_did_panel_model_a.csv}"
+REPO_MONTH_PANEL_FILE="${REPO_MONTH_PANEL_FILE:-../ai_code_complexity_study_python/ai-code-complexity-study/repo_x01/run-x-a05/velocity_did_panel_model_a.csv}"
 OUTPUT_DIR="${OUTPUT_DIR:-output/snapshot_npr/run-x-a12}"
 LOG_DIR="${LOG_DIR:-logs/run-x-a12}"
 RUN_SELF_TEST="${RUN_SELF_TEST:-1}"
 STRICT_EXPECTED_COUNTS="${STRICT_EXPECTED_COUNTS:-1}"
 EXPECTED_A05_CODE_MANIFEST_SHA256="${EXPECTED_A05_CODE_MANIFEST_SHA256:-1acb3726f5c62e6154672f1aff592973c65a13e58dbfd37f8058560d1a474e6c}"
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
-LOG_FILE="${LOG_FILE:-${LOG_DIR}/run-x-a12-v1-aggregate-snapshot-npr-fun-files-${TIMESTAMP}.log}"
+LOG_FILE="${LOG_FILE:-${LOG_DIR}/run-x-a12-v2-aggregate-snapshot-npr-fun-files-${TIMESTAMP}.log}"
 
 mkdir -p "${OUTPUT_DIR}" "${LOG_DIR}"
 
@@ -113,7 +118,7 @@ exec > >(tee "${LOG_FILE}") 2>&1
 
 START_EPOCH="$(date +%s)"
 echo "============================================================================"
-echo "run-x-a12-v1: aggregate FUN NPR to snapshot/file and repo-month/file"
+echo "run-x-a12-v2: aggregate FUN NPR to snapshot/file and repo-month/file"
 echo "Started:                         $(date)"
 echo "Project root:                    ${PROJECT_ROOT}"
 echo "Python:                          $(command -v "${PYTHON_BIN}") (${PYTHON_VERSION})"
@@ -163,7 +168,7 @@ printf -v ELAPSED_TEXT '%02d:%02d:%02d' $((ELAPSED / 3600)) $(((ELAPSED % 3600) 
 
 echo
 echo "============================================================================"
-echo "run-x-a12-v1 execution summary"
+echo "run-x-a12-v2 execution summary"
 echo "Started:          $(date -d "@${START_EPOCH}" 2>/dev/null || true)"
 echo "Completed:        $(date)"
 echo "Elapsed:          ${ELAPSED_TEXT}"

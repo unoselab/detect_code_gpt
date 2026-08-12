@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping
 
 
-SCRIPT_VERSION = "run-x-a12-v1"
+SCRIPT_VERSION = "run-x-a12-v2"
 PRIMARY_ROLE = "primary"
 FUN_CODE_UNIT_TYPE = "function_body"
 EXPECTED_A05_CODE_MANIFEST_SHA256 = (
@@ -55,10 +55,13 @@ EXPECTED_A02_CONFIG_FINGERPRINT = (
     "78655715edc8699710a27f593cac5a8360067e803eac8c50a0765084edfa5fb2"
 )
 EXPECTED_MODEL_REVISION = "bb9afde76d7945da5745592525db122d4d729eb1"
+# A11 v3 exports normalized exclusion classes, not raw window invalid reasons.
+# In particular, raw ``no_valid_perturbation_scores`` is normalized by A11 v3 to
+# ``insufficient_llm_tokens_for_npr`` when the original input has <= 1 LLM token.
 EXPECTED_EXCLUSION_CLASSES = {
     "model_context_exceeded",
     "zero_original_log_rank",
-    "no_valid_perturbation_scores",
+    "insufficient_llm_tokens_for_npr",
 }
 
 A05_SNAPSHOT_REQUIRED = {
@@ -843,6 +846,14 @@ def write_repo_month_file_scores(
 def run_self_test() -> None:
     score_a = UniqueScore("a", 10, 1.0, 2.0, 2.0, 1.0, 0, EXPECTED_A09_CONFIG_FINGERPRINT, EXPECTED_A02_CONFIG_FINGERPRINT)
     score_b = UniqueScore("b", 30, 2.0, 4.0, 8.0, 2.0, 1, EXPECTED_A09_CONFIG_FINGERPRINT, EXPECTED_A02_CONFIG_FINGERPRINT)
+    # Regression guard for the A11 v3 normalized exclusion schema.
+    # The raw invalid reason is ``no_valid_perturbation_scores`` but the exported
+    # exclusion class must be ``insufficient_llm_tokens_for_npr``.
+    assert EXPECTED_EXCLUSION_CLASSES == {
+        "model_context_exceeded",
+        "zero_original_log_rank",
+        "insufficient_llm_tokens_for_npr",
+    }
     exclusion = ExcludedUnit("x", {"zero_original_log_rank"}, {2})
     acc = FileAccumulator()
     acc.add_score("a", 10, score_a)
@@ -871,7 +882,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Aggregate finalized A11 FUN NPR to snapshot/file and repo-month/file levels.")
     parser.add_argument("--a05-root", type=Path, default=Path("output/snapshot_npr/run-x-a05"))
     parser.add_argument("--a11-results-root", type=Path, default=Path("output/snapshot_npr/run-x-a11/results"))
-    parser.add_argument("--repo-month-panel-file", type=Path, default=Path("repo_x01/run-x-a05/velocity_did_panel_model_a.csv"))
+    parser.add_argument("--repo-month-panel-file", type=Path, default=Path("../ai_code_complexity_study_python/ai-code-complexity-study/repo_x01/run-x-a05/velocity_did_panel_model_a.csv"))
     parser.add_argument("--output-dir", type=Path, default=Path("output/snapshot_npr/run-x-a12"))
     parser.add_argument("--gpu-indexes", default="0,1,2")
     parser.add_argument("--expected-snapshots", type=int, default=1496)
