@@ -5,8 +5,8 @@
 # structure but does not call any previous shell wrapper.
 #
 # Versioned delivery files:
-#   code-detection/score_snapshot_npr_fun_shards-v3.py
-#   proc_sh/run-x-a11-score-snapshot-npr-fun-v3.sh
+#   code-detection/score_snapshot_npr_fun_shards-v2.py
+#   proc_sh/run-x-a11-score-snapshot-npr-fun-v2.sh
 #
 # Canonical server paths after deployment:
 #   code-detection/score_snapshot_npr_fun_shards.py
@@ -49,11 +49,6 @@
 #   MODE=run
 #       Scores the entire A10-assigned FUN workload for this GPU. Production
 #       perturbations are never regenerated. Resume is automatic when OVERWRITE=0.
-#   MODE=finalize
-#       Reuses the existing v2/v3 production SQLite checkpoint in results/gpu-X.
-#       No model is loaded and no window is rescored. The v3 policy normalizes only
-#       context-overflow OOM rows, exports deterministic exclusions, and rebuilds
-#       window/unit CSVs plus final QC. Use OVERWRITE=0.
 #
 # Recommended three-terminal smoke commands on R158:
 #   MODE=smoke GPU_INDEX=0 CUDA_DEVICE=0 OVERWRITE=1 bash proc_sh/run-x-a11-score-snapshot-npr-fun.sh
@@ -75,14 +70,6 @@
 # MODE=run and the corresponding GPU_INDEX/CUDA_DEVICE values. Use OVERWRITE=1
 # only for the first clean production invocation. If interrupted, rerun the same
 # command with OVERWRITE=0 to resume from the SQLite checkpoint.
-#
-# After the completed v2 production run, v3 recovery/finalization is intentionally
-# short and does not rescore the 307,600 FUN windows. Run one finalize command per
-# existing GPU result directory with OVERWRITE=0.
-#
-#   MODE=finalize GPU_INDEX=0 CUDA_DEVICE=0 SYSTEM_LABEL=r158-a6000-0 OVERWRITE=0 bash proc_sh/run-x-a11-score-snapshot-npr-fun.sh
-#   MODE=finalize GPU_INDEX=1 CUDA_DEVICE=1 SYSTEM_LABEL=r158-a6000-1 OVERWRITE=0 bash proc_sh/run-x-a11-score-snapshot-npr-fun.sh
-#   MODE=finalize GPU_INDEX=2 CUDA_DEVICE=2 SYSTEM_LABEL=r158-a6000-2 OVERWRITE=0 bash proc_sh/run-x-a11-score-snapshot-npr-fun.sh
 #
 # Optional environment variables:
 #   PROJECT_ROOT, PYTHON_BIN, PY_SCRIPT, A02_SCRIPT, A09_ROOT, A10_ROOT,
@@ -108,8 +95,8 @@ cd "${PROJECT_ROOT}"
 RUN_PREFIX="run-x-a11"
 MODE="${MODE:-smoke}"
 case "${MODE}" in
-    smoke|run|finalize) ;;
-    *) echo "ERROR: MODE must be smoke, run, or finalize; got ${MODE}" >&2; exit 2 ;;
+    smoke|run) ;;
+    *) echo "ERROR: MODE must be smoke or run; got ${MODE}" >&2; exit 2 ;;
 esac
 
 PYTHON_BIN="${PYTHON_BIN:-python}"
@@ -126,15 +113,8 @@ CUDA_DEVICE="${CUDA_DEVICE:-${GPU_INDEX}}"
 SYSTEM_LABEL="${SYSTEM_LABEL:-r158-a6000-${GPU_INDEX}}"
 PROGRESS_EVERY_WINDOWS="${PROGRESS_EVERY_WINDOWS:-100}"
 OVERWRITE="${OVERWRITE:-0}"
-if [[ "${MODE}" == "finalize" ]]; then
-    RETRY_ERROR_WINDOWS="${RETRY_ERROR_WINDOWS:-0}"
-else
-    RETRY_ERROR_WINDOWS="${RETRY_ERROR_WINDOWS:-1}"
-fi
-# v3 permits only prespecified deterministic exclusions; unexpected invalid rows
-# remain hard failures in Python. Set REQUIRE_ALL_VALID=1 only for a stricter
-# diagnostic run that also rejects expected exclusions.
-REQUIRE_ALL_VALID="${REQUIRE_ALL_VALID:-0}"
+RETRY_ERROR_WINDOWS="${RETRY_ERROR_WINDOWS:-1}"
+REQUIRE_ALL_VALID="${REQUIRE_ALL_VALID:-1}"
 ALLOW_NON_A6000="${ALLOW_NON_A6000:-0}"
 RUN_SELF_TEST="${RUN_SELF_TEST:-1}"
 
@@ -148,18 +128,13 @@ else
     OUTPUT_DIR="${OUTPUT_ROOT}/results/gpu-${GPU_INDEX}"
 fi
 
-if [[ "${MODE}" == "finalize" && "${OVERWRITE}" != "0" ]]; then
-    echo "ERROR: MODE=finalize must use OVERWRITE=0 to preserve the existing SQLite checkpoint." >&2
-    exit 2
-fi
-
 export CUDA_VISIBLE_DEVICES="${CUDA_DEVICE}"
 export TOKENIZERS_PARALLELISM="false"
 export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"
 
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
-LOG_FILE="${LOG_FILE:-${LOG_DIR}/${RUN_PREFIX}-v3-${MODE}-${SYSTEM_LABEL}-${TIMESTAMP}.log}"
+LOG_FILE="${LOG_FILE:-${LOG_DIR}/${RUN_PREFIX}-v2-${MODE}-${SYSTEM_LABEL}-${TIMESTAMP}.log}"
 
 require_file() {
     local path="$1"
@@ -195,7 +170,7 @@ finish() {
     elapsed=$((end_epoch - START_EPOCH))
     echo
     echo "============================================================================"
-    echo "run-x-a11-v3 execution summary"
+    echo "run-x-a11-v2 execution summary"
     echo "Mode:             ${MODE}"
     echo "System label:     ${SYSTEM_LABEL}"
     echo "GPU index:        ${GPU_INDEX}"
@@ -252,7 +227,7 @@ PY
 )"
 
 echo "============================================================================"
-echo "run-x-a11-v3: FUN fixed-perturbation NPR scoring on homogeneous R158 GPUs"
+echo "run-x-a11-v2: FUN fixed-perturbation NPR scoring on homogeneous R158 GPUs"
 echo "Started:                         ${START_TEXT}"
 echo "Mode:                            ${MODE}"
 echo "Project root:                    ${PROJECT_ROOT}"
@@ -280,8 +255,7 @@ echo "Classification:                  disabled"
 echo "Resume checkpoint:               SQLite per window"
 echo "Overwrite checkpoint:            ${OVERWRITE}"
 echo "Retry prior scoring errors:      ${RETRY_ERROR_WINDOWS}"
-echo "Require all valid (strict):      ${REQUIRE_ALL_VALID}"
-echo "Expected exclusion policy:       context-overflow / zero-denominator / <=1-token no-valid-perturbation"
+echo "Require all valid:               ${REQUIRE_ALL_VALID}"
 echo "Reference check windows:         ${REFERENCE_CHECK_WINDOWS}"
 if [[ "${MODE}" == "smoke" ]]; then
     echo "Smoke max assigned shards:       ${SMOKE_MAX_SHARDS}"
@@ -309,9 +283,6 @@ ARGS=(
 
 if [[ "${MODE}" == "smoke" ]]; then
     ARGS+=(--max-shards "${SMOKE_MAX_SHARDS}" --max-windows-per-shard "${SMOKE_WINDOWS_PER_SHARD}")
-fi
-if [[ "${MODE}" == "finalize" ]]; then
-    ARGS+=(--finalize-only)
 fi
 if [[ "${OVERWRITE}" == "1" ]]; then
     ARGS+=(--overwrite)

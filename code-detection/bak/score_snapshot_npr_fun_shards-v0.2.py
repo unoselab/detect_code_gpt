@@ -33,23 +33,6 @@ are regenerated from SQLite after the selected workload is complete.
 
 The production database contains scores and provenance only; it deliberately
 omits the original/perturbed source strings because those remain frozen in A09.
-
-A11 v3 expected-exclusion policy
---------------------------------
-A11 v3 preserves the frozen A02 NPR definition and A09 128 literal-space-token
-windows.  It does not truncate, split, or epsilon-adjust pathological inputs.
-Instead, three prespecified deterministic cases are treated as measurement-domain
-exclusions rather than experiment failures:
-- ``model_context_exceeded``: the original window tokenizes beyond the model's
-  reported context limit.  Fresh scoring stops before model forward execution.
-- ``zero_original_log_rank``: NPR is mathematically undefined because the A02
-  denominator is exactly zero.
-- ``no_valid_perturbation_scores`` only when the original input has at most one
-  LLM token, so no rankable perturbation score exists.
-All other invalid windows and all other scoring exceptions remain hard failures.
-A finalize-only mode can re-audit an existing v2 SQLite checkpoint, normalize the
-two observed context-overflow OOM rows into deterministic exclusions, and rebuild
-CSV/QC outputs without rescoring the 307,600 FUN windows.
 """
 
 from __future__ import annotations
@@ -76,7 +59,7 @@ os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 import numpy as np
 
 
-SCRIPT_VERSION = "run-x-a11-v3"
+SCRIPT_VERSION = "run-x-a11-v2"
 CATEGORY = "FUN"
 ASSIGNMENT_POLICY = "deterministic_lpt_by_fun_windows"
 EXPECTED_A02_SHA256 = "57e0781a406d992fb045335a79b1cb97e5c0557de9582603401f6d402ef528a0"
@@ -107,30 +90,6 @@ FAILURE_COLUMNS = [
     "stage",
     "error_type",
     "error_message",
-]
-EXPECTED_EXCLUSION_REASONS = {
-    "model_context_exceeded",
-    "zero_original_log_rank",
-    "no_valid_perturbation_scores",
-}
-EXCLUSION_COLUMNS = [
-    "logical_shard",
-    "gpu_index",
-    "system_label",
-    "code_unit_sha256",
-    "code_unit_types",
-    "unit_groups",
-    "window_index",
-    "exclusion_class",
-    "window_npr_invalid_reason",
-    "original_llm_token_count",
-    "reported_model_context_limit",
-    "original_log_rank",
-    "mean_perturbed_log_rank",
-    "valid_perturbation_scores",
-    "window_space_by_token_count",
-    "raw_char_count",
-    "normalization_note",
 ]
 REFERENCE_COLUMNS = [
     "logical_shard",
@@ -553,27 +512,6 @@ def score_prepared_window(
     perturbed_lengths: list[int] = []
     try:
         original_llm_tokens = a02.tokenizer_input_length(tokenizer, original_text)
-        reported_context = runtime.reported_model_context_limit
-        if (
-            reported_context is not None
-            and original_llm_tokens is not None
-            and int(original_llm_tokens) > int(reported_context)
-        ):
-            return {
-                "original_llm_token_count": int(original_llm_tokens),
-                "perturbed_llm_token_count_min": None,
-                "perturbed_llm_token_count_mean": None,
-                "perturbed_llm_token_count_max": None,
-                "original_log_rank": None,
-                "mean_perturbed_log_rank": None,
-                "window_npr": None,
-                "expected_perturbations": int(config.perturbations_per_window),
-                "valid_perturbation_scores": 0,
-                "deterministic_exclusion_reason": "model_context_exceeded",
-                "scoring_error_type": None,
-                "scoring_error_message": None,
-                "scoring_seconds": float(time.perf_counter() - started),
-            }
         original_log_rank = runtime.get_rank(original_text, runtime.args, runtime.model_config, log=True)
         perturbed_lengths = a02.tokenizer_lengths(tokenizer, perturbations)
         perturbed_ranks = runtime.get_ranks(perturbations, runtime.args, runtime.model_config, log=True)
@@ -623,11 +561,7 @@ def make_window_row(
     a09_config_fingerprint: str,
     a02_config_fingerprint: str,
 ) -> dict[str, Any]:
-    deterministic_reason = scored.get("deterministic_exclusion_reason")
-    if deterministic_reason:
-        valid, reason = False, str(deterministic_reason)
-    else:
-        valid, reason = a02.classify_window_validity(scored)
+    valid, reason = a02.classify_window_validity(scored)
     original_llm_count = scored.get("original_llm_token_count")
     reported_context = runtime.reported_model_context_limit
     exceeds = (
@@ -750,133 +684,6 @@ def export_window_csv(connection: sqlite3.Connection, path: Path) -> int:
     return count
 
 
-def expected_exclusion_class(row: dict[str, Any]) -> str | None:
-    """Return a prespecified exclusion class, or None for an unexpected invalid row."""
-    if bool(row.get("window_npr_valid")):
-        return None
-    reason = str(row.get("window_npr_invalid_reason") or "")
-    original_tokens = row.get("original_llm_token_count")
-    context_limit = row.get("reported_model_context_limit")
-    valid_perturbations = int(row.get("valid_perturbation_scores") or 0)
-    original_rank = row.get("original_log_rank")
-
-    if reason == "model_context_exceeded":
-        if (
-            original_tokens is not None
-            and context_limit is not None
-            and int(original_tokens) > int(context_limit)
-            and not row.get("scoring_error_type")
-        ):
-            return "model_context_exceeded"
-        return None
-    if reason == "zero_original_log_rank":
-        if original_rank is not None and float(original_rank) == 0.0 and valid_perturbations > 0:
-            return "zero_original_log_rank"
-        return None
-    if reason == "no_valid_perturbation_scores":
-        if original_tokens is not None and int(original_tokens) <= 1 and valid_perturbations == 0:
-            return "insufficient_llm_tokens_for_npr"
-        return None
-    return None
-
-
-def normalize_existing_v2_context_oom_rows(connection: sqlite3.Connection) -> int:
-    """Convert only context-overflow OOM rows from v2 into deterministic exclusions."""
-    rows = connection.execute(
-        """
-        SELECT code_unit_sha256, window_index, scoring_error_message
-        FROM window_scores
-        WHERE window_npr_valid = 0
-          AND scoring_error_type = 'OutOfMemoryError'
-          AND original_llm_tokens_exceed_reported_context = 1
-          AND original_llm_token_count IS NOT NULL
-          AND reported_model_context_limit IS NOT NULL
-          AND original_llm_token_count > reported_model_context_limit
-        """
-    ).fetchall()
-    for sha, window_index, message in rows:
-        del message
-        normalization_note = (
-            "v3 normalized a legacy v2 context-overflow OOM into an expected "
-            "measurement-domain exclusion; the original OOM remains in the v2 log."
-        )
-        connection.execute(
-            """
-            UPDATE window_scores
-               SET window_npr_invalid_reason = 'model_context_exceeded',
-                   scoring_error_type = NULL,
-                   scoring_error_message = ?
-             WHERE code_unit_sha256 = ? AND window_index = ?
-            """,
-            (normalization_note, str(sha), int(window_index)),
-        )
-    connection.commit()
-    return len(rows)
-
-
-def export_expected_exclusions(connection: sqlite3.Connection, path: Path) -> tuple[int, int]:
-    """Export prespecified window exclusions and return (window_count, unique_unit_count)."""
-    columns = [
-        "logical_shard", "gpu_index", "system_label", "code_unit_sha256",
-        "code_unit_types", "unit_groups", "window_index", "window_npr_invalid_reason",
-        "original_llm_token_count", "reported_model_context_limit", "original_log_rank",
-        "mean_perturbed_log_rank", "valid_perturbation_scores",
-        "window_space_by_token_count", "raw_char_count", "scoring_error_message",
-        "window_npr_valid", "scoring_error_type",
-    ]
-    rows_out: list[dict[str, Any]] = []
-    unique_units: set[str] = set()
-    cursor = connection.execute(
-        f"SELECT {','.join(columns)} FROM window_scores WHERE window_npr_valid = 0 "
-        "ORDER BY code_unit_sha256, window_index"
-    )
-    for values in cursor:
-        row = dict(zip(columns, values))
-        exclusion_class = expected_exclusion_class(row)
-        if exclusion_class is None:
-            continue
-        sha = str(row["code_unit_sha256"])
-        unique_units.add(sha)
-        rows_out.append({
-            "logical_shard": row["logical_shard"],
-            "gpu_index": row["gpu_index"],
-            "system_label": row["system_label"],
-            "code_unit_sha256": sha,
-            "code_unit_types": row["code_unit_types"],
-            "unit_groups": row["unit_groups"],
-            "window_index": row["window_index"],
-            "exclusion_class": exclusion_class,
-            "window_npr_invalid_reason": row["window_npr_invalid_reason"],
-            "original_llm_token_count": row["original_llm_token_count"],
-            "reported_model_context_limit": row["reported_model_context_limit"],
-            "original_log_rank": row["original_log_rank"],
-            "mean_perturbed_log_rank": row["mean_perturbed_log_rank"],
-            "valid_perturbation_scores": row["valid_perturbation_scores"],
-            "window_space_by_token_count": row["window_space_by_token_count"],
-            "raw_char_count": row["raw_char_count"],
-            "normalization_note": row["scoring_error_message"],
-        })
-    atomic_csv(rows_out, path, EXCLUSION_COLUMNS)
-    return len(rows_out), len(unique_units)
-
-
-def count_unexpected_invalid_windows(connection: sqlite3.Connection) -> int:
-    columns = [
-        "window_npr_valid", "window_npr_invalid_reason", "original_llm_token_count",
-        "reported_model_context_limit", "original_log_rank", "valid_perturbation_scores",
-        "scoring_error_type",
-    ]
-    count = 0
-    cursor = connection.execute(
-        f"SELECT {','.join(columns)} FROM window_scores WHERE window_npr_valid = 0"
-    )
-    for values in cursor:
-        row = dict(zip(columns, values))
-        if expected_exclusion_class(row) is None:
-            count += 1
-    return count
-
-
 def aggregate_and_export_units(
     connection: sqlite3.Connection,
     unit_plan: dict[str, dict[str, Any]],
@@ -888,14 +695,13 @@ def aggregate_and_export_units(
     output_path: Path,
     failure_path: Path,
     skip_units_missing_from_plan: bool = False,
-) -> tuple[int, int, int, int, list[dict[str, Any]]]:
+) -> tuple[int, int, int, list[dict[str, Any]]]:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = output_path.with_suffix(output_path.suffix + ".tmp")
     failures: list[dict[str, Any]] = []
     units_written = 0
     partial_units = 0
     invalid_windows_total = 0
-    excluded_units = 0
 
     query_columns = [
         "logical_shard",
@@ -908,10 +714,6 @@ def aggregate_and_export_units(
         "window_space_by_start",
         "window_space_by_end",
         "window_npr_valid",
-        "window_npr_invalid_reason",
-        "scoring_error_type",
-        "reported_model_context_limit",
-        "valid_perturbation_scores",
         "original_llm_token_count",
         "original_log_rank",
         "mean_perturbed_log_rank",
@@ -929,7 +731,7 @@ def aggregate_and_export_units(
         current_rows: list[dict[str, Any]] = []
 
         def flush_unit() -> None:
-            nonlocal units_written, partial_units, invalid_windows_total, excluded_units, current_rows, current_sha
+            nonlocal units_written, partial_units, invalid_windows_total, current_rows, current_sha
             if current_sha is None or not current_rows:
                 return
             meta = unit_plan.get(current_sha)
@@ -967,29 +769,6 @@ def aggregate_and_export_units(
                     }
                 )
                 return
-
-            unexpected_invalid = [
-                row for row in current_rows
-                if not bool(row["window_npr_valid"]) and expected_exclusion_class(row) is None
-            ]
-            if unexpected_invalid:
-                failures.append(
-                    {
-                        "logical_shard": meta["logical_shard"],
-                        "code_unit_sha256": current_sha,
-                        "window_index": "",
-                        "stage": "aggregate_unit",
-                        "error_type": "UnexpectedInvalidWindow",
-                        "error_message": f"unexpected_invalid_windows={len(unexpected_invalid)}",
-                    }
-                )
-                return
-
-            valid_count = sum(bool(row["window_npr_valid"]) for row in current_rows)
-            if valid_count == 0 and invalid > 0:
-                excluded_units += 1
-                return
-
             a02_rows = [
                 {
                     "window_space_by_start": int(row["window_space_by_start"]),
@@ -1061,7 +840,7 @@ def aggregate_and_export_units(
         flush_unit()
     os.replace(tmp, output_path)
     atomic_csv(failures, failure_path, FAILURE_COLUMNS)
-    return units_written, partial_units, invalid_windows_total, excluded_units, failures
+    return units_written, partial_units, invalid_windows_total, failures
 
 
 def count_db(connection: sqlite3.Connection) -> dict[str, int]:
@@ -1082,7 +861,6 @@ def count_db(connection: sqlite3.Connection) -> dict[str, int]:
         "scoring_errors": int(row[2] or 0),
         "unique_units": int(row[3] or 0),
         "context_exceed_windows": int(row[4] or 0),
-        "unexpected_invalid_windows": count_unexpected_invalid_windows(connection),
     }
 
 
@@ -1213,7 +991,7 @@ def run_self_test() -> None:
         }
         aggregate_csv = Path(tmp_text) / "aggregate.csv"
         aggregate_failures_csv = Path(tmp_text) / "aggregate_failures.csv"
-        written, partial, invalid, excluded, aggregate_failures = aggregate_and_export_units(
+        written, partial, invalid, aggregate_failures = aggregate_and_export_units(
             connection,
             aggregate_plan,
             MockA02(),
@@ -1228,34 +1006,7 @@ def run_self_test() -> None:
         assert written == 1
         assert partial == 0
         assert invalid == 0
-        assert excluded == 0
         assert aggregate_failures == []
-
-        expected = {
-            "window_npr_valid": 0,
-            "window_npr_invalid_reason": "model_context_exceeded",
-            "original_llm_token_count": 20000,
-            "reported_model_context_limit": 16384,
-            "original_log_rank": None,
-            "valid_perturbation_scores": 0,
-            "scoring_error_type": None,
-        }
-        assert expected_exclusion_class(expected) == "model_context_exceeded"
-        expected.update({
-            "window_npr_invalid_reason": "zero_original_log_rank",
-            "original_llm_token_count": 2,
-            "reported_model_context_limit": 16384,
-            "original_log_rank": 0.0,
-            "valid_perturbation_scores": 50,
-        })
-        assert expected_exclusion_class(expected) == "zero_original_log_rank"
-        expected.update({
-            "window_npr_invalid_reason": "no_valid_perturbation_scores",
-            "original_llm_token_count": 1,
-            "original_log_rank": None,
-            "valid_perturbation_scores": 0,
-        })
-        assert expected_exclusion_class(expected) == "insufficient_llm_tokens_for_npr"
         connection.close()
     print("score_snapshot_npr_fun_shards self-test: PASS")
 
@@ -1281,8 +1032,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-windows-per-shard", type=int, default=None)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--retry-error-windows", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--require-all-valid", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--finalize-only", action="store_true")
+    parser.add_argument("--require-all-valid", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--allow-non-a6000", action="store_true")
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--self-test-only", action="store_true")
@@ -1400,14 +1150,8 @@ def main() -> int:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     db_path = args.output_dir / "window_scores.sqlite3"
-    checkpoint_existed_before_open = db_path.is_file()
-    if args.finalize_only and not checkpoint_existed_before_open:
-        raise FileNotFoundError(
-            f"Finalize-only mode requires an existing A11 SQLite checkpoint: {db_path}"
-        )
     connection = open_database(db_path, overwrite=args.overwrite)
-    migrated_context_oom_rows = normalize_existing_v2_context_oom_rows(connection)
-    if args.retry_error_windows and not args.finalize_only:
+    if args.retry_error_windows:
         connection.execute("DELETE FROM window_scores WHERE scoring_error_type IS NOT NULL")
         connection.commit()
 
@@ -1433,35 +1177,24 @@ def main() -> int:
     completed_keys = load_completed_keys(connection)
     reused_at_start = len(completed_keys)
 
-    prior_metadata_path = args.output_dir / "metadata.json"
-    prior_metadata = load_json(prior_metadata_path) if prior_metadata_path.is_file() else {}
-    runtime_metadata = prior_metadata.get("runtime", {}) if isinstance(prior_metadata, dict) else {}
-    gpu_name = str(runtime_metadata.get("gpu_name", ""))
-    model_revision = str(runtime_metadata.get("model_revision", ""))
-
-    if args.finalize_only:
-        add_check(checks, "finalize_checkpoint_exists", checkpoint_existed_before_open, db_path, "existing v2/v3 SQLite checkpoint")
-        add_check(checks, "finalize_prior_gpu_is_rtx_a6000", args.allow_non_a6000 or "RTX A6000" in gpu_name, gpu_name, "NVIDIA RTX A6000")
-        add_check(checks, "finalize_prior_model_revision", model_revision == EXPECTED_MODEL_REVISION, model_revision, EXPECTED_MODEL_REVISION)
-    else:
-        # A02 load_runtime expects these argument attributes.
-        runtime_args = argparse.Namespace(
-            project_root=project_root,
-            device=args.device,
-            model_cache_dir=args.model_cache_dir,
-            detector_output_name=args.detector_output_name,
-            quiet_internal_progress=args.quiet_internal_progress,
-            detector_log_level=args.detector_log_level,
-        )
-        runtime = a02.load_runtime(config, runtime_args)
-        gpu_name = str(runtime.gpu_name)
-        add_check(checks, "cuda_visible_device_count", int(runtime.torch.cuda.device_count()) == 1, runtime.torch.cuda.device_count(), 1)
-        add_check(checks, "gpu_is_rtx_a6000", args.allow_non_a6000 or "RTX A6000" in gpu_name, gpu_name, "NVIDIA RTX A6000")
-        model_revision = str(getattr(runtime.model_config["base_model"].config, "_commit_hash", ""))
-        add_check(checks, "model_revision", model_revision == EXPECTED_MODEL_REVISION, model_revision, EXPECTED_MODEL_REVISION)
+    # A02 load_runtime expects these argument attributes.
+    runtime_args = argparse.Namespace(
+        project_root=project_root,
+        device=args.device,
+        model_cache_dir=args.model_cache_dir,
+        detector_output_name=args.detector_output_name,
+        quiet_internal_progress=args.quiet_internal_progress,
+        detector_log_level=args.detector_log_level,
+    )
+    runtime = a02.load_runtime(config, runtime_args)
+    gpu_name = str(runtime.gpu_name)
+    add_check(checks, "cuda_visible_device_count", int(runtime.torch.cuda.device_count()) == 1, runtime.torch.cuda.device_count(), 1)
+    add_check(checks, "gpu_is_rtx_a6000", args.allow_non_a6000 or "RTX A6000" in gpu_name, gpu_name, "NVIDIA RTX A6000")
+    model_revision = str(getattr(runtime.model_config["base_model"].config, "_commit_hash", ""))
+    add_check(checks, "model_revision", model_revision == EXPECTED_MODEL_REVISION, model_revision, EXPECTED_MODEL_REVISION)
     if any(not bool(row["passed"]) for row in checks):
         atomic_csv(checks, args.output_dir / "checks.csv", CHECK_COLUMNS)
-        raise RuntimeError("GPU/model/finalize provenance checks failed.")
+        raise RuntimeError("GPU/model provenance checks failed.")
 
     selected_expected_windows = full_expected_windows
     limited_run = args.max_shards is not None or args.max_windows_per_shard is not None
@@ -1478,10 +1211,7 @@ def main() -> int:
     last_sha: str | None = None
     last_window_index: int | None = None
 
-    plan_rows_to_score = [] if args.finalize_only else lpt_plan
-    if args.finalize_only:
-        candidate_records_seen = full_expected_windows
-    for plan_row in plan_rows_to_score:
+    for plan_row in lpt_plan:
         shard_id = int(plan_row["logical_shard"])
         data_path, _ = shard_paths(args.a09_root, shard_id)
         per_shard_seen = 0
@@ -1507,7 +1237,7 @@ def main() -> int:
                 raise RuntimeError(f"A09 perturbation digest mismatch for {sha}/{window_index}")
 
             scored = score_prepared_window(record, a02, config, runtime)
-            if reference_remaining > 0 and scored.get("deterministic_exclusion_reason") != "model_context_exceeded":
+            if reference_remaining > 0:
                 check_row = reference_check(record, scored, a02, config, runtime)
                 reference_rows.append(check_row)
                 reference_remaining -= 1
@@ -1573,16 +1303,8 @@ def main() -> int:
     counts = count_db(connection)
     add_check(checks, "selected_windows_complete", counts["windows"] == selected_expected_windows, counts["windows"], selected_expected_windows)
     add_check(checks, "scoring_errors_zero", counts["scoring_errors"] == 0, counts["scoring_errors"], 0)
-    add_check(
-        checks,
-        "unexpected_invalid_windows_zero",
-        counts["unexpected_invalid_windows"] == 0,
-        counts["unexpected_invalid_windows"],
-        0,
-        "Only prespecified deterministic measurement-domain exclusions are permitted.",
-    )
     if args.require_all_valid:
-        add_check(checks, "invalid_windows_zero_strict", counts["invalid_windows"] == 0, counts["invalid_windows"], 0)
+        add_check(checks, "invalid_windows_zero", counts["invalid_windows"] == 0, counts["invalid_windows"], 0)
 
     if reference_rows:
         atomic_csv(reference_rows, args.output_dir / "reference_scoring_checks.csv", REFERENCE_COLUMNS)
@@ -1593,11 +1315,7 @@ def main() -> int:
     window_csv_path = args.output_dir / "python_fun_window_npr_scores.csv"
     unique_csv_path = args.output_dir / "python_fun_unique_code_unit_npr_scores.csv"
     failure_csv_path = args.output_dir / "python_fun_npr_failures.csv"
-    exclusion_csv_path = args.output_dir / "python_fun_npr_exclusions.csv"
     window_export_rows = export_window_csv(connection, window_csv_path)
-    expected_exclusion_windows, expected_exclusion_unique_units = export_expected_exclusions(
-        connection, exclusion_csv_path
-    )
 
     # For a limited smoke run, the full unit plan contains incomplete units. Build
     # a temporary plan containing only units for which every expected window was
@@ -1616,7 +1334,7 @@ def main() -> int:
             if db_counts_by_unit.get(sha, 0) == int(meta["n_expected_windows"])
         }
 
-    units_written, partial_units, invalid_windows_agg, excluded_unique_units, aggregate_failures = aggregate_and_export_units(
+    units_written, partial_units, invalid_windows_agg, aggregate_failures = aggregate_and_export_units(
         connection,
         aggregate_plan,
         a02,
@@ -1636,44 +1354,18 @@ def main() -> int:
 
     add_check(checks, "window_csv_rows_match_database", window_export_rows == counts["windows"], window_export_rows, counts["windows"])
     if not limited_run:
-        add_check(
-            checks,
-            "unique_fun_units_accounted",
-            units_written + excluded_unique_units == full_expected_units,
-            units_written + excluded_unique_units,
-            full_expected_units,
-            "Finite NPR units plus fully expected-excluded units must account for the complete FUN plan.",
-        )
-        add_check(
-            checks,
-            "fully_excluded_units_subset_of_units_with_exclusions",
-            excluded_unique_units <= expected_exclusion_unique_units,
-            excluded_unique_units,
-            f"<= {expected_exclusion_unique_units}",
-            "Units with at least one expected-excluded window may still have a partial finite NPR score.",
-        )
+        add_check(checks, "unique_fun_units_complete", units_written == full_expected_units, units_written, full_expected_units)
     add_check(checks, "no_agc_hwc_classification", True, "none", "none", "A11 output schema contains no threshold/classification columns.")
 
     failed_checks = [row for row in checks if not bool(row["passed"])]
-    if failed_checks or failure_rows:
-        status = "FAIL"
-    elif expected_exclusion_windows > 0:
-        status = "PASS_WITH_EXCLUSIONS"
-    else:
-        status = "PASS"
+    status = "PASS" if not failed_checks and not failure_rows else "FAIL"
     atomic_csv(checks, args.output_dir / "checks.csv", CHECK_COLUMNS)
 
     scoring_elapsed = time.perf_counter() - scoring_started
     invocation_elapsed = time.perf_counter() - invocation_started
     new_rate = newly_scored / scoring_elapsed if newly_scored and scoring_elapsed > 0 else 0.0
-    if runtime is not None and runtime.torch.cuda.is_available():
-        peak_allocated = int(runtime.torch.cuda.max_memory_allocated())
-        peak_reserved = int(runtime.torch.cuda.max_memory_reserved())
-        model_load_seconds = float(runtime.model_load_seconds)
-    else:
-        peak_allocated = 0
-        peak_reserved = 0
-        model_load_seconds = 0.0
+    peak_allocated = int(runtime.torch.cuda.max_memory_allocated()) if runtime.torch.cuda.is_available() else 0
+    peak_reserved = int(runtime.torch.cuda.max_memory_reserved()) if runtime.torch.cuda.is_available() else 0
 
     summary = {
         "status": status,
@@ -1684,7 +1376,6 @@ def main() -> int:
         "system_label": args.system_label,
         "hostname": platform.node(),
         "limited_run": limited_run,
-        "finalize_only": bool(args.finalize_only),
         "assigned_logical_shards": sorted(assigned_shards),
         "assigned_shard_count": len(assigned_shards),
         "full_expected_fun_unique_units": full_expected_units,
@@ -1696,23 +1387,16 @@ def main() -> int:
         "resume_reused_windows_at_start": reused_at_start,
         "retry_error_windows": bool(args.retry_error_windows),
         "invalid_windows": counts["invalid_windows"],
-        "expected_exclusion_windows": expected_exclusion_windows,
-        "unexpected_invalid_windows": counts["unexpected_invalid_windows"],
         "scoring_errors": counts["scoring_errors"],
-        "migrated_v2_context_oom_rows": migrated_context_oom_rows,
         "windows_exceeding_reported_model_context": counts["context_exceed_windows"],
         "exported_unique_units": units_written,
-        "excluded_unique_units": excluded_unique_units,
-        "expected_exclusion_unique_units": expected_exclusion_unique_units,
-        "finite_unique_unit_coverage_ratio": float(units_written / full_expected_units) if full_expected_units else 0.0,
-        "window_exclusion_rate": float(expected_exclusion_windows / selected_expected_windows) if selected_expected_windows else 0.0,
         "partial_unique_units": partial_units,
         "aggregate_invalid_windows": invalid_windows_agg,
         "failed_checks": len(failed_checks),
         "failure_rows": len(failure_rows),
         "reference_checks": len(reference_rows),
         "reference_failures": sum(not bool(row["passed"]) for row in reference_rows),
-        "model_load_seconds": model_load_seconds,
+        "model_load_seconds": float(runtime.model_load_seconds),
         "scoring_elapsed_seconds": scoring_elapsed,
         "invocation_elapsed_seconds": invocation_elapsed,
         "new_windows_per_second": new_rate,
@@ -1727,8 +1411,7 @@ def main() -> int:
     }
     atomic_json(summary, args.output_dir / "summary.json")
 
-    metadata = dict(prior_metadata) if args.finalize_only and prior_metadata else {}
-    metadata.update({
+    metadata = {
         "script_version": SCRIPT_VERSION,
         "methodology": {
             "category": "FUN = primary function_body membership",
@@ -1738,12 +1421,6 @@ def main() -> int:
             "unit_aggregation": "A02 valid-frontier space-by-token weighting plus pooled components",
             "classification": "disabled",
             "resume": "per-window SQLite primary key checkpoint",
-            "expected_exclusions": [
-                "model_context_exceeded",
-                "zero_original_log_rank",
-                "no_valid_perturbation_scores only when original_llm_token_count <= 1",
-            ],
-            "expected_exclusion_policy": "preserve A02/A09 semantics; no truncation, re-windowing, epsilon correction, or synthetic NPR",
         },
         "inputs": {
             "a09_root": str(args.a09_root),
@@ -1757,15 +1434,14 @@ def main() -> int:
         "runtime": {
             "python_version": platform.python_version(),
             "gpu_name": gpu_name,
-            "gpu_total_memory_bytes": int(runtime.gpu_total_memory_bytes) if runtime is not None else int(runtime_metadata.get("gpu_total_memory_bytes", 0) or 0),
-            "tokenizer_model_max_length": runtime.tokenizer_model_max_length if runtime is not None else runtime_metadata.get("tokenizer_model_max_length"),
-            "model_context_fields": runtime.model_context_fields if runtime is not None else runtime_metadata.get("model_context_fields", {}),
-            "reported_model_context_limit": runtime.reported_model_context_limit if runtime is not None else runtime_metadata.get("reported_model_context_limit"),
+            "gpu_total_memory_bytes": int(runtime.gpu_total_memory_bytes),
+            "tokenizer_model_max_length": runtime.tokenizer_model_max_length,
+            "model_context_fields": runtime.model_context_fields,
+            "reported_model_context_limit": runtime.reported_model_context_limit,
             "model_revision": model_revision,
             "explicit_llm_truncation": False,
-            "finalize_only": bool(args.finalize_only),
         },
-    })
+    }
     atomic_json(metadata, args.output_dir / "metadata.json")
     write_progress(
         progress_path,
@@ -1789,7 +1465,6 @@ def main() -> int:
     print(f"System label:                    {args.system_label}")
     print(f"GPU:                             {gpu_name}")
     print(f"Limited/smoke run:               {int(limited_run)}")
-    print(f"Finalize-only:                   {int(args.finalize_only)}")
     print(f"Assigned logical shards:         {len(assigned_shards)}")
     print(f"Full planned FUN windows:        {full_expected_windows}")
     print(f"Selected expected windows:       {selected_expected_windows}")
@@ -1797,18 +1472,14 @@ def main() -> int:
     print(f"Newly scored this invocation:    {newly_scored}")
     print(f"Resume-reused at start:          {reused_at_start}")
     print(f"Invalid NPR windows:             {counts['invalid_windows']}")
-    print(f"Expected exclusion windows:      {expected_exclusion_windows}")
-    print(f"Unexpected invalid windows:      {counts['unexpected_invalid_windows']}")
     print(f"Scoring errors:                  {counts['scoring_errors']}")
-    print(f"Migrated v2 context OOM rows:    {migrated_context_oom_rows}")
-    print(f"Exported finite unique units:    {units_written}")
-    print(f"Excluded unique units:           {excluded_unique_units}")
+    print(f"Exported complete unique units:  {units_written}")
     print(f"Partial unique units:            {partial_units}")
     print(f"Reference exact checks:          {len(reference_rows)}")
     print(f"A02 script SHA256:               {a02_sha}")
     print(f"A02 config fingerprint:          {a02_config_fingerprint}")
     print(f"Model revision:                  {model_revision}")
-    print(f"Model load seconds:              {model_load_seconds:.3f}")
+    print(f"Model load seconds:              {runtime.model_load_seconds:.3f}")
     print(f"Scoring elapsed seconds:         {scoring_elapsed:.3f}")
     print(f"New windows/second:              {new_rate:.6f}")
     print(f"Peak CUDA allocated bytes:       {peak_allocated}")
@@ -1817,7 +1488,7 @@ def main() -> int:
     print(f"Failure rows:                    {len(failure_rows)}")
     print(f"Output directory:                {args.output_dir}")
     print("=" * 80)
-    return 0 if status in {"PASS", "PASS_WITH_EXCLUSIONS"} else 5
+    return 0 if status == "PASS" else 5
 
 
 if __name__ == "__main__":
