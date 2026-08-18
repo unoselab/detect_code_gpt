@@ -1,36 +1,36 @@
 ============================================================================
 run-1c0a: Table 2 mixed-code overlap-window benchmark
-Started:                         Tue Aug 18 02:27:39 PM CDT 2026
-Workspace:                       /home/user1-system12/project-workspace/detect_code_gpt
-Active conda env:                detectcodegpt
-Python path:                     /home/user1-system12/miniconda3/envs/detectcodegpt/bin/python
+Started:                         Tue Aug 18 04:08:06 PM CDT 2026
+Workspace:                       /home/user1-system11/project-workspace/detect_code_gpt
+Active conda env:                detectcodegpt-gptoss
+Python path:                     /home/user1-system11/miniconda3/envs/detectcodegpt-gptoss/bin/python
 Python version:                  Python 3.11.15
-Python script:                   /home/user1-system12/project-workspace/detect_code_gpt/code-detection/main_mixedcode_benchmark_overlap.py
+Python script:                   /home/user1-system11/project-workspace/detect_code_gpt/code-detection/main_mixedcode_benchmark_overlap.py
 Python script SHA:               aebd701cfb068f97511cd47b24dbc5f020e1c562ee74cb8da5aba06a5de35794
-Benchmark root:                  /home/user1-system12/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b
+Benchmark root:                  /home/user1-system11/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gpt-oss
 Benchmark JSON files:            50
 Benchmark Python files:          50
-Base model:                      codellama/CodeLlama-7b-hf
-CUDA_VISIBLE_DEVICES:            0
+Base model:                      openai/gpt-oss-120b
+CUDA_VISIBLE_DEVICES:            0,1,2
 PYTHONUNBUFFERED:                1
 Algorithm:                       overlap_final_full_window_valid_frontier_weighting-v1
 Partial-body policy:             any_valid_window_partial_success_full_windows-v2
 Window size:                     128
 Perturbations/window:            50
 Random seed:                     20260723
-Output directory:                /home/user1-system12/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1
-Results cache:                   /home/user1-system12/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_50files_overlap-v1.pkl
-Function score CSV:              /home/user1-system12/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_50files_overlap-v1.csv
-Window score CSV:                /home/user1-system12/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_chunks_main_mixedcode_benchmark_mixedcode_codellama-7b_50files_overlap-v1.csv
-Log file:                        /home/user1-system12/project-workspace/detect_code_gpt/logs/run-1c0a/run-1c0a-mixedcode_codellama-7b_50files_overlap-v1-20260818-142739.log
+Output directory:                /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1
+Results cache:                   /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/results_cache_main_mixedcode_benchmark_mixedcode_gpt-oss-120b_50files_overlap-v1.pkl
+Function score CSV:              /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_scores_main_mixedcode_benchmark_mixedcode_gpt-oss-120b_50files_overlap-v1.csv
+Window score CSV:                /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_chunks_main_mixedcode_benchmark_mixedcode_gpt-oss-120b_50files_overlap-v1.csv
+Log file:                        /home/user1-system11/project-workspace/detect_code_gpt/logs/run-1c0a/run-1c0a-mixedcode_gpt-oss-120b_50files_overlap-v1-20260818-160806.log
 ============================================================================
 [STEP 1] Count-only benchmark validation
 ================================================================================
 main_mixedcode_benchmark_overlap-v1.py
 ================================================================================
-benchmark_root       : /home/user1-system12/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b
+benchmark_root       : /home/user1-system11/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gpt-oss
 function bodies      : 300
-base_model_name      : bigcode/starcoder2-7b
+base_model_name      : openai/gpt-oss-120b
 device               : cuda
 chunk_len            : 128
 min_chunk_tokens     : 1
@@ -51,18 +51,18 @@ Counts by bucket:
   type03_130: HWC=15 AGC=15
   type04_140: HWC=15 AGC=15
   type05_150: HWC=15 AGC=15
-  type06_160_new1: HWC=15 AGC=15
-  type07_170_new1: HWC=15 AGC=15
+  type06_160: HWC=15 AGC=15
+  type07_170: HWC=15 AGC=15
   type08_180: HWC=15 AGC=15
   type09_190: HWC=15 AGC=15
-  type10_200_new2: HWC=15 AGC=15
+  type10_200: HWC=15 AGC=15
 [STEP 2] Full 300-body overlap benchmark
 ================================================================================
 main_mixedcode_benchmark_overlap-v1.py
 ================================================================================
-benchmark_root       : /home/user1-system12/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/codellama-7b
+benchmark_root       : /home/user1-system11/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gpt-oss
 function bodies      : 300
-base_model_name      : codellama/CodeLlama-7b-hf
+base_model_name      : openai/gpt-oss-120b
 device               : cuda
 chunk_len            : 128
 min_chunk_tokens     : 1
@@ -72,40 +72,23 @@ random_seed          : 20260723
 algorithm_version    : overlap_final_full_window_valid_frontier_weighting-v1
 partial_body_policy  : any_valid_window_partial_success_full_windows-v2
 perturb_type         : random-insert-space+newline
-output_csv           : /home/user1-system12/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_50files_overlap-v1.csv
-chunk_csv            : /home/user1-system12/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_chunks_main_mixedcode_benchmark_mixedcode_codellama-7b_50files_overlap-v1.csv
-results_cache        : /home/user1-system12/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_50files_overlap-v1.pkl
+output_csv           : /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_scores_main_mixedcode_benchmark_mixedcode_gpt-oss-120b_50files_overlap-v1.csv
+chunk_csv            : /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_chunks_main_mixedcode_benchmark_mixedcode_gpt-oss-120b_50files_overlap-v1.csv
+results_cache        : /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/results_cache_main_mixedcode_benchmark_mixedcode_gpt-oss-120b_50files_overlap-v1.pkl
 ================================================================================
-2026-08-18 14:27:42.773 | INFO     | __main__:score_examples:541 - Before model load: CUDA_VISIBLE_DEVICES=0, args.DEVICE=cuda
-Using cache dir /home/user1-system12/.cache/huggingface/hub
-2026-08-18 14:27:42.774 | INFO     | __main__:score_examples:549 - Loading base scoring model...
-Loading BASE model codellama/CodeLlama-7b-hf...
-Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:02<00:02,  2.66s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:03<00:00,  1.76s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:03<00:00,  1.90s/it]
-The tokenizer class you load from this checkpoint is not the same type as the class this function is called from. It may result in unexpected tokenization. 
-The tokenizer class you load from this checkpoint is 'CodeLlamaTokenizer'. 
-The class this function is called from is 'LlamaTokenizer'.
-You are using the default legacy behaviour of the <class 'transformers.models.llama.tokenization_llama.LlamaTokenizer'>. This is expected, and simply means that the `legacy` (previous) behavior will be used so nothing changes for you. If you want to use the new behaviour, set `legacy=False`. This should only be set if you understand what it means, and thoroughly read the reason why this was added as explained in https://github.com/huggingface/transformers/pull/24565 - if you loaded a llama tokenizer from a GGUF file you can ignore this message
-  Tokenizer pad_token_id was None; set to eos_token_id=2
-Scoring function bodies:   0%|          | 0/300 [00:00<?, ?it/s]We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)
-
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 183.69it/s]
-Scoring function bodies:   0%|          | 1/300 [00:01<09:37,  1.93s/it]
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 183.14it/s]
-Scoring function bodies:   1%|          | 2/300 [00:03<09:34,  1.93s/it]
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 177.03it/s]
-Scoring function bodies:   1%|          | 3/300 [00:05<09:10,  1.85s/it]
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 182.04it/s]
-Scoring function bodies:   1%|▏         | 4/300 [00:07<09:11,  1.86s/it]
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 186.62it/s]
-Scoring function bodies:   2%|▏         | 5/300 [00:09<09:23,  1.91s/it]
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 180.86it/s]
-Scoring function bodies:   2%|▏         | 6/300 [00:11<09:08,  1.86s/it]
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 175.32it/s]
-Scoring function bodies:   2%|▏         | 7/300 [00:13<09:17,  1.90s/it]
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 185.77it/s]
-Scoring function bodies:   3%|▎         | 8/300 [00:15<09:02,  1.86s/it]
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 182.28it/s]
-Scoring function bodies:   3%|▎         | 9/300 [00:16<09:10,  1.89s/it]
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 181.17it/s]
-Scoring function bodies:   3%|▎         | 10/300 [00:18<08:59,  1.86s/it]
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 179.17it/s]
+2026-08-18 16:08:31.432 | INFO     | __main__:score_examples:541 - Before model load: CUDA_VISIBLE_DEVICES=0,1,2, args.DEVICE=cuda
+Using cache dir /home/user1-system11/.cache/huggingface/hub
+2026-08-18 16:08:31.432 | INFO     | __main__:score_examples:549 - Loading base scoring model...
+Loading BASE model openai/gpt-oss-120b...
+CUDA_VISIBLE_DEVICES=0,1,2
+torch.cuda.device_count()=3
+Using GPT-OSS multi-GPU loader; visible GPUs=3, max_memory={0: '44GiB', 1: '44GiB', 2: '44GiB', 'cpu': '128GiB'}
+/home/user1-system11/miniconda3/envs/detectcodegpt-gptoss/lib/python3.11/site-packages/kernels/utils.py:391: FutureWarning: Future versions of `kernels` (>=0.15) will require specifying a kernel version or revision. See: https://huggingface.co/docs/kernels/migration
+  revision = select_revision_or_version(repo_id, revision=revision, version=version)
+Fetching ... files: 0it [00:00, ?it/s]Fetching ... files: 1it [00:00,  3.33it/s]Fetching ... files: 14it [00:00, 40.08it/s]Fetching ... files: 20it [00:00, 25.36it/s]Fetching ... files: 37it [00:00, 46.65it/s]Fetching ... files: 43it [00:01, 41.75it/s]
+Loading weights:   0%|          | 0/615 [00:00<?, ?it/s]Loading weights:   0%|          | 1/615 [00:00<05:28,  1.87it/s]Loading weights:   1%|          | 4/615 [00:00<01:49,  5.59it/s]Loading weights:   1%|          | 7/615 [00:01<01:47,  5.63it/s]Loading weights:   4%|▎         | 22/615 [00:02<00:46, 12.77it/s]Loading weights:   6%|▌         | 38/615 [00:02<00:26, 21.44it/s]Loading weights:   7%|▋         | 41/615 [00:02<00:36, 15.91it/s]Loading weights:   9%|▉         | 55/615 [00:03<00:24, 22.99it/s]Loading weights:   9%|▉         | 58/615 [00:03<00:33, 16.74it/s]Loading weights:  12%|█▏        | 72/615 [00:04<00:23, 23.37it/s]Loading weights:  12%|█▏        | 75/615 [00:04<00:31, 16.92it/s]Loading weights:  14%|█▍        | 89/615 [00:04<00:21, 24.07it/s]Loading weights:  15%|█▌        | 93/615 [00:05<00:29, 17.74it/s]Loading weights:  17%|█▋        | 106/615 [00:05<00:21, 23.95it/s]Loading weights:  18%|█▊        | 110/615 [00:06<00:28, 17.84it/s]Loading weights:  20%|██        | 123/615 [00:06<00:20, 23.68it/s]Loading weights:  20%|██        | 126/615 [00:07<00:28, 17.22it/s]Loading weights:  23%|██▎       | 140/615 [00:07<00:19, 24.41it/s]Loading weights:  23%|██▎       | 144/615 [00:07<00:26, 18.04it/s]Loading weights:  26%|██▌       | 157/615 [00:08<00:19, 23.73it/s]Loading weights:  26%|██▌       | 160/615 [00:08<00:26, 17.04it/s]Loading weights:  28%|██▊       | 174/615 [00:09<00:18, 23.92it/s]Loading weights:  29%|██▉       | 177/615 [00:09<00:25, 17.36it/s]Loading weights:  31%|███       | 191/615 [00:09<00:17, 24.56it/s]Loading weights:  32%|███▏      | 195/615 [00:10<00:23, 18.11it/s]Loading weights:  34%|███▎      | 207/615 [00:10<00:17, 23.36it/s]Loading weights:  34%|███▍      | 210/615 [00:11<00:23, 17.31it/s]Loading weights:  37%|███▋      | 225/615 [00:11<00:15, 24.88it/s]Loading weights:  37%|███▋      | 229/615 [00:12<00:22, 17.46it/s]Loading weights:  39%|███▉      | 242/615 [00:12<00:15, 23.47it/s]Loading weights:  40%|████      | 246/615 [00:12<00:20, 17.64it/s]Loading weights:  42%|████▏     | 260/615 [00:13<00:19, 17.87it/s]Loading weights:  45%|████▍     | 275/615 [00:13<00:14, 23.82it/s]Loading weights:  45%|████▌     | 279/615 [00:14<00:18, 18.37it/s]Loading weights:  47%|████▋     | 292/615 [00:14<00:13, 23.76it/s]Loading weights:  48%|████▊     | 296/615 [00:15<00:17, 17.95it/s]Loading weights:  51%|█████     | 311/615 [00:15<00:12, 24.88it/s]Loading weights:  51%|█████     | 315/615 [00:16<00:15, 18.94it/s]Loading weights:  53%|█████▎    | 327/615 [00:16<00:11, 24.16it/s]Loading weights:  54%|█████▍    | 331/615 [00:17<00:16, 17.44it/s]Loading weights:  56%|█████▌    | 344/615 [00:17<00:11, 23.34it/s]Loading weights:  56%|█████▋    | 347/615 [00:17<00:15, 16.88it/s]Loading weights:  59%|█████▊    | 361/615 [00:18<00:10, 23.90it/s]Loading weights:  59%|█████▉    | 365/615 [00:18<00:14, 17.76it/s]Loading weights:  61%|██████▏   | 378/615 [00:19<00:10, 23.43it/s]Loading weights:  62%|██████▏   | 381/615 [00:19<00:14, 16.47it/s]Loading weights:  64%|██████▍   | 395/615 [00:19<00:09, 23.48it/s]Loading weights:  65%|██████▍   | 399/615 [00:20<00:12, 17.20it/s]Loading weights:  67%|██████▋   | 413/615 [00:21<00:11, 17.53it/s]Loading weights:  70%|██████▉   | 429/615 [00:21<00:07, 23.61it/s]Loading weights:  70%|███████   | 432/615 [00:22<00:10, 17.86it/s]Loading weights:  73%|███████▎  | 447/615 [00:22<00:06, 24.39it/s]Loading weights:  73%|███████▎  | 451/615 [00:22<00:08, 18.76it/s]Loading weights:  75%|███████▌  | 463/615 [00:23<00:06, 23.65it/s]Loading weights:  76%|███████▌  | 466/615 [00:23<00:08, 17.13it/s]Loading weights:  78%|███████▊  | 480/615 [00:24<00:05, 23.98it/s]Loading weights:  79%|███████▊  | 484/615 [00:24<00:07, 17.93it/s]Loading weights:  81%|████████  | 497/615 [00:24<00:04, 24.04it/s]Loading weights:  81%|████████▏ | 501/615 [00:25<00:06, 17.85it/s]Loading weights:  84%|████████▎ | 515/615 [00:25<00:04, 24.00it/s]Loading weights:  84%|████████▍ | 518/615 [00:26<00:05, 16.55it/s]Loading weights:  87%|████████▋ | 532/615 [00:26<00:03, 23.10it/s]Loading weights:  87%|████████▋ | 535/615 [00:27<00:04, 17.08it/s]Loading weights:  89%|████████▉ | 548/615 [00:27<00:02, 23.49it/s]Loading weights:  90%|████████▉ | 552/615 [00:27<00:03, 17.57it/s]Loading weights:  92%|█████████▏| 565/615 [00:28<00:02, 23.55it/s]Loading weights:  92%|█████████▏| 568/615 [00:28<00:02, 17.09it/s]Loading weights:  94%|█████████▍| 581/615 [00:29<00:01, 23.67it/s]Loading weights:  95%|█████████▌| 585/615 [00:29<00:01, 17.67it/s]Loading weights:  98%|█████████▊| 600/615 [00:29<00:00, 25.37it/s]Loading weights:  98%|█████████▊| 604/615 [00:30<00:00, 18.83it/s]Loading weights: 100%|██████████| 615/615 [00:30<00:00, 20.24it/s]
+  Tokenizer has native pad_token_id=199999 (eos_token_id=200002); preserving.
+Scoring function bodies:   0%|          | 0/300 [00:00<?, ?it/s]
+Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 106.62it/s]
+Scoring function bodies:   0%|          | 1/300 [00:07<37:26,  7.51s/it]
+Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][AApplying perturbations: 100%|██████████| 5/5 [00:00<00:00, 122.16it/s]

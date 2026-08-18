@@ -1,14 +1,16 @@
 #!/bin/bash
 # 
-# Run the SC2-7B:
+# SC2-7B:
 # CUDA_DEVICE=0 GEN_MODEL=starcoder2-7b BASE_MODEL_NAME=bigcode/starcoder2-7b OUTPUT_NAME=mixedcode_starcoder2-7b_50files_overlap-v1-repro-20260818 bash proc_sh/run-1c0a-score-mixedcode-overlap-benchmark.sh
 #
-# Run the CL-7B:
+# CL-7B:
 # CUDA_DEVICE=0 GEN_MODEL=codellama-7b BASE_MODEL_NAME=codellama/CodeLlama-7b-hf OUTPUT_NAME=mixedcode_codellama-7b_50files_overlap-v1 bash proc_sh/run-1c0a-score-mixedcode-overlap-benchmark.sh
 # 
-# SC2-15B
+# SC2-15B:
 # CUDA_DEVICE=0 GEN_MODEL=starcoder2-15b-instruct-v0.1 BASE_MODEL_NAME=bigcode/starcoder2-15b-instruct-v0.1 OUTPUT_NAME=mixedcode_starcoder2-15b-instruct-v0.1_50files_overlap-v1 bash proc_sh/run-1c0a-score-mixedcode-overlap-benchmark.sh
 # 
+# gpt-oss-120b:
+# CUDA_DEVICE=0,1,2 GEN_MODEL=gpt-oss BASE_MODEL_NAME=openai/gpt-oss-120b OUTPUT_NAME=mixedcode_gpt-oss-120b_50files_overlap-v1 bash proc_sh/run-1c0a-score-mixedcode-overlap-benchmark.sh
 # 
 
 set -euo pipefail
@@ -72,6 +74,7 @@ mkdir -p "${LOG_DIR}" "${OUTPUT_ROOT}"
   echo "[STEP 1] Count-only benchmark validation"
   "${PYTHON_BIN}" -u "${PYTHON_SCRIPT}" \
     --benchmark_root "${BENCHMARK_ROOT}" \
+    --base_model_name "${BASE_MODEL_NAME}" \
     --count_only
 
   echo "[STEP 2] Full 300-body overlap benchmark"
