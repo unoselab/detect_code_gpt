@@ -1,4 +1,11 @@
 #!/bin/bash
+# 
+# Run the SC2-7B:
+# CUDA_DEVICE=0 GEN_MODEL=starcoder2-7b BASE_MODEL_NAME=bigcode/starcoder2-7b OUTPUT_NAME=mixedcode_starcoder2-7b_50files_overlap-v1-repro-20260818 bash proc_sh/run-1c0a-score-mixedcode-overlap-benchmark.sh
+#
+# Run the CL-7B:
+# CUDA_DEVICE=0 GEN_MODEL=codellama-7b BASE_MODEL_NAME=codellama/CodeLlama-7b-hf OUTPUT_NAME=mixedcode_codellama-7b_50files_overlap-v1 bash proc_sh/run-1c0a-score-mixedcode-overlap-benchmark.sh
+# 
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

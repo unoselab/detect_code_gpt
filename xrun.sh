@@ -1,33 +1,10 @@
-#!/usr/bin/env bash
+# Confirm that the incorrect run has stopped.
+pgrep -af 'main_mixedcode_benchmark_overlap.py' || true
 
-echo "===== GPU 0: b07489f0 ====="
-head -n 1 output/snapshot_npr/run-x-a11/results/gpu-0/python_fun_window_npr_scores.csv
-grep b07489f0 output/snapshot_npr/run-x-a11/results/gpu-0/python_fun_window_npr_scores.csv
-echo
-head -n 1 output/snapshot_npr/run-x-a11/results/gpu-0/python_fun_npr_failures.csv
-grep b07489f0 output/snapshot_npr/run-x-a11/results/gpu-0/python_fun_npr_failures.csv
-echo
+# Check whether the interrupted run created final outputs.
+ls -lh \
+  output/commit_function/run-1c0a/mixedcode-overlap-v1/*mixedcode_codellama-7b_50files_overlap-v1* \
+  2>/dev/null || true
 
-echo "===== GPU 1: 2acee67a ====="
-head -n 1 output/snapshot_npr/run-x-a11/results/gpu-1/python_fun_window_npr_scores.csv
-grep 2acee67a output/snapshot_npr/run-x-a11/results/gpu-1/python_fun_window_npr_scores.csv
-echo
-head -n 1 output/snapshot_npr/run-x-a11/results/gpu-1/python_fun_npr_failures.csv
-grep 2acee67a output/snapshot_npr/run-x-a11/results/gpu-1/python_fun_npr_failures.csv
-echo
-
-echo "===== GPU 2: a00c3b59 ====="
-head -n 1 output/snapshot_npr/run-x-a11/results/gpu-2/python_fun_window_npr_scores.csv
-grep a00c3b59 output/snapshot_npr/run-x-a11/results/gpu-2/python_fun_window_npr_scores.csv
-echo
-head -n 1 output/snapshot_npr/run-x-a11/results/gpu-2/python_fun_npr_failures.csv
-grep a00c3b59 output/snapshot_npr/run-x-a11/results/gpu-2/python_fun_npr_failures.csv
-echo
-
-echo "===== GPU 2: ab5df625 ====="
-head -n 1 output/snapshot_npr/run-x-a11/results/gpu-2/python_fun_window_npr_scores.csv
-grep ab5df625 output/snapshot_npr/run-x-a11/results/gpu-2/python_fun_window_npr_scores.csv
-echo
-head -n 1 output/snapshot_npr/run-x-a11/results/gpu-2/python_fun_npr_failures.csv
-grep ab5df625 output/snapshot_npr/run-x-a11/results/gpu-2/python_fun_npr_failures.csv
-echo
+# Run the correct matched-model CL-7B benchmark.
+CUDA_DEVICE=0 GEN_MODEL=codellama-7b BASE_MODEL_NAME=codellama/CodeLlama-7b-hf OUTPUT_NAME=mixedcode_codellama-7b_50files_overlap-v1 bash proc_sh/run-1c0a-score-mixedcode-overlap-benchmark.sh

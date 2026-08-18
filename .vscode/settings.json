@@ -3,14 +3,14 @@
     // font
     "markdown.preview.fontSize": 18,
     "editor.fontSize": 12,
-    "terminal.integrated.fontSize": 14,
+    "terminal.integrated.fontSize": 15,
 
     "files.watcherExclude": {
         "**/env*": false,
-        "**/__pycache__": true,
+        "**/__pycache__": true
     },
     "files.exclude": {
         "**/env*": false,
-        "**/__pycache__": true,
+        "**/__pycache__": true
     }
 }
