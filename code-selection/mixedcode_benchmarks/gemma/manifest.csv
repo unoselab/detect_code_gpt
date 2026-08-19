@@ -1,0 +1,11 @@
+benchmark_type,target,token_range,n_hwc_candidates,n_agc_candidates,n_files,out_dir
+type01_110,110,100-110,173,157,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma/type01_110
+type02_120,120,111-120,149,119,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma/type02_120
+type03_130,130,121-130,129,90,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma/type03_130
+type04_140,140,131-140,119,89,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma/type04_140
+type05_150,150,141-150,93,81,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma/type05_150
+type06_160,160,151-160,81,60,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma/type06_160
+type07_170,170,161-170,77,59,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma/type07_170
+type08_180,180,171-180,88,61,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma/type08_180
+type09_190,190,181-190,57,54,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma/type09_190
+type10_200,200,191-200,62,34,5,~/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma/type10_200
