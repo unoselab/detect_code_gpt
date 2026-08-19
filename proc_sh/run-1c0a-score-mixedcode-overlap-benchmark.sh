@@ -12,6 +12,8 @@
 # gpt-oss-120b:
 # CUDA_DEVICE=0,1,2 GEN_MODEL=gpt-oss BASE_MODEL_NAME=openai/gpt-oss-120b OUTPUT_NAME=mixedcode_gpt-oss-120b_50files_overlap-v1 bash proc_sh/run-1c0a-score-mixedcode-overlap-benchmark.sh
 # 
+# GM4-31B:
+# PYTHON_BIN=/home/user1-system11/miniconda3/envs/detectcodegpt-gptoss/bin/python CUDA_DEVICE=0,1,2 GEN_MODEL=gemma BASE_MODEL_NAME=google/gemma-4-31B-it OUTPUT_NAME=mixedcode_gemma-4-31b_50files_overlap-v1 bash proc_sh/run-1c0a-score-mixedcode-overlap-benchmark.sh
 
 set -euo pipefail
 

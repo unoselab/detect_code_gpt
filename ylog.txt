@@ -1,175 +1,121 @@
-=== Existing benchmark-generation wrappers ===
-./run5b-gen-benchmark2.sh
-./run5b-gen-benchmark3.sh
-./run5b-gen-benchmark4.sh
-./run5b-gen-benchmark.sh
+============================================================================
+run-1c0a: Table 2 mixed-code overlap-window benchmark
+Started:                         Tue Aug 18 11:21:35 PM CDT 2026
+Workspace:                       /home/user1-system11/project-workspace/detect_code_gpt
+Active conda env:                detectcodegpt-gptoss
+Python path:                     /home/user1-system11/miniconda3/envs/detectcodegpt-gptoss/bin/python
+Python version:                  Python 3.11.15
+Python script:                   /home/user1-system11/project-workspace/detect_code_gpt/code-detection/main_mixedcode_benchmark_overlap.py
+Python script SHA:               aebd701cfb068f97511cd47b24dbc5f020e1c562ee74cb8da5aba06a5de35794
+Benchmark root:                  /home/user1-system11/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma
+Benchmark JSON files:            50
+Benchmark Python files:          50
+Base model:                      google/gemma-4-31B-it
+CUDA_VISIBLE_DEVICES:            0,1,2
+PYTHONUNBUFFERED:                1
+Algorithm:                       overlap_final_full_window_valid_frontier_weighting-v1
+Partial-body policy:             any_valid_window_partial_success_full_windows-v2
+Window size:                     128
+Perturbations/window:            50
+Random seed:                     20260723
+Output directory:                /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1
+Results cache:                   /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/results_cache_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.pkl
+Function score CSV:              /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_scores_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.csv
+Window score CSV:                /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_chunks_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.csv
+Log file:                        /home/user1-system11/project-workspace/detect_code_gpt/logs/run-1c0a/run-1c0a-mixedcode_gemma-4-31b_50files_overlap-v1-20260818-232135.log
+============================================================================
+[STEP 1] Count-only benchmark validation
+================================================================================
+main_mixedcode_benchmark_overlap-v1.py
+================================================================================
+benchmark_root       : /home/user1-system11/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma
+function bodies      : 300
+base_model_name      : google/gemma-4-31B-it
+device               : cuda
+chunk_len            : 128
+min_chunk_tokens     : 1
+aggregate            : weighted_mean
+n_perturbation       : 50
+random_seed          : 20260723
+algorithm_version    : overlap_final_full_window_valid_frontier_weighting-v1
+partial_body_policy  : any_valid_window_partial_success_full_windows-v2
+perturb_type         : random-insert-space+newline
+output_csv           : ../logs/npr_scores_main_mixedcode_benchmark_mixedcode_benchmark.csv
+chunk_csv            : ../logs/npr_chunks_main_mixedcode_benchmark_mixedcode_benchmark.csv
+results_cache        : ../logs/results_cache_main_mixedcode_benchmark_mixedcode_benchmark.pkl
+================================================================================
 
-=== Candidate wrapper contents ===
-FILE=./run5b-gen-benchmark4.sh
-#!/usr/bin/env bash
-set -euo pipefail
+Counts by bucket:
+  type01_110: HWC=15 AGC=15
+  type02_120: HWC=15 AGC=15
+  type03_130: HWC=15 AGC=15
+  type04_140: HWC=15 AGC=15
+  type05_150: HWC=15 AGC=15
+  type06_160: HWC=15 AGC=15
+  type07_170: HWC=15 AGC=15
+  type08_180: HWC=15 AGC=15
+  type09_190: HWC=15 AGC=15
+  type10_200: HWC=15 AGC=15
+[STEP 2] Full 300-body overlap benchmark
+================================================================================
+main_mixedcode_benchmark_overlap-v1.py
+================================================================================
+benchmark_root       : /home/user1-system11/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma
+function bodies      : 300
+base_model_name      : google/gemma-4-31B-it
+device               : cuda
+chunk_len            : 128
+min_chunk_tokens     : 1
+aggregate            : weighted_mean
+n_perturbation       : 50
+random_seed          : 20260723
+algorithm_version    : overlap_final_full_window_valid_frontier_weighting-v1
+partial_body_policy  : any_valid_window_partial_success_full_windows-v2
+perturb_type         : random-insert-space+newline
+output_csv           : /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_scores_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.csv
+chunk_csv            : /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_chunks_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.csv
+results_cache        : /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/results_cache_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.pkl
+================================================================================
+2026-08-18 23:21:40.335 | INFO     | __main__:score_examples:541 - Before model load: CUDA_VISIBLE_DEVICES=0,1,2, args.DEVICE=cuda
+Using cache dir /home/user1-system11/.cache/huggingface/hub
+2026-08-18 23:21:40.335 | INFO     | __main__:score_examples:549 - Loading base scoring model...
+Loading BASE model google/gemma-4-31B-it...
+CUDA_VISIBLE_DEVICES=0,1,2
+torch.cuda.device_count()=3
+Visible GPU memory GiB: [47.4, 47.4, 47.4]
+Using Gemma multi-GPU loader; visible GPUs=3, dtype=torch.bfloat16, max_memory={0: '42GiB', 1: '42GiB', 2: '42GiB', 'cpu': '128GiB'}
+[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
 
-# ~/project-workspace/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet/codellama-7b/validsyntax_4500_complexity/codesearchnet_codellama-7b_python_merged_4500.csv
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
+Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 19.39it/s]
+Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 19.32it/s]
 
-PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+Loading weights:   0%|          | 0/1188 [00:00<?, ?it/s]
+Loading weights:   0%|          | 2/1188 [00:01<13:13,  1.49it/s]
+Loading weights:   0%|          | 5/1188 [00:01<04:41,  4.21it/s]
+Loading weights:   1%|          | 7/1188 [00:01<03:40,  5.36it/s]
+Loading weights:   1%|▏         | 15/1188 [00:01<01:18, 14.99it/s]
+...
+Loading weights:  99%|█████████▊| 1173/1188 [00:30<00:00, 457.18it/s]
+Loading weights: 100%|██████████| 1188/1188 [00:30<00:00, 38.89it/s] 
+  Tokenizer has native pad_token_id=0 (eos_token_id=1); preserving.
 
-CODE_SELECTION_DIR="${PROJECT_ROOT}/code-selection"
-LOG_DIR="${PROJECT_ROOT}/logs"
-OUTPUT_ROOT="${PROJECT_ROOT}/output"
-INPUT_DATA_ROOT="${HOME}/project-workspace/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet"
+Scoring function bodies:   0%|          | 0/300 [00:00<?, ?it/s]
 
-GEN_MODEL="${GEN_MODEL:-codellama-7b}"
-FILES_PER_TYPE="${FILES_PER_TYPE:-5}"
-SEED="${SEED:-0}"
+Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][A
+Applying perturbations: 100%|██████████| 5/5 [00:00<00:00, 114.60it/s]
 
-INPUT_CSV="${INPUT_DATA_ROOT}/${GEN_MODEL}/validsyntax_4500_complexity/codesearchnet_${GEN_MODEL}_python_merged_4500.csv"
-OUTPUT_DIR="${CODE_SELECTION_DIR}/mixedcode_benchmarks/${GEN_MODEL}"
+Scoring function bodies:   0%|          | 1/300 [00:07<38:10,  7.66s/it]
 
-TIMESTAMP="$(date +%m-%d_%H-%M)"
-LOG_FILE="${LOG_DIR}/generate_mixedcode_${GEN_MODEL}_${TIMESTAMP}.log"
+Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][A
+Applying perturbations: 100%|██████████| 5/5 [00:00<00:00, 115.82it/s]
 
-mkdir -p "${LOG_DIR}"
+Scoring function bodies:   1%|          | 2/300 [00:17<43:04,  8.67s/it]
 
-# cd ~/project-workspace/detect_code_gpt/code-selection
+Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][A
+Applying perturbations: 100%|██████████| 5/5 [00:00<00:00, 127.21it/s]
 
-# python analyze_func_size.py \
-#   --input_csv ~/project-workspace/ai_detector/src/code-analyzer-tree-sitter/data_codesearchnet/starcoder2-7b/validsyntax_4500_complexity/codesearchnet_starcoder2-7b_python_merged_4500.csv \
-#   --out_dir ./size_analysis/starcoder2-7b \
-#   --files_per_type 100
+Scoring function bodies:   1%|          | 3/300 [00:26<44:35,  9.01s/it]
 
-{
-  echo "=== Mixed-code benchmark generation ==="
-  echo "  PROJECT_ROOT:       ${PROJECT_ROOT}"
-  echo "  CODE_SELECTION_DIR: ${CODE_SELECTION_DIR}"
-  echo "  LOG_DIR:            ${LOG_DIR}"
-  echo "  OUTPUT_ROOT:        ${OUTPUT_ROOT}"
-  echo "  GEN_MODEL:          ${GEN_MODEL}"
-  echo "  INPUT_CSV:          ${INPUT_CSV}"
-  echo "  OUTPUT_DIR:         ${OUTPUT_DIR}"
-  echo "  FILES_PER_TYPE:     ${FILES_PER_TYPE}"
-  echo "  SEED:               ${SEED}"
-  echo "  LOG_FILE:           ${LOG_FILE}"
-  echo "======================================="
-  echo ""
-
-  test -d "${CODE_SELECTION_DIR}" || { echo "Missing code-selection dir: ${CODE_SELECTION_DIR}"; exit 1; }
-  test -f "${CODE_SELECTION_DIR}/generate_mixedcode_benchmark.py" || { echo "Missing generate_mixedcode_benchmark.py"; exit 1; }
-  test -f "${INPUT_CSV}" || { echo "Missing input CSV: ${INPUT_CSV}"; exit 1; }
-
-  cd "${CODE_SELECTION_DIR}"
-
-  # echo "[RUN] python generate_mixedcode_benchmark.py \\"
-  # echo "        --input_csv \"${INPUT_CSV}\" \\"
-  # echo "        --out_dir \"${OUTPUT_DIR}\" \\"
-  # echo "        --files_per_type \"${FILES_PER_TYPE}\" \\"
-  # echo "        --seed \"${SEED}\""
-  # echo ""
-
-  # python generate_mixedcode_benchmark.py \
-  #   --input_csv "${INPUT_CSV}" \
-  #   --out_dir "${OUTPUT_DIR}" \
-  #   --files_per_type "${FILES_PER_TYPE}" \
-  #   --seed "${SEED}"
-
-  ## ===================== REGENERATE ========================================== 
-  # python generate_mixedcode_benchmark.py \
-  #   --input_csv "$INPUT_CSV" \
-  #   --out_dir "${OUTPUT_DIR}" \
-  #   --only_targets 200 \
-  #   --exclude_used_dir ../code-selection/mixedcode_benchmarks/codellama-7b \
-  #   --exclude_roles AGC \
-  #   --type_suffix new1 \
-  #   --files_per_type 5 \
-  #   --seed 1
-
-  # python generate_mixedcode_benchmark.py \
-  #   --input_csv "$INPUT_CSV" \
-  #   --out_dir ../code-selection/mixedcode_benchmarks/codellama-7b \
-  #   --only_targets 200 \
-  #   --bucket_width_overrides 200:11 \
-  #   --exclude_used_dir ../code-selection/mixedcode_benchmarks/codellama-7b \
-  #   --exclude_roles AGC \
-  #   --type_suffix new2 \
-  #   --files_per_type 5 \
-  #   --seed 2
-
-  python generate_mixedcode_benchmark.py \
-    --input_csv "$INPUT_CSV" \
-    --out_dir ../code-selection/mixedcode_benchmarks/codellama-7b \
-    --only_targets 170 \
-    --bucket_width_overrides 160:11 \
-    --exclude_used_dir ../code-selection/mixedcode_benchmarks/codellama-7b \
-    --exclude_roles AGC \
-    --type_suffix new1 \
-    --files_per_type 5 \
-    --seed 2
-
-} 2>&1 | tee "${LOG_FILE}"
-=== Generator interface ===
-usage: generate_mixedcode_benchmark.py [-h] --input_csv INPUT_CSV --out_dir
-                                       OUT_DIR [--targets TARGETS]
-                                       [--bucket_width BUCKET_WIDTH]
-                                       [--bucket_width_overrides BUCKET_WIDTH_OVERRIDES]
-                                       [--files_per_type FILES_PER_TYPE]
-                                       [--seed SEED] [--no_shuffle_candidates]
-                                       [--allow_reuse_across_types]
-                                       [--keep_lm_prompt]
-                                       [--only_targets ONLY_TARGETS]
-                                       [--exclude_used_dir EXCLUDE_USED_DIR]
-                                       [--exclude_roles EXCLUDE_ROLES]
-                                       [--append] [--type_suffix TYPE_SUFFIX]
-
-Generate 6-function mixed-code benchmark .py files with JSON ground truth.
-
-options:
-  -h, --help            show this help message and exit
-  --input_csv INPUT_CSV
-                        Merged HWC/AGC CSV with idx,code,label
-  --out_dir OUT_DIR     Output benchmark root directory
-  --targets TARGETS     Comma-separated bucket upper bounds. Default:
-                        110,120,...,200
-  --bucket_width BUCKET_WIDTH
-                        Token bucket width. Default: 10
-  --bucket_width_overrides BUCKET_WIDTH_OVERRIDES
-                        Per-target bucket-width overrides as TARGET:WIDTH
-                        pairs, e.g. '200:11'. Only the listed targets use the
-                        override; all others keep --bucket_width. Useful to
-                        widen one sparse group without changing the rest.
-  --files_per_type FILES_PER_TYPE
-                        Number of mixed_code_*.py files per type. 0 = maximum
-                        possible.
-  --seed SEED           Random seed
-  --no_shuffle_candidates
-                        Do not shuffle candidate pools
-  --allow_reuse_across_types
-                        Allow the same source function to appear in multiple
-                        type buckets. Normally unnecessary because buckets do
-                        not overlap.
-  --keep_lm_prompt      Use the LM row's own prompt instead of replacing it
-                        with the human prompt. Default uses human prompt for
-                        AGC body.
-  --only_targets ONLY_TARGETS
-                        Regenerate only these bucket upper bounds (must be a
-                        subset of --targets). Type index and bucket boundaries
-                        stay identical to a full run, e.g. --only_targets 200
-                        regenerates type10_200.
-  --exclude_used_dir EXCLUDE_USED_DIR
-                        Scan this existing benchmark tree
-                        (type*/mixed_code_*.json) and avoid re-selecting the
-                        same source functions, so regenerated files get fresh
-                        code. Usually the same path as --out_dir.
-  --exclude_roles EXCLUDE_ROLES
-                        Comma-separated roles to treat as already-used when
-                        --exclude_used_dir is set. Default: AGC (only avoid
-                        reusing AGC functions). Pass 'AGC,HWC' to make every
-                        function fresh.
-  --append              Preserve existing mixed_code_*.py files and continue
-                        numbering after the highest existing id per type dir,
-                        instead of starting at 001 (which would overwrite
-                        existing files).
-  --type_suffix TYPE_SUFFIX
-                        Append a suffix to the type folder name so regenerated
-                        files go into a fresh directory instead of an existing
-                        one, e.g. --type_suffix new1 writes type10_200_new1/.
-                        Numbering starts at 001 in the new folder and
-                        benchmark_type is labeled accordingly.
+Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][A
+Applying perturbations: 100%|██████████| 5/5 [00:00<00:00, 116.51it/s]
