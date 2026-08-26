@@ -1,121 +1,52 @@
-============================================================================
-run-1c0a: Table 2 mixed-code overlap-window benchmark
-Started:                         Tue Aug 18 11:21:35 PM CDT 2026
-Workspace:                       /home/user1-system11/project-workspace/detect_code_gpt
-Active conda env:                detectcodegpt-gptoss
-Python path:                     /home/user1-system11/miniconda3/envs/detectcodegpt-gptoss/bin/python
-Python version:                  Python 3.11.15
-Python script:                   /home/user1-system11/project-workspace/detect_code_gpt/code-detection/main_mixedcode_benchmark_overlap.py
-Python script SHA:               aebd701cfb068f97511cd47b24dbc5f020e1c562ee74cb8da5aba06a5de35794
-Benchmark root:                  /home/user1-system11/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma
-Benchmark JSON files:            50
-Benchmark Python files:          50
-Base model:                      google/gemma-4-31B-it
-CUDA_VISIBLE_DEVICES:            0,1,2
-PYTHONUNBUFFERED:                1
-Algorithm:                       overlap_final_full_window_valid_frontier_weighting-v1
-Partial-body policy:             any_valid_window_partial_success_full_windows-v2
-Window size:                     128
-Perturbations/window:            50
-Random seed:                     20260723
-Output directory:                /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1
-Results cache:                   /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/results_cache_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.pkl
-Function score CSV:              /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_scores_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.csv
-Window score CSV:                /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_chunks_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.csv
-Log file:                        /home/user1-system11/project-workspace/detect_code_gpt/logs/run-1c0a/run-1c0a-mixedcode_gemma-4-31b_50files_overlap-v1-20260818-232135.log
-============================================================================
-[STEP 1] Count-only benchmark validation
-================================================================================
-main_mixedcode_benchmark_overlap-v1.py
-================================================================================
-benchmark_root       : /home/user1-system11/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma
-function bodies      : 300
-base_model_name      : google/gemma-4-31B-it
-device               : cuda
-chunk_len            : 128
-min_chunk_tokens     : 1
-aggregate            : weighted_mean
-n_perturbation       : 50
-random_seed          : 20260723
-algorithm_version    : overlap_final_full_window_valid_frontier_weighting-v1
-partial_body_policy  : any_valid_window_partial_success_full_windows-v2
-perturb_type         : random-insert-space+newline
-output_csv           : ../logs/npr_scores_main_mixedcode_benchmark_mixedcode_benchmark.csv
-chunk_csv            : ../logs/npr_chunks_main_mixedcode_benchmark_mixedcode_benchmark.csv
-results_cache        : ../logs/results_cache_main_mixedcode_benchmark_mixedcode_benchmark.pkl
-================================================================================
+```
+(base) user1-system11@oisit-r158r4l01:~/project-workspace/detect_code_gpt$ tree -sh output/snapshot_npr/run-x-a14/results -D
+[4.0K Aug 12 19:37]  output/snapshot_npr/run-x-a14/results
+├── [4.0K Aug 17 13:36]  gpu-0
+│   ├── [8.1K Aug 12 19:37]  assigned_shard_audit.csv
+│   ├── [3.4K Aug 17 13:36]  checks.csv
+│   ├── [4.2K Aug 17 13:36]  metadata.json
+│   ├── [ 594 Aug 17 13:36]  progress.json
+│   ├── [ 322 Aug 17 13:36]  python_cfun_new_npr_exclusions.csv
+│   ├── [  76 Aug 17 13:36]  python_cfun_new_npr_failures.csv
+│   ├── [ 28M Aug 17 13:36]  python_cfun_new_unique_code_unit_npr_scores.csv
+│   ├── [116M Aug 17 13:36]  python_cfun_new_window_npr_scores.csv
+│   ├── [ 319 Aug 17 13:36]  reference_scoring_checks.csv
+│   ├── [2.3K Aug 17 13:36]  summary.json
+│   └── [142M Aug 17 13:36]  window_scores.sqlite3
+├── [4.0K Aug 17 14:30]  gpu-1
+│   ├── [8.1K Aug 12 19:37]  assigned_shard_audit.csv
+│   ├── [3.4K Aug 17 14:30]  checks.csv
+│   ├── [4.2K Aug 17 14:30]  metadata.json
+│   ├── [ 593 Aug 17 14:30]  progress.json
+│   ├── [ 322 Aug 17 14:30]  python_cfun_new_npr_exclusions.csv
+│   ├── [  76 Aug 17 14:30]  python_cfun_new_npr_failures.csv
+│   ├── [ 28M Aug 17 14:30]  python_cfun_new_unique_code_unit_npr_scores.csv
+│   ├── [116M Aug 17 14:30]  python_cfun_new_window_npr_scores.csv
+│   ├── [ 319 Aug 17 14:30]  reference_scoring_checks.csv
+│   ├── [2.3K Aug 17 14:30]  summary.json
+│   └── [142M Aug 17 14:30]  window_scores.sqlite3
+└── [4.0K Aug 17 13:47]  gpu-2
+    ├── [8.1K Aug 12 19:37]  assigned_shard_audit.csv
+    ├── [3.4K Aug 17 13:47]  checks.csv
+    ├── [4.2K Aug 17 13:47]  metadata.json
+    ├── [ 590 Aug 17 13:47]  progress.json
+    ├── [ 322 Aug 17 13:47]  python_cfun_new_npr_exclusions.csv
+    ├── [  76 Aug 17 13:47]  python_cfun_new_npr_failures.csv
+    ├── [ 28M Aug 17 13:47]  python_cfun_new_unique_code_unit_npr_scores.csv
+    ├── [116M Aug 17 13:47]  python_cfun_new_window_npr_scores.csv
+    ├── [ 319 Aug 17 13:47]  reference_scoring_checks.csv
+    ├── [2.3K Aug 17 13:47]  summary.json
+    └── [142M Aug 17 13:47]  window_scores.sqlite3
 
-Counts by bucket:
-  type01_110: HWC=15 AGC=15
-  type02_120: HWC=15 AGC=15
-  type03_130: HWC=15 AGC=15
-  type04_140: HWC=15 AGC=15
-  type05_150: HWC=15 AGC=15
-  type06_160: HWC=15 AGC=15
-  type07_170: HWC=15 AGC=15
-  type08_180: HWC=15 AGC=15
-  type09_190: HWC=15 AGC=15
-  type10_200: HWC=15 AGC=15
-[STEP 2] Full 300-body overlap benchmark
-================================================================================
-main_mixedcode_benchmark_overlap-v1.py
-================================================================================
-benchmark_root       : /home/user1-system11/project-workspace/detect_code_gpt/code-selection/mixedcode_benchmarks/gemma
-function bodies      : 300
-base_model_name      : google/gemma-4-31B-it
-device               : cuda
-chunk_len            : 128
-min_chunk_tokens     : 1
-aggregate            : weighted_mean
-n_perturbation       : 50
-random_seed          : 20260723
-algorithm_version    : overlap_final_full_window_valid_frontier_weighting-v1
-partial_body_policy  : any_valid_window_partial_success_full_windows-v2
-perturb_type         : random-insert-space+newline
-output_csv           : /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_scores_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.csv
-chunk_csv            : /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/npr_chunks_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.csv
-results_cache        : /home/user1-system11/project-workspace/detect_code_gpt/output/commit_function/run-1c0a/mixedcode-overlap-v1/results_cache_main_mixedcode_benchmark_mixedcode_gemma-4-31b_50files_overlap-v1.pkl
-================================================================================
-2026-08-18 23:21:40.335 | INFO     | __main__:score_examples:541 - Before model load: CUDA_VISIBLE_DEVICES=0,1,2, args.DEVICE=cuda
-Using cache dir /home/user1-system11/.cache/huggingface/hub
-2026-08-18 23:21:40.335 | INFO     | __main__:score_examples:549 - Loading base scoring model...
-Loading BASE model google/gemma-4-31B-it...
-CUDA_VISIBLE_DEVICES=0,1,2
-torch.cuda.device_count()=3
-Visible GPU memory GiB: [47.4, 47.4, 47.4]
-Using Gemma multi-GPU loader; visible GPUs=3, dtype=torch.bfloat16, max_memory={0: '42GiB', 1: '42GiB', 2: '42GiB', 'cpu': '128GiB'}
-[transformers] `torch_dtype` is deprecated! Use `dtype` instead!
+3 directories, 33 files
+(base) user1-system11@oisit-r158r4l01:~/project-workspace/detect_code_gpt$ 
+```
 
-Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]
-Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 19.39it/s]
-Fetching 2 files: 100%|██████████| 2/2 [00:00<00:00, 19.32it/s]
-
-Loading weights:   0%|          | 0/1188 [00:00<?, ?it/s]
-Loading weights:   0%|          | 2/1188 [00:01<13:13,  1.49it/s]
-Loading weights:   0%|          | 5/1188 [00:01<04:41,  4.21it/s]
-Loading weights:   1%|          | 7/1188 [00:01<03:40,  5.36it/s]
-Loading weights:   1%|▏         | 15/1188 [00:01<01:18, 14.99it/s]
-...
-Loading weights:  99%|█████████▊| 1173/1188 [00:30<00:00, 457.18it/s]
-Loading weights: 100%|██████████| 1188/1188 [00:30<00:00, 38.89it/s] 
-  Tokenizer has native pad_token_id=0 (eos_token_id=1); preserving.
-
-Scoring function bodies:   0%|          | 0/300 [00:00<?, ?it/s]
-
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][A
-Applying perturbations: 100%|██████████| 5/5 [00:00<00:00, 114.60it/s]
-
-Scoring function bodies:   0%|          | 1/300 [00:07<38:10,  7.66s/it]
-
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][A
-Applying perturbations: 100%|██████████| 5/5 [00:00<00:00, 115.82it/s]
-
-Scoring function bodies:   1%|          | 2/300 [00:17<43:04,  8.67s/it]
-
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][A
-Applying perturbations: 100%|██████████| 5/5 [00:00<00:00, 127.21it/s]
-
-Scoring function bodies:   1%|          | 3/300 [00:26<44:35,  9.01s/it]
-
-Applying perturbations:   0%|          | 0/5 [00:00<?, ?it/s][A
-Applying perturbations: 100%|██████████| 5/5 [00:00<00:00, 116.51it/s]
+```
+(base) user1-system11@oisit-r158r4l01:~/project-workspace/detect_code_gpt$ find output/snapshot_npr/run-x-a14/results \
+  -type f ! -size +10M -print0 | \
+tar --null -T - -czf run-x-a14-v1-results-under-10M-20260817-143019.tar.gz && \
+ls -lh run-x-a14-v1-results-under-10M-20260817-143019.tar.gz
+-rw-rw-r-- 1 user1-system11 user1-system11 6.8K Aug 25 19:09 run-x-a14-v1-results-under-10M-20260817-143019.tar.gz
+(base) user1-system11@oisit-r158r4l01:~/project-workspace/detect_code_gpt$ 
+```
