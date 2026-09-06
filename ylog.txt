@@ -1,52 +1,236 @@
-```
-(base) user1-system11@oisit-r158r4l01:~/project-workspace/detect_code_gpt$ tree -sh output/snapshot_npr/run-x-a14/results -D
-[4.0K Aug 12 19:37]  output/snapshot_npr/run-x-a14/results
-├── [4.0K Aug 17 13:36]  gpu-0
-│   ├── [8.1K Aug 12 19:37]  assigned_shard_audit.csv
-│   ├── [3.4K Aug 17 13:36]  checks.csv
-│   ├── [4.2K Aug 17 13:36]  metadata.json
-│   ├── [ 594 Aug 17 13:36]  progress.json
-│   ├── [ 322 Aug 17 13:36]  python_cfun_new_npr_exclusions.csv
-│   ├── [  76 Aug 17 13:36]  python_cfun_new_npr_failures.csv
-│   ├── [ 28M Aug 17 13:36]  python_cfun_new_unique_code_unit_npr_scores.csv
-│   ├── [116M Aug 17 13:36]  python_cfun_new_window_npr_scores.csv
-│   ├── [ 319 Aug 17 13:36]  reference_scoring_checks.csv
-│   ├── [2.3K Aug 17 13:36]  summary.json
-│   └── [142M Aug 17 13:36]  window_scores.sqlite3
-├── [4.0K Aug 17 14:30]  gpu-1
-│   ├── [8.1K Aug 12 19:37]  assigned_shard_audit.csv
-│   ├── [3.4K Aug 17 14:30]  checks.csv
-│   ├── [4.2K Aug 17 14:30]  metadata.json
-│   ├── [ 593 Aug 17 14:30]  progress.json
-│   ├── [ 322 Aug 17 14:30]  python_cfun_new_npr_exclusions.csv
-│   ├── [  76 Aug 17 14:30]  python_cfun_new_npr_failures.csv
-│   ├── [ 28M Aug 17 14:30]  python_cfun_new_unique_code_unit_npr_scores.csv
-│   ├── [116M Aug 17 14:30]  python_cfun_new_window_npr_scores.csv
-│   ├── [ 319 Aug 17 14:30]  reference_scoring_checks.csv
-│   ├── [2.3K Aug 17 14:30]  summary.json
-│   └── [142M Aug 17 14:30]  window_scores.sqlite3
-└── [4.0K Aug 17 13:47]  gpu-2
-    ├── [8.1K Aug 12 19:37]  assigned_shard_audit.csv
-    ├── [3.4K Aug 17 13:47]  checks.csv
-    ├── [4.2K Aug 17 13:47]  metadata.json
-    ├── [ 590 Aug 17 13:47]  progress.json
-    ├── [ 322 Aug 17 13:47]  python_cfun_new_npr_exclusions.csv
-    ├── [  76 Aug 17 13:47]  python_cfun_new_npr_failures.csv
-    ├── [ 28M Aug 17 13:47]  python_cfun_new_unique_code_unit_npr_scores.csv
-    ├── [116M Aug 17 13:47]  python_cfun_new_window_npr_scores.csv
-    ├── [ 319 Aug 17 13:47]  reference_scoring_checks.csv
-    ├── [2.3K Aug 17 13:47]  summary.json
-    └── [142M Aug 17 13:47]  window_scores.sqlite3
-
-3 directories, 33 files
-(base) user1-system11@oisit-r158r4l01:~/project-workspace/detect_code_gpt$ 
-```
-
-```
-(base) user1-system11@oisit-r158r4l01:~/project-workspace/detect_code_gpt$ find output/snapshot_npr/run-x-a14/results \
-  -type f ! -size +10M -print0 | \
-tar --null -T - -czf run-x-a14-v1-results-under-10M-20260817-143019.tar.gz && \
-ls -lh run-x-a14-v1-results-under-10M-20260817-143019.tar.gz
--rw-rw-r-- 1 user1-system11 user1-system11 6.8K Aug 25 19:09 run-x-a14-v1-results-under-10M-20260817-143019.tar.gz
-(base) user1-system11@oisit-r158r4l01:~/project-workspace/detect_code_gpt$ 
-```
+./analysis_results/bak/plot_mixedcode_results_v0.1.py
+./analysis_results/mixedcode/fig_mixedcode_auc_by_bucket.pdf
+./analysis_results/mixedcode/fig_mixedcode_auc_by_bucket.png
+./analysis_results/mixedcode/fig_mixedcode_npr_gap_by_bucket.pdf
+./analysis_results/mixedcode/fig_mixedcode_npr_gap_by_bucket.png
+./analysis_results/mixedcode/fig_mixedcode_overall_auc.pdf
+./analysis_results/mixedcode/fig_mixedcode_overall_auc.png
+./analysis_results/mixedcode/mixedcode_bucket_summary_combined.csv
+./analysis_results/mixedcode/mixedcode_overall_summary.csv
+./analysis_results/mixedcode/table_mixedcode_auc_by_bucket.tex
+./analysis_results/mixedcode/table_mixedcode_overall.tex
+./analysis_results/plot_mixedcode_results.py
+./analysis_results/table_mixedcode_auc_by_bucket_updated.tex
+./code-detection/aggregate_snapshot_npr_cfun_files.py
+./code-detection/aggregate_snapshot_npr_fun_files.py
+./code-detection/aggregate_snapshot_npr.py
+./code-detection/analyze_npr_scoring_workload.py
+./code-detection/audit_snapshot_npr_perturbation_shards.py
+./code-detection/audit_snapshot_npr.py
+./code-detection/bak/main_mixedcode_benchmark_v0.1.py
+./code-detection/bak/score_commit_function_npr_full-gt200-v0.2.py
+./code-detection/bak/score_commit_function_npr-v0.1.py
+./code-detection/bak/score_commit_function_npr-v0.2.py
+./code-detection/bak/score_snapshot_npr_fun_shards-v0.2.py
+./code-detection/benchmark_snapshot_npr_gpu.py
+./code-detection/calibrate_mixedcode_overlap_threshold.py
+./code-detection/main_mixedcode_benchmark_overlap.py
+./code-detection/main_mixedcode_benchmark.py
+./code-detection/npr_overlap_core.py
+./code-detection/prepare_full_snapshot_npr_inputs.py
+./code-detection/prepare_snapshot_npr_cfun_workload.py
+./code-detection/prepare_snapshot_npr_inputs.py
+./code-detection/prepare_snapshot_npr_perturbations.py
+./code-detection/__pycache__/aggregate_snapshot_npr.cpython-311.pyc
+./code-detection/__pycache__/analyze_npr_scoring_workload.cpython-311.pyc
+./code-detection/__pycache__/audit_snapshot_npr.cpython-311.pyc
+./code-detection/__pycache__/benchmark_snapshot_npr_gpu.cpython-311.pyc
+./code-detection/__pycache__/npr_overlap_core.cpython-311.pyc
+./code-detection/__pycache__/prepare_full_snapshot_npr_inputs.cpython-312.pyc
+./code-detection/__pycache__/prepare_snapshot_npr_inputs.cpython-312.pyc
+./code-detection/__pycache__/prepare_snapshot_npr_perturbations.cpython-311.pyc
+./code-detection/__pycache__/score_commit_function_npr.cpython-311.pyc
+./code-detection/__pycache__/score_commit_function_npr_full.cpython-311.pyc
+./code-detection/__pycache__/score_snapshot_npr.cpython-311.pyc
+./code-detection/recalc_auc_from_npr_csv_v1.py
+./code-detection/recalc_auc_from_npr_csv_v2.py
+./code-detection/score_commit_function_npr_full-gt200.py
+./code-detection/score_commit_function_npr_full.py
+./code-detection/score_commit_function_npr.py
+./code-detection/score_snapshot_npr_cfun_shards.py
+./code-detection/score_snapshot_npr_fun_shards.py
+./code-detection/score_snapshot_npr.py
+./code-detection/validate_cross_gpu_npr_benchmark.py
+./code-selection/bak/generate_mixedcode_benchmark_v0.1.py
+./code-selection/generate_mixedcode_benchmark.py
+./logs-backup-may12-13/npr_scores_codellama-7b-hf_csn_t02_n2000_run.csv
+./logs-backup-may12-13/npr_scores_codellama-7b-hf_csn_t02_n2000_run-old.csv
+./logs/bak/npr_chunks_main_adapter_codellama-7b_4500_n5.csv
+./logs/bak/npr_chunks_main_adapter_gpt-oss_4500_refreshed_n50.csv
+./logs/bak/npr_chunks_main_adapter_gpt-oss_4500_refreshed_n5.csv
+./logs/bak/npr_chunks_main_adapter_starcoder2-15b-instruct-v0.1_4500_n5.csv
+./logs/bak/npr_chunks_main_adapter_starcoder2-7b_4500_n100.csv
+./logs/bak/npr_chunks_main_adapter_starcoder2-7b_4500_n5.csv
+./logs/bak/npr_chunks_main_adapter_starcoder2-7b_4500_refreshed_n200.csv
+./logs/bak/npr_chunks_main_mixedcode_benchmark_mixedcode_codellama-7b_smoke.csv
+./logs/bak/npr_chunks_main_mixedcode_benchmark_mixedcode_gpt-oss_smoke.csv
+./logs/bak/npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_smoke.csv
+./logs/bak/npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-7b_smoke.csv
+./logs/bak/npr_scores_codellama-7b-hf_csn_t02_n2000_run.csv
+./logs/bak/npr_scores_main_adapter_codellama-7b_4500_n5.csv
+./logs/bak/npr_scores_main_adapter_gpt-oss_4500_refreshed_n50.csv
+./logs/bak/npr_scores_main_adapter_gpt-oss_4500_refreshed_n5.csv
+./logs/bak/npr_scores_main_adapter_starcoder2-15b-instruct-v0.1_4500_n5.csv
+./logs/bak/npr_scores_main_adapter_starcoder2-7b_4500_n100.csv
+./logs/bak/npr_scores_main_adapter_starcoder2-7b_4500_n5.csv
+./logs/bak/npr_scores_main_adapter_starcoder2-7b_4500_refreshed_n200.csv
+./logs/bak/npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_smoke_bucket_summary.csv
+./logs/bak/npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_smoke.csv
+./logs/bak/npr_scores_main_mixedcode_benchmark_mixedcode_gpt-oss_smoke_bucket_summary.csv
+./logs/bak/npr_scores_main_mixedcode_benchmark_mixedcode_gpt-oss_smoke.csv
+./logs/bak/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_smoke_bucket_summary.csv
+./logs/bak/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_smoke.csv
+./logs/bak/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_smoke_bucket_summary.csv
+./logs/bak/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_smoke.csv
+./logs/bak/npr_scores_main_v2_codellama-7b_4500_n3.csv
+./logs/bak/npr_scores_main_v2_starcoder2_4500_n100.csv
+./logs/bak/npr_scores_starcoder2-7b_csn_t02_n50_smoke.csv
+./logs/bak/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_smoke.pkl
+./logs/csv/npr_chunks_main_adapter_gpt-oss_4500_refreshed_n50.csv
+./logs/csv/npr_chunks_main_adapter_gpt-oss_4500_refreshed_n5.csv
+./logs/csv/npr_chunks_main_adapter_starcoder2-7b_4500_n100.csv
+./logs/csv/npr_chunks_main_adapter_starcoder2-7b_4500_n5.csv
+./logs/csv/npr_chunks_main_adapter_starcoder2-7b_4500_refreshed_n200.csv
+./logs/csv/npr_scores_main_adapter_gpt-oss_4500_refreshed_n50.csv
+./logs/csv/npr_scores_main_adapter_gpt-oss_4500_refreshed_n5.csv
+./logs/csv/npr_scores_main_adapter_starcoder2-7b_4500_n100.csv
+./logs/csv/npr_scores_main_adapter_starcoder2-7b_4500_n5.csv
+./logs/csv/npr_scores_main_adapter_starcoder2-7b_4500_refreshed_n200.csv
+./logs/csv/npr_scores_main_v2_codellama-7b_4500_n3.csv
+./logs/csv/npr_scores_main_v2_starcoder2_4500_n100.csv
+./logs/generate_mixedcode_codellama-7b_06-07_15-12.log
+./logs/generate_mixedcode_codellama-7b_06-07_22-13.log
+./logs/generate_mixedcode_codellama-7b_06-07_22-23.log
+./logs/generate_mixedcode_codellama-7b_06-07_22-49.log
+./logs/generate_mixedcode_codellama-7b_06-07_22-50.log
+./logs/generate_mixedcode_codellama-7b_06-07_22-51.log
+./logs/generate_mixedcode_codellama-7b_06-07_22-54.log
+./logs/generate_mixedcode_codellama-7b_06-07_23-04.log
+./logs/generate_mixedcode_codellama-7b_06-07_23-44.log
+./logs/generate_mixedcode_gpt-oss_06-07_12-11.log
+./logs/generate_mixedcode_starcoder2-15b-instruct-v0.1_06-08_00-26.log
+./logs/generate_mixedcode_starcoder2-15b-instruct-v0.1_06-08_00-38.log
+./logs/generate_mixedcode_starcoder2-15b-instruct-v0.1_06-08_00-39.log
+./logs/generate_mixedcode_starcoder2-15b-instruct-v0.1_06-08_00-43.log
+./logs/generate_mixedcode_starcoder2-15b-instruct-v0.1_06-08_00-49.log
+./logs/generate_mixedcode_starcoder2-7b_06-06_22-08.log
+./logs/generate_mixedcode_starcoder2-7b_06-06_22-24.log
+./logs/generate_mixedcode_starcoder2-7b_06-06_22-30.log
+./logs/mixedcode_codellama-7b_06-07_15-16.log
+./logs/mixedcode_codellama-7b_06-07_15-17.log
+./logs/mixedcode_codellama-7b_06-07_15-20.log
+./logs/mixedcode_codellama-7b_06-07_21-52.log
+./logs/mixedcode_codellama-7b_06-07_22-32.log
+./logs/mixedcode_codellama-7b_06-07_22-56.log
+./logs/mixedcode_codellama-7b_06-07_23-06.log
+./logs/mixedcode_codellama-7b_06-07_23-25.log
+./logs/mixedcode_codellama-7b_06-07_23-40.log
+./logs/mixedcode_codellama-7b_06-07_23-46.log
+./logs/mixedcode_codellama-7b_06-07_23-48.log
+./logs/mixedcode_gpt-oss_count_only_06-07_12-28.log
+./logs/mixedcode_gpt-oss_count_only_06-07_12-30.log
+./logs/mixedcode_gpt-oss_count_only_06-07_12-33.log
+./logs/mixedcode_starcoder2-15b-instruct-v0.1_06-08_00-33.log
+./logs/mixedcode_starcoder2-15b-instruct-v0.1_06-08_00-39.log
+./logs/mixedcode_starcoder2-15b-instruct-v0.1_06-08_00-44.log
+./logs/mixedcode_starcoder2-15b-instruct-v0.1_06-08_00-50.log
+./logs/npr_chunks_main_adapter_codellama-7b_4500.csv
+./logs/npr_chunks_main_adapter_gemma_4500_complexity_refreshed.csv
+./logs/npr_chunks_main_adapter_gpt-oss_4500_refreshed.csv
+./logs/npr_chunks_main_adapter_main_adapter.csv
+./logs/npr_chunks_main_adapter_starcoder2-15b-instruct-v0.1_4500.csv
+./logs/npr_chunks_main_adapter_starcoder2-7b_4500.csv
+./logs/npr_chunks_main_adapter_starcoder2-7b_4500_refreshed.csv
+./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_benchmark.csv
+./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_codellama-7b_50files.csv
+./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_codellama-7b_type10_200_merged.csv
+./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_gpt-oss_50files.csv
+./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-bak1.csv
+./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files.csv
+./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-new1.csv
+./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files.csv
+./logs/npr_chunks_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files-recheck-v1.csv
+./logs/npr_scores_main_adapter_codellama-7b_4500.csv
+./logs/npr_scores_main_adapter_gemma_4500_complexity_refreshed.csv
+./logs/npr_scores_main_adapter_gpt-oss_4500_refreshed.csv
+./logs/npr_scores_main_adapter_main_adapter.csv
+./logs/npr_scores_main_adapter_starcoder2-15b-instruct-v0.1_4500.csv
+./logs/npr_scores_main_adapter_starcoder2-7b_4500.csv
+./logs/npr_scores_main_adapter_starcoder2-7b_4500_refreshed.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_benchmark_bucket_summary.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_benchmark.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_50files_bucket_summary.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_50files.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_type10_200_merged_bucket_summary.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_codellama-7b_type10_200_merged.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_gpt-oss_50files_bucket_summary.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_gpt-oss_50files.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-bak1.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files_bucket_summary-bak1.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files_bucket_summary.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-new1_bucket_summary.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-new1.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files_bucket_summary.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files-recheck-v1_bucket_summary.csv
+./logs/npr_scores_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files-recheck-v1.csv
+./logs/npr_scores_main_v2_codellama-7b_4500.csv
+./logs/npr_scores_main_v2_starcoder2-7b_4500.csv
+./logs/npr_scores_starcoder2-7b_csn_t02_n3000_run.csv
+./logs/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_50files-bak1.pkl
+./logs/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_50files-bak2.pkl
+./logs/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_50files.pkl
+./logs/results_cache_main_mixedcode_benchmark_mixedcode_codellama-7b_type10_200_merged.pkl
+./logs/results_cache_main_mixedcode_benchmark_mixedcode_gpt-oss_50files.pkl
+./logs/results_cache_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-bak1.pkl
+./logs/results_cache_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-bak2.pkl
+./logs/results_cache_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files-new1.pkl
+./logs/results_cache_main_mixedcode_benchmark_mixedcode_starcoder2-15b-instruct-v0.1_50files.pkl
+./logs/results_cache_main_mixedcode_benchmark_mixedcode_starcoder2-7b_50files.pkl
+./logs/run-1c0a/run-1c0a-mixedcode_codellama-7b_50files_overlap-v1-20260818-142223.log
+./logs/run-1c0a/run-1c0a-mixedcode_codellama-7b_50files_overlap-v1-20260818-142739.log
+./logs/run-1c0a/run-1c0a-mixedcode_starcoder2-15b-instruct-v0.1_50files_overlap-v1-20260818-151134.log
+./logs/run-1c0a/run-1c0a-mixedcode_starcoder2-7b_50files_overlap-v1-20260723-233944.log
+./logs/run-1c0a/run-1c0a-mixedcode_starcoder2-7b_50files_overlap-v1-repro-20260818-20260818-135840.log
+./logs/run-1c0b/run-1c0b-calibrate-mixedcode-overlap-threshold-20260724-000000.log
+./logs/run-1c/run-1c-score-commit-func-npr-pilot-v1-20260723-154817.log
+./logs/run-1c/run-1c-score-commit-func-npr-pilot-v4-20260723-163654.log
+./logs/run-1c/run-1c-score-commit-func-npr-pilot-v7-20260724-002529.log
+./logs/run-1c/run-1c-score-commit-func-npr-pilot-v7-20260724-002902.log
+./logs/run-1d/run-1d-score-commit-func-npr-full-v1-20260724-013158.log
+./logs/run-1d/run-1d-score-commit-func-npr-full-v1-20260724-013541.log
+./logs/run-x-a01/run-x-a01-v1-prepare-snapshot-npr-inputs-20260807-221001.log
+./logs/run-x-a02/run-x-a02-v2-score-snapshot-npr-20260807-224522.log
+./logs/run-x-a02/run-x-a02-v3-score-snapshot-npr-20260807-234409.log
+./logs/run-x-a03/run-x-a03-v1-aggregate-snapshot-npr-20260807-235630.log
+./logs/run-x-a04/run-x-a04-v1-audit-snapshot-npr-20260808-000525.log
+./logs/run-x-a05/run-x-a05-v1-prepare-full-snapshot-npr-inputs-20260808-002455.log
+./logs/run-x-a05/run-x-a05-v2-prepare-full-snapshot-npr-inputs-20260808-131025.log
+./logs/run-x-a05/run-x-a05-v2-prepare-full-snapshot-npr-inputs-20260808-134030.log
+./logs/run-x-a06/run-x-a06-v1-analyze-npr-scoring-workload-20260808-151814.log
+./proc_sh/bak/run-1c-score-commit-func-npr-v0.1.sh
+./proc_sh/bak/run-1c-score-commit-func-npr-v0.2.sh
+./proc_sh/bak/run-x-a11-score-snapshot-npr-fun-v0.2.sh
+./proc_sh/run-1c0a-score-mixedcode-overlap-benchmark.sh
+./proc_sh/run-1c0b-calibrate-mixedcode-overlap-threshold.sh
+./proc_sh/run-1c-score-commit-func-npr.sh
+./proc_sh/run-1d-score-commit-func-npr-full-gt200.sh
+./proc_sh/run-1d-score-commit-func-npr-full.sh
+./proc_sh/run-x-a01-prepare-snapshot-npr-inputs.sh
+./proc_sh/run-x-a02-score-snapshot-npr.sh
+./proc_sh/run-x-a03-aggregate-snapshot-npr.sh
+./proc_sh/run-x-a04-audit-snapshot-npr.sh
+./proc_sh/run-x-a05-prepare-full-snapshot-npr-inputs.sh
+./proc_sh/run-x-a06-analyze-npr-scoring-workload.sh
+./proc_sh/run-x-a07-benchmark-snapshot-npr-gpu.sh
+./proc_sh/run-x-a08-validate-cross-gpu-npr-benchmark.sh
+./proc_sh/run-x-a09-prepare-snapshot-npr-perturbations.sh
+./proc_sh/run-x-a10-audit-snapshot-npr-perturbation-shards.sh
+./proc_sh/run-x-a11-score-snapshot-npr-fun.sh
+./proc_sh/run-x-a12-aggregate-snapshot-npr-fun-files.sh
+./proc_sh/run-x-a13-prepare-snapshot-npr-cfun-workload.sh
+./proc_sh/run-x-a14-score-snapshot-npr-cfun.sh
+./proc_sh/run-x-a15-aggregate-snapshot-npr-cfun.sh
+./run2a-recalc-auc-npr-csv.sh
+./run7c-plot-mixedcode-result.sh
