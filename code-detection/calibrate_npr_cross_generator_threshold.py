@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, roc_auc_score
 
-SCRIPT_VERSION = "run-1c0fg-v1"
+SCRIPT_VERSION = "run-1c0g-v1"
 ALGORITHM_VERSION = "overlap_final_full_window_valid_frontier_weighting-v1"
 PARTIAL_BODY_POLICY = "any_valid_window_partial_success_full_windows-v2"
 SCORING_MODEL_KEY = "gpt-oss"
@@ -153,7 +153,7 @@ def validate_selection(selection_path: Path) -> dict[str, object]:
     selected_key = str(selected.iloc[0]["scoring_model_key"])
     if selected_key != SCORING_MODEL_KEY:
         raise RuntimeError(
-            f"run-1c0f selected {selected_key!r}, but run-1c0fg expects {SCORING_MODEL_KEY!r}."
+            f"run-1c0f selected {selected_key!r}, but run-1c0g expects {SCORING_MODEL_KEY!r}."
         )
 
     record: dict[str, object] = {
@@ -339,7 +339,7 @@ def source_metrics(pooled: pd.DataFrame, threshold: float) -> pd.DataFrame:
 
 def write_methodology(path: Path, threshold: float, metrics: dict[str, float | int]) -> None:
     """Write a compact human-readable record of the calibration design."""
-    text = f"""run-1c0fg v1: pooled cross-generator NPR threshold calibration
+    text = f"""run-1c0g v1: pooled cross-generator NPR threshold calibration
 
 Purpose
 -------
@@ -560,7 +560,7 @@ def main() -> None:
     atomic_json(summary, qc_dir / "npr_pooled_threshold_summary.json")
 
     print("=" * 80)
-    print("run-1c0fg: pooled cross-generator NPR threshold calibration")
+    print("run-1c0g: pooled cross-generator NPR threshold calibration")
     print("=" * 80)
     print(f"Selected scoring model : {SCORING_MODEL_NAME}")
     print(f"Generation sources     : {', '.join(TARGET_SOURCES)}")
