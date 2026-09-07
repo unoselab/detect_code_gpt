@@ -1,0 +1,53 @@
+--- a/code-detection/baselines/utils/loadmodel.py
++++ b/code-detection/baselines/utils/loadmodel.py
+@@
+-        is_large_gemma = any(tag in name.lower() for tag in ("31b", "27b", "gemma-4"))
+-        if is_large_gemma and n_gpu < 3:
+-            raise RuntimeError(
+-                "Large Gemma scoring should use the 3 visible A6000 GPUs for "
+-                "weights plus activation/KV-cache headroom. "
+-                f"Got torch.cuda.device_count()={n_gpu}, "
+-                f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}"
+-            )
++        is_large_gemma = any(tag in name.lower() for tag in ("31b", "27b", "gemma-4"))
++
++        # 2026-09-06: allow the 31B Gemma scorer on the Server 173
++        # 2 x RTX 6000 Ada configuration. The previous guard required three
++        # visible GPUs because it was written specifically for the r158
++        # 3 x RTX A6000 setup. Two 48 GiB GPUs provide enough aggregate
++        # capacity for BF16 model weights while still leaving explicit
++        # activation/KV-cache headroom via a lower per-GPU max_memory cap.
++        two_large_48g_gpus = n_gpu == 2 and min(gpu_mem_gib) >= 47.0
++        if is_large_gemma and n_gpu < 3 and not two_large_48g_gpus:
++            raise RuntimeError(
++                "Large Gemma scoring requires either at least 3 visible GPUs "
++                "or 2 visible GPUs with at least 47 GiB each. "
++                f"Got torch.cuda.device_count()={n_gpu}, "
++                f"visible_gpu_memory_gib={[round(x, 1) for x in gpu_mem_gib]}, "
++                f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}"
++            )
+@@
+-        max_memory = {}
+-        for i, mem in enumerate(gpu_mem_gib):
+-            if mem >= 47:
+-                max_memory[i] = "42GiB"
+-            elif mem >= 23:
+-                max_memory[i] = "20GiB"
+-            else:
+-                max_memory[i] = f"{int(max(1, mem - 4))}GiB"
++        max_memory = {}
++        for i, mem in enumerate(gpu_mem_gib):
++            if is_large_gemma and two_large_48g_gpus:
++                # On 2 x 48 GiB GPUs, use a more conservative cap than the
++                # 3-GPU r158 configuration. This leaves roughly 7.5 GiB per
++                # GPU outside the Accelerate weight-placement budget.
++                max_memory[i] = os.environ.get(
++                    "GEMMA_2GPU_MAX_MEMORY", "40GiB"
++                )
++            elif mem >= 47:
++                max_memory[i] = "42GiB"
++            elif mem >= 23:
++                max_memory[i] = "20GiB"
++            else:
++                max_memory[i] = f"{int(max(1, mem - 4))}GiB"
+*** End Patch

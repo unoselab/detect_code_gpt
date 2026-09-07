@@ -1,0 +1,37 @@
+diff --git a/code-detection/baselines/utils/loadmodel.py b/code-detection/baselines/utils/loadmodel.py
+index 025c22e..c689cd2 100644
+--- a/code-detection/baselines/utils/loadmodel.py
++++ b/code-detection/baselines/utils/loadmodel.py
+@@ -3,11 +3,17 @@
+         print(f"Visible GPU memory GiB: {[round(x, 1) for x in gpu_mem_gib]}")
+ 
+         is_large_gemma = any(tag in name.lower() for tag in ("31b", "27b", "gemma-4"))
+-        if is_large_gemma and n_gpu < 3:
++
++        # 2026-09-06: allow large Gemma scoring on Server 173 with
++        # 2 x 48 GiB RTX 6000 Ada GPUs. The previous guard was written
++        # specifically for the r158 3 x RTX A6000 configuration.
++        two_large_48g_gpus = n_gpu == 2 and min(gpu_mem_gib) >= 47.0
++        if is_large_gemma and n_gpu < 3 and not two_large_48g_gpus:
+             raise RuntimeError(
+-                "Large Gemma scoring should use the 3 visible A6000 GPUs for "
+-                "weights plus activation/KV-cache headroom. "
++                "Large Gemma scoring requires either at least 3 visible GPUs "
++                "or 2 visible GPUs with at least 47 GiB each. "
+                 f"Got torch.cuda.device_count()={n_gpu}, "
++                f"visible_gpu_memory_gib={[round(x, 1) for x in gpu_mem_gib]}, "
+                 f"CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES')}"
+             )
+ 
+@@ -15,7 +21,10 @@
+         # Leave room for activations, perturbation batches, and allocator overhead.
+         max_memory = {}
+         for i, mem in enumerate(gpu_mem_gib):
+-            if mem >= 47:
++            if is_large_gemma and two_large_48g_gpus:
++                # Keep additional headroom on the 2-GPU Ada configuration.
++                max_memory[i] = os.environ.get("GEMMA_2GPU_MAX_MEMORY", "40GiB")
++            elif mem >= 47:
+                 max_memory[i] = "42GiB"
+             elif mem >= 23:
+                 max_memory[i] = "20GiB"
