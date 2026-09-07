@@ -9,8 +9,8 @@
 # NPR aggregation semantics.
 #
 # Versioned delivery files:
-#   proc_sh/run-x-b01-score-historical-npr-gptoss-v1.sh
-#   code-detection/score_historical_npr_gptoss-v1.py
+#   proc_sh/run-x-b01-score-historical-npr-gptoss-v2.sh
+#   code-detection/score_historical_npr_gptoss-v2.py
 #
 # Canonical server files after removing the version suffix:
 #   proc_sh/run-x-b01-score-historical-npr-gptoss.sh
@@ -50,22 +50,22 @@
 #   MODE=finalize  Rebuild CSV/QC from an existing SQLite checkpoint without loading
 #                  GPT-OSS or rescoring any window. OVERWRITE must be 0.
 #
-# SERVER 173 EXAMPLES
-#   Smoke on both RTX 6000 Ada GPUs:
-#     MODE=smoke CUDA_DEVICE=0,1 bash proc_sh/run-x-b01-score-historical-npr-gptoss.sh
+# R158 PRIMARY EXAMPLES
+#   Smoke on all three RTX A6000 GPUs:
+#     MODE=smoke CUDA_DEVICE=0,1,2 bash proc_sh/run-x-b01-score-historical-npr-gptoss.sh
 #
 #   First production invocation after smoke:
-#     MODE=run CUDA_DEVICE=0,1 OVERWRITE=1 bash proc_sh/run-x-b01-score-historical-npr-gptoss.sh
+#     MODE=run CUDA_DEVICE=0,1,2 OVERWRITE=1 bash proc_sh/run-x-b01-score-historical-npr-gptoss.sh
 #
 #   Resume an interrupted production invocation:
-#     MODE=run CUDA_DEVICE=0,1 OVERWRITE=0 bash proc_sh/run-x-b01-score-historical-npr-gptoss.sh
+#     MODE=run CUDA_DEVICE=0,1,2 OVERWRITE=0 bash proc_sh/run-x-b01-score-historical-npr-gptoss.sh
 #
 #   Finalize/rebuild exports without loading the model:
 #     MODE=finalize OVERWRITE=0 bash proc_sh/run-x-b01-score-historical-npr-gptoss.sh
 #
-# R158 FALLBACK / REPRODUCTION EXAMPLE
-#   The same package supports the known-working 3xA6000 GPT-OSS topology:
-#     MODE=smoke CUDA_DEVICE=0,1,2 bash proc_sh/run-x-b01-score-historical-npr-gptoss.sh
+# SERVER 173 OPTIONAL REPRODUCTION EXAMPLE
+#   The same package can be tested on the 2x48GiB RTX 6000 Ada topology:
+#     MODE=smoke CUDA_DEVICE=0,1 bash proc_sh/run-x-b01-score-historical-npr-gptoss.sh
 #
 # IMPORTANT
 #   B01 intentionally does NOT apply the new downstream threshold 1.545529.
@@ -73,7 +73,7 @@
 #   historical occurrence/file localization belong to the next experiment.
 #
 # Optional environment variables:
-#   PROJECT_ROOT, PYTHON_BIN, PY_SCRIPT, A02_SCRIPT, A09_ROOT, A10_ROOT, A13_ROOT,
+#   PROJECT_ROOT, PYTHON_BIN, PY_SCRIPT, A02_SCRIPT, RANK_SCRIPT, A09_ROOT, A10_ROOT, A13_ROOT,
 #   OUTPUT_ROOT, OUTPUT_DIR, LOG_DIR, MODEL_CACHE_DIR, SCORING_MODEL, MODEL_REVISION,
 #   EXPECTED_MODEL_REVISION, MODE, SCOPE, SHARD_IDS, CUDA_DEVICE, SYSTEM_LABEL,
 #   SMOKE_MAX_WINDOWS, PROGRESS_EVERY_WINDOWS, OVERWRITE, RETRY_ERROR_WINDOWS,
@@ -97,6 +97,7 @@ esac
 PYTHON_BIN="${PYTHON_BIN:-python}"
 PY_SCRIPT="${PY_SCRIPT:-code-detection/score_historical_npr_gptoss.py}"
 A02_SCRIPT="${A02_SCRIPT:-code-detection/score_snapshot_npr.py}"
+RANK_SCRIPT="${RANK_SCRIPT:-code-detection/baselines/rank.py}"
 A09_ROOT="${A09_ROOT:-output/snapshot_npr/run-x-a09}"
 A10_ROOT="${A10_ROOT:-output/snapshot_npr/run-x-a10}"
 A13_ROOT="${A13_ROOT:-output/snapshot_npr/run-x-a13}"
@@ -109,8 +110,20 @@ MODEL_REVISION="${MODEL_REVISION:-}"
 EXPECTED_MODEL_REVISION="${EXPECTED_MODEL_REVISION:-}"
 SCOPE="${SCOPE:-all}"
 SHARD_IDS="${SHARD_IDS:-all}"
-CUDA_DEVICE="${CUDA_DEVICE:-0,1}"
-SYSTEM_LABEL="${SYSTEM_LABEL:-173-2x-rtx6000ada}"
+HOST_SHORT="$(hostname -s 2>/dev/null || hostname)"
+if [[ -z "${CUDA_DEVICE:-}" ]]; then
+    case "${HOST_SHORT}" in
+        *r158*|*R158*) CUDA_DEVICE="0,1,2" ;;
+        *)            CUDA_DEVICE="0,1" ;;
+    esac
+fi
+if [[ -z "${SYSTEM_LABEL:-}" ]]; then
+    case "${HOST_SHORT}" in
+        *r158*|*R158*) SYSTEM_LABEL="r158-3x-a6000" ;;
+        *173*|*IST173*) SYSTEM_LABEL="173-2x-rtx6000ada" ;;
+        *) SYSTEM_LABEL="${HOST_SHORT}" ;;
+    esac
+fi
 SMOKE_MAX_WINDOWS="${SMOKE_MAX_WINDOWS:-2}"
 PROGRESS_EVERY_WINDOWS="${PROGRESS_EVERY_WINDOWS:-25}"
 OVERWRITE="${OVERWRITE:-0}"
@@ -162,7 +175,7 @@ export HF_HUB_OFFLINE
 export TRANSFORMERS_OFFLINE
 
 TIMESTAMP="${TIMESTAMP:-$(date +%Y%m%d-%H%M%S)}"
-LOG_FILE="${LOG_FILE:-${LOG_DIR}/${RUN_PREFIX}-v1-${MODE}-${SYSTEM_LABEL}-${TIMESTAMP}.log}"
+LOG_FILE="${LOG_FILE:-${LOG_DIR}/${RUN_PREFIX}-v2-${MODE}-${SYSTEM_LABEL}-${TIMESTAMP}.log}"
 mkdir -p "${LOG_DIR}"
 
 require_file() {
@@ -180,6 +193,7 @@ fi
 
 require_file "${PY_SCRIPT}" "B01 Python script"
 require_file "${A02_SCRIPT}" "frozen A02 scoring script"
+require_file "${RANK_SCRIPT}" "DetectCodeGPT rank script"
 require_file "${A09_ROOT}/plan/summary.json" "A09 plan summary"
 require_file "${A09_ROOT}/plan/unique_primary_units.csv" "A09 unique-unit plan"
 
@@ -192,7 +206,7 @@ finish() {
     elapsed=$((end_epoch - START_EPOCH))
     echo
     echo "============================================================================"
-    echo "run-x-b01-v1 execution summary"
+    echo "run-x-b01-v2 execution summary"
     echo "Mode:             ${MODE}"
     echo "System label:     ${SYSTEM_LABEL}"
     echo "Started:          ${START_TEXT}"
@@ -217,9 +231,10 @@ fi
 
 PY_SHA="$(sha256sum "${PY_SCRIPT}" | awk '{print $1}')"
 A02_SHA="$(sha256sum "${A02_SCRIPT}" | awk '{print $1}')"
+RANK_SHA="$(sha256sum "${RANK_SCRIPT}" | awk '{print $1}')"
 
 echo "============================================================================"
-echo "run-x-b01-v1: GPT-OSS historical NPR scoring"
+echo "run-x-b01-v2: GPT-OSS historical NPR scoring"
 echo "Started:                         ${START_TEXT}"
 echo "Mode:                            ${MODE}"
 echo "Project root:                    ${PROJECT_ROOT}"
@@ -229,6 +244,8 @@ echo "Python script:                   ${PY_SCRIPT}"
 echo "Python script SHA256:            ${PY_SHA}"
 echo "Frozen A02 script:              ${A02_SCRIPT}"
 echo "Frozen A02 SHA256:               ${A02_SHA}"
+echo "DetectCodeGPT rank script:        ${RANK_SCRIPT}"
+echo "DetectCodeGPT rank SHA256:        ${RANK_SHA}"
 echo "A09 root:                        ${A09_ROOT}"
 echo "A10 reference root:              ${A10_ROOT}"
 echo "A13 reference root:              ${A13_ROOT}"
@@ -265,6 +282,7 @@ if [[ "${RUN_SELF_TEST}" == "1" ]]; then
     "${PYTHON_BIN}" "${PY_SCRIPT}" \
         --project-root "${PROJECT_ROOT}" \
         --a02-script "${A02_SCRIPT}" \
+        --rank-script "${RANK_SCRIPT}" \
         --output-dir "/tmp/run-x-b01-self-test" \
         --self-test-only
 fi
@@ -272,6 +290,7 @@ fi
 ARGS=(
     --project-root "${PROJECT_ROOT}"
     --a02-script "${A02_SCRIPT}"
+    --rank-script "${RANK_SCRIPT}"
     --a09-root "${A09_ROOT}"
     --a10-root "${A10_ROOT}"
     --a13-root "${A13_ROOT}"
@@ -330,7 +349,7 @@ PY
 
 echo
 echo "============================================================================"
-echo "run-x-b01-v1 verification"
+echo "run-x-b01-v2 verification"
 echo "Status:                          ${STATUS}"
 echo "Database windows:                ${DB_WINDOWS}"
 echo "Scoring errors:                  ${ERRORS}"

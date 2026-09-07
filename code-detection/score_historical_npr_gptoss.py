@@ -22,7 +22,7 @@ implementation, but loads GPT-OSS-120B directly so the new experiment does not d
 on the old StarCoder-specific one-GPU A11/A14 runtime guards.
 
 Versioned delivery filename:
-    code-detection/score_historical_npr_gptoss-v1.py
+    code-detection/score_historical_npr_gptoss-v2.py
 Canonical server filename after deployment:
     code-detection/score_historical_npr_gptoss.py
 """
@@ -48,7 +48,7 @@ from typing import Any, Iterable, Iterator, Sequence
 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-SCRIPT_VERSION = "run-x-b01-v1"
+SCRIPT_VERSION = "run-x-b01-v2"
 SCORING_MODEL = "openai/gpt-oss-120b"
 WINDOW_SIZE = 128
 PERTURBATIONS_PER_WINDOW = 50
@@ -380,13 +380,16 @@ def positive_context_value(value: Any) -> int | None:
 
 
 def load_gptoss_runtime(args: argparse.Namespace) -> RuntimeBundle:
-    project_root = str(args.project_root.resolve())
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-
     import torch
     import transformers
-    from baselines.rank import get_rank, get_ranks
+
+    # Load the exact repository rank implementation whose SHA-256 is recorded in
+    # B01 provenance. The repository layout places it under code-detection/baselines,
+    # not at PROJECT_ROOT/baselines. Loading by absolute path also prevents an
+    # unrelated installed package named "baselines" from shadowing this source.
+    rank_module = load_module(args.rank_script, "run_x_b01_rank")
+    get_rank = rank_module.get_rank
+    get_ranks = rank_module.get_ranks
 
     if not torch.cuda.is_available():
         raise RuntimeError("GPT-OSS scoring requires CUDA; torch.cuda.is_available() is false")
@@ -759,6 +762,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="run-x-b01 GPT-OSS historical NPR scoring")
     parser.add_argument("--project-root", type=Path, default=Path.cwd())
     parser.add_argument("--a02-script", type=Path, default=Path("code-detection/score_snapshot_npr.py"))
+    parser.add_argument("--rank-script", type=Path, default=Path("code-detection/baselines/rank.py"))
     parser.add_argument("--a09-root", type=Path, default=Path("output/snapshot_npr/run-x-a09"))
     parser.add_argument("--a10-root", type=Path, default=Path("output/snapshot_npr/run-x-a10"))
     parser.add_argument("--a13-root", type=Path, default=Path("output/snapshot_npr/run-x-a13"))
@@ -793,6 +797,7 @@ def main() -> int:
     project_root = args.project_root.resolve()
     args.project_root = project_root
     args.a02_script = resolve(project_root, args.a02_script)
+    args.rank_script = resolve(project_root, args.rank_script)
     args.a09_root = resolve(project_root, args.a09_root)
     args.a10_root = resolve(project_root, args.a10_root)
     args.a13_root = resolve(project_root, args.a13_root)
@@ -809,7 +814,10 @@ def main() -> int:
 
     if not args.a02_script.is_file():
         raise FileNotFoundError(f"Missing frozen A02 script: {args.a02_script}")
+    if not args.rank_script.is_file():
+        raise FileNotFoundError(f"Missing DetectCodeGPT rank script: {args.rank_script}")
     a02_sha = sha256_file(args.a02_script)
+    rank_sha = sha256_file(args.rank_script)
     add_check(checks, "a02_script_sha256", a02_sha == EXPECTED_A02_SHA256, a02_sha, EXPECTED_A02_SHA256)
     if a02_sha != EXPECTED_A02_SHA256:
         raise RuntimeError("A02 script SHA-256 mismatch; refusing B01 scoring")
@@ -872,7 +880,7 @@ def main() -> int:
         model_revision = runtime.model_revision
         source_hashes = {
             "a02_sha256": a02_sha,
-            "rank_sha256": sha256_file(project_root / "baselines" / "rank.py"),
+            "rank_sha256": rank_sha,
             "b01_script_sha256": sha256_file(Path(__file__).resolve()),
         }
         scoring_fingerprint = stable_json_hash({
@@ -1081,6 +1089,8 @@ def main() -> int:
         "python_executable": sys.executable,
         "python_version": sys.version,
         "project_root": str(project_root),
+        "rank_script": str(args.rank_script),
+        "rank_sha256": rank_sha,
         "a02_script": str(args.a02_script),
         "a09_root": str(args.a09_root),
         "a10_root": str(args.a10_root),
