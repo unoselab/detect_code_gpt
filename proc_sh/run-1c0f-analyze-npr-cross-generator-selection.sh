@@ -110,7 +110,8 @@ elif [[ "${LEGACY_GEMMA_EXPLICIT}" -eq 1 ]]; then
     echo "ERROR: Explicit LEGACY_GEMMA_SCORE_CSV does not exist: ${LEGACY_GEMMA_SCORE_CSV}" >&2
     exit 2
 else
-    echo "WARNING: Legacy Gemma score CSV not found; optional Gemma reproducibility audit will be skipped." >&2
+    echo ""
+    # echo "WARNING: Legacy Gemma score CSV not found; optional Gemma reproducibility audit will be skipped." >&2
 fi
 
 PYTHON_SHA="$(sha256sum "${PYTHON_SCRIPT}" | awk '{print $1}')"
